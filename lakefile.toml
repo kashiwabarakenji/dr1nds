@@ -1,0 +1,20 @@
+name = "dr1nds"
+version = "0.1.0"
+defaultTargets = ["dr1nds"]
+
+[[lean_lib]]
+name = "Dr1nds"
+
+[[lean_exe]]
+name = "dr1nds"
+root = "Main"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev  = "v4.26.0"
+
+[[require]]
+name = "LeanCopilot"
+git  = "https://github.com/lean-dojo/LeanCopilot.git"
+rev = "v4.26.0"
