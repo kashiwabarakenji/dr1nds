@@ -14,7 +14,8 @@ variable {α : Type} [DecidableEq α]
 Forbid1: 「穴あき族」(holey family) と補正付き NDS
 
 Up(C;A)   := { X∈C | A ⊆ X }
-Hole(C;A) := { X∈C | ¬ A ⊆ X }   (= C \ Up)
+Hole(C;A) := { X∈C | ¬ A ⊆ X }   (= C \ Up だが、定義は filter)
+F(C;A)    := Hole(C;A) （旧名互換）
 
 NDS_corr_n(C;A) := Σ_{X∈Hole(C;A)} w_n(X) + |Up(C;A)|
 -/
@@ -49,6 +50,22 @@ def NDS_corr (n : Nat) (C : Finset (Finset α)) (A : Finset α) : Int :=
     X ∈ Hole (α := α) C A ↔ (X ∈ C ∧ ¬ (A ⊆ X)) := by
   unfold Hole
   simp [Finset.mem_filter]
+
+/- ------------------------------------------------------------
+  Simple subset facts (named; useful for later rewrites)
+------------------------------------------------------------ -/
+
+/-- Up(C;A) ⊆ C -/
+@[simp] lemma Up_subset_C (C : Finset (Finset α)) (A : Finset α) :
+    Up (α := α) C A ⊆ C := by
+  intro X hX
+  exact (mem_Up_iff (α := α) C A X).1 hX |>.1
+
+/-- Hole(C;A) ⊆ C -/
+@[simp] lemma Hole_subset_C (C : Finset (Finset α)) (A : Finset α) :
+    Hole (α := α) C A ⊆ C := by
+  intro X hX
+  exact (mem_Hole_iff (α := α) C A X).1 hX |>.1
 
 /- ------------------------------------------------------------
   Partition facts: C splits into Up and Hole
@@ -89,30 +106,57 @@ theorem union_Up_Hole_eq (C : Finset (Finset α)) (A : Finset α) :
   ext X
   constructor
   · intro h
-    -- if in union, then in C
     rcases Finset.mem_union.1 h with hUp | hHo
     · exact (mem_Up_iff (α := α) C A X).1 hUp |>.1
     · exact (mem_Hole_iff (α := α) C A X).1 hHo |>.1
   · intro hXC
-    -- if in C, decide A⊆X
     have : X ∈ Up (α := α) C A ∨ X ∈ Hole (α := α) C A :=
       (mem_C_iff_mem_Up_or_mem_Hole (α := α) C A X).1 hXC
     exact Finset.mem_union.2 this
 
-/-- Card decomposition: |C| = |Up| + |Hole|. -/
+/-- Card decomposition: |C| = |Up| + |Hole|. (stable proof) -/
 theorem card_eq_card_Up_add_card_Hole (C : Finset (Finset α)) (A : Finset α) :
     C.card = (Up (α := α) C A).card + (Hole (α := α) C A).card := by
   classical
-  -- disjoint union card
   have hdisj : Disjoint (Up (α := α) C A) (Hole (α := α) C A) :=
     disjoint_Up_Hole (α := α) C A
-  -- use union_Up_Hole_eq, but card_union requires disjoint
-  have := (Finset.card_union_of_disjoint hdisj)
-  -- rewrite union to C
-  -- card_union_of_disjoint : card (s ∪ t) = card s + card t
+  have hcard :
+      (Up (α := α) C A ∪ Hole (α := α) C A).card
+        =
+      (Up (α := α) C A).card + (Hole (α := α) C A).card :=
+    Finset.card_union_of_disjoint hdisj
+  -- union = C に置換して終わり
   let uuh := union_Up_Hole_eq (α := α) C A
   simp_all
 
+/- ------------------------------------------------------------
+  Optional: "Hole = C \\ Up" as a Finset equality (ext lemma)
+------------------------------------------------------------ -/
+
+/--
+`Hole(C;A)` は `C \ Up(C;A)` と同値（Finset の等式として固定）
+
+※定義上は filter vs sdiff なので、ext で示す。
+-/
+theorem Hole_eq_sdiff_Up (C : Finset (Finset α)) (A : Finset α) :
+    Hole (α := α) C A = C \ Up (α := α) C A := by
+  classical
+  ext X
+  constructor
+  · intro hX
+    have hC : X ∈ C := (mem_Hole_iff (α := α) C A X).1 hX |>.1
+    have hnotUp : X ∉ Up (α := α) C A := by
+      intro hUp
+      have hAX : A ⊆ X := (mem_Up_iff (α := α) C A X).1 hUp |>.2
+      exact (mem_Hole_iff (α := α) C A X).1 hX |>.2 hAX
+    exact Finset.mem_sdiff.2 ⟨hC, hnotUp⟩
+  · intro hX
+    rcases Finset.mem_sdiff.1 hX with ⟨hC, hnotUp⟩
+    have hnotAX : ¬ (A ⊆ X) := by
+      intro hAX
+      have : X ∈ Up (α := α) C A := (mem_Up_iff (α := α) C A X).2 ⟨hC, hAX⟩
+      exact hnotUp this
+    exact (mem_Hole_iff (α := α) C A X).2 ⟨hC, hnotAX⟩
 
 /- ------------------------------------------------------------
   Forbid1: emptiness facts
@@ -125,7 +169,7 @@ lemma not_subset_empty_of_nonempty
   rcases hA with ⟨a, ha⟩
   intro hsub
   have : a ∈ (∅ : Finset α) := hsub ha
-  simp_all only [Finset.subset_empty, Finset.notMem_empty]
+  simpa using this
 
 /-- If A is nonempty, then ∅ ∉ Up(C;A). -/
 lemma empty_not_mem_Up_of_nonempty

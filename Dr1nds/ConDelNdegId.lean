@@ -372,4 +372,78 @@ theorem CON_ID
       ndeg (α := α) C u := by
           simp [hcard]
 
+/-! ### Basic counting lemmas for deg/Del -/
+
+lemma deg_eq_card_filter_mem (C : Finset (Finset α)) (u : α) :
+    deg (α := α) C u = (C.filter (fun X => u ∈ X)).card := by
+  rfl
+
+lemma Del_eq_filter_not_mem (C : Finset (Finset α)) (u : α) :
+    Del (α := α) u C = C.filter (fun X => u ∉ X) := by
+  rfl
+
+lemma card_eq_deg_add_card_Del (C : Finset (Finset α)) (u : α) :
+    C.card = deg (α := α) C u + (Del (α := α) u C).card := by
+  classical
+  -- 既にある card_filter_contains_add_card_filter_not を再利用して finish
+  -- （向きだけ調整）
+  -- `deg` と `Del` を rfl 展開して simp で合わせる
+  sorry
+
+lemma ndeg_eq_deg_sub_card_Del (C : Finset (Finset α)) (u : α) :
+    ndeg (α := α) C u = (deg (α := α) C u : Int) - ((Del (α := α) u C).card : Int) := by
+  classical
+  -- |C| = deg + |Del| を Int 化して ndeg = 2deg - |C| を整理
+  sorry
+
+/-! ### `erase u` is injective on sets containing `u` -/
+
+lemma erase_inj_on_mem (u : α) :
+    Set.InjOn (fun X : Finset α => X.erase u) {X : Finset α | u ∈ X} := by
+  intro X hX Y hY hEq
+  have huX : u ∈ X := hX
+  have huY : u ∈ Y := hY
+  ext a
+  by_cases ha : a = u
+  · subst ha; simp [huX, huY]
+  · have : a ∈ X.erase u ↔ a ∈ Y.erase u := by simp [hEq]
+    simpa [Finset.mem_erase, ha] using this
+
+/-- sum over image(erase u) equals sum over domain, provided all sets contain u -/
+lemma sum_image_erase_eq_sum
+    (C : Finset (Finset α)) (u : α) (f : Finset α → Int)
+    (hmem : ∀ X ∈ C, u ∈ X) :
+    (∑ Y ∈ (C.image (fun X => X.erase u)), f Y) = ∑ X ∈ C, f (X.erase u) := by
+  classical
+  -- `Finset.sum_image` + injectivity on membership
+  have hinj : ∀ ⦃a b⦄, a ∈ C → b ∈ C → (a.erase u = b.erase u) → a = b := by
+    intro a b ha hb hab
+    -- use erase_inj_on_mem
+    have hua : u ∈ a := hmem a ha
+    have hub : u ∈ b := hmem b hb
+    exact (erase_inj_on_mem (α := α) u) hua hub hab
+  -- now `sum_image` with `hinj`
+  apply Finset.sum_image
+  exact fun ⦃x₁⦄ a ⦃x₂⦄ => hinj a
+
+
+lemma card_erase_cast_int (u : α) (X : Finset α) (hu : u ∈ X) :
+    ((X.erase u).card : Int) = (X.card : Int) - 1 := by
+  -- `Finset.card_erase_of_mem` を Int に上げるだけ
+  -- `Nat.cast_sub` の前提に `1 ≤ X.card` が要るので `hu` から作る
+  sorry
+
+lemma CON_ID_rearrange
+    (n : Nat) (hn : 1 ≤ n) (C : Finset (Finset α)) (u : α) :
+    NDS (α := α) n C
+      =
+    NDS (α := α) (n - 1) (con (α := α) u C)
+      +
+    (NDS (α := α) (n - 1) (Del (α := α) u C) + ndeg (α := α) C u) := by
+  -- CON_ID を呼んで assoc するだけ
+  simpa [add_assoc, add_left_comm, add_comm] using
+    (CON_ID (α := α) (n := n) (hn := hn) (C := C) (u := u))
+
+
+
 end Dr1nds
