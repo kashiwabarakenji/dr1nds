@@ -45,7 +45,6 @@ abbrev C : Finset (Finset α) := P.F.C
 
 end ClosedPack
 
-
 ------------------------------------------------------------
 -- 1. T / Q
 ------------------------------------------------------------
@@ -76,6 +75,15 @@ def Q (n : Nat) : Prop :=
     2 ≤ A.card →
     A ⊆ P.U →
     NDS_corr n P.C A ≤ 0
+
+/- 便利：Q の入力が `2 ≤ A.card` であることを明示的に取り出す補題 -/
+lemma Q_apply
+  {n : Nat} (hQ : Q (α := α) n)
+  (P : ClosedPack (α := α)) (A : Finset α)
+  (hcard : P.U.card = n) (hDR1 : P.R.IsDR1) (hNEP : P.R.IsNEP)
+  (hA2 : 2 ≤ A.card) (hA_sub : A ⊆ P.U) :
+  NDS_corr (α := α) n (ClosedPack.C (α := α) P) A ≤ 0 := by
+  exact hQ P A hcard hDR1 hNEP hA2 hA_sub
 
 ------------------------------------------------------------
 -- 2. Mutual induction step "types" (S10 / S11)
