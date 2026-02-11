@@ -8,10 +8,13 @@ import Mathlib.Tactic
 import Dr1nds.S0_CoreDefs
 import Dr1nds.S4_FixFamily
 import Dr1nds.S8_Statements
+import Dr1nds.S10_Steps
 import Dr1nds.S11_LocalKernels
 
 namespace Dr1nds
 
+open Dr1nds
+open Dr1nds.Local
 open scoped BigOperators
 variable {α : Type} [DecidableEq α]
 
@@ -35,27 +38,40 @@ namespace Induction
 theorem main_mutual (n : Nat) (P : HypPack α) :
     Q (α := α) n P ∧ (∀ A : Finset α, ForbidOK (α := α) P A → Qcorr (α := α) n P A) := by
   classical
+
   induction n with
   | zero =>
-      -- n = 0: Q_step で Q(0) を閉じ、Qcorr_step で forbid 版を閉じる
-      have hex : ∃ v : α, GoodV_for_Q (α := α) P v := by
-        rcases Local.exists_good_v_for_Q (α := α) 0 P with ⟨v, hv⟩
-        exact ⟨v, hv⟩
+      -- n = 0
+      -- NOTE: `Step.Q_step` / `Step.Qcorr_step` are designed for the `n ≥ 1` accounting step.
+      -- Base case is kept as a skeleton (`sorry`) to avoid forcing an impossible `1 ≤ 0`.
       have hQ : Q (α := α) 0 P := by
-        exact Q_step (α := α) 0 P hex
+        sorry
       refine ⟨hQ, ?_⟩
       intro A hOK
-      exact Qcorr_step (α := α) 0 P A hOK
+      have hQcorr0 : Qcorr (α := α) 0 P A := by
+        sorry
+      exact hQcorr0
+
   | succ n ih =>
-      -- n = n+1: ここでは骨格として Q_step / Qcorr_step をそのまま使う
-      have hex : ∃ v : α, GoodV_for_Q (α := α) P v := by
-        rcases Local.exists_good_v_for_Q (α := α) (Nat.succ n) P with ⟨v, hv⟩
-        exact ⟨v, hv⟩
-      have hQ : Q (α := α) (Nat.succ n) P := by
-        exact Q_step (α := α) (Nat.succ n) P hex
+      -- n = n+1
+      -- ここでは「枠の固定」が目的なので、IH は名前付けして保持しておく
+      have hQ_prev : Q (α := α) n P := ih.1
+      have _hQcorr_prev : (∀ A : Finset α, ForbidOK (α := α) P A → Qcorr (α := α) n P A) := ih.2
+
+      -- 現段階では hQ_prev / hQcorr_prev を内部で使うステップは S10/S11 側に置く
+      -- （ここでは Q_step / Qcorr_step が骨格 API を提供している想定）
+      have hn' : 1 ≤ Nat.succ n := by
+        exact Nat.succ_le_succ (Nat.zero_le n)
+
+      have hQ : Q (α := α) (Nat.succ n) P :=
+        Step.Q_step (α := α) (n := Nat.succ n) (hn := hn') (P := P) hQ_prev
+
       refine ⟨hQ, ?_⟩
       intro A hOK
-      exact Qcorr_step (α := α) (Nat.succ n) P A hOK
+      -- forbid 側は Step 側（S10_Steps）に委譲：必要な前提は明示して渡す
+      have hQcorr : Qcorr (α := α) (Nat.succ n) P A :=
+        Step.Qcorr_step (α := α) (n := Nat.succ n) (hn := hn') (P := P) (A := A) hOK hQ_prev
+      exact hQcorr
 
 /-- 通常会計だけ取り出し -/
 theorem main_Q (n : Nat) (P : HypPack α) : Q (α := α) n P := by

@@ -85,6 +85,49 @@ lemma local_SC_del_ndeg_le_zero'
   -- purely a wrapper
   simpa [D] using local_SC_del_ndeg_le_zero (α := α) (n := n) (C := C) (A := A) (s := s) hA hSC
 
+/- ------------------------------------------------------------
+  3. Projected bounds used by forbid-step (still skeleton)
+------------------------------------------------------------ -/
+
+/--
+If `s` is an SC point (in the base family `C`), then the *ndeg* term in the hole family is non-positive.
+
+This is exported as a standalone bound because the forbid-step splits the local inequality.
+-/
+axiom local_SC_ndeg_hole_le_zero
+  (n : Nat)
+  (C : Finset (Finset α))
+  (A : Finset α)
+  (s : α) :
+  (2 ≤ A.card) →
+  SC (α := α) C s →
+  ndeg (α := α) (Hole (α := α) C A) s ≤ 0
+
+/--
+If `s` is an SC point (in the base family `C`), then the *Del-branch* term in the hole family is non-positive.
+
+Kept separate because S10/S11 often call it without rewriting the full local inequality.
+-/
+axiom local_SC_Del_hole_bound
+  (n : Nat)
+  (C : Finset (Finset α))
+  (A : Finset α)
+  (s : α) :
+  (2 ≤ A.card) →
+  SC (α := α) C s →
+  NDS (α := α) (n - 1) (Del (α := α) s (Hole (α := α) C A)) ≤ 0
+
+/-- Same as `local_SC_Del_hole_bound`, written with `D := Hole(C,A)` to reduce rewriting noise. -/
+lemma local_SC_Del_D_bound'
+  (n : Nat)
+  (C : Finset (Finset α))
+  (A : Finset α)
+  (s : α)
+  (hA : 2 ≤ A.card)
+  (hSC : SC (α := α) C s) :
+  NDS (α := α) (n - 1) (Del (α := α) s (D (α := α) C A)) ≤ 0 := by
+  simpa [D] using local_SC_Del_hole_bound (α := α) (n := n) (C := C) (A := A) (s := s) hA hSC
+
 end S7
 
 end Dr1nds

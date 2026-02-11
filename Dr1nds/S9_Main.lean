@@ -9,7 +9,6 @@ theorem main_from_Q
   (n : Nat) (P : HypPack α) :
   Q (α := α) n P → NDS (α := α) n P.C ≤ 0 := by
   intro hQ
-  -- ここは Q の定義次第で `exact hQ P` みたいに終わる
-  sorry
+  simpa [Q] using hQ
 
 end Dr1nds

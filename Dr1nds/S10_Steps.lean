@@ -19,6 +19,11 @@ variable {α : Type} [DecidableEq α]
 
 namespace Step
 
+/-
+NOTE: `S8_Statements.lean` には同名の axiom が残っている場合があるので、
+本体は常に `Step.Q_step` / `Step.Qcorr_step` を参照する。
+-/
+
 /- ------------------------------------------------------------
   Q_step（通常 NDS）
 ------------------------------------------------------------ -/
@@ -32,10 +37,12 @@ theorem Q_step
   intro hIH
   show NDS (α := α) n P.C ≤ 0
 
-  let gv : Local.GoodV_for_Q (α := α) n P :=
-    Local.choose_goodV_for_Q (α := α) (n := n) P
+  have gv : Local.GoodV_for_Q (α := α) n P :=
+    Local.choose_goodV_for_Q (α := α) (n := n) (P := P)
   let v : α := gv.v
-  have hv_ndeg : ndeg (α := α) P.C v ≤ 0 := gv.hndeg
+  have hv_ndeg : ndeg (α := α) P.C v ≤ 0 := by
+    -- `v` は `let` で導入しているので、ここは `simp [v]` で確実に落とす
+    simpa [v] using gv.hndeg
 
   have hcon :
       NDS (α := α) (n - 1) (con (α := α) v P.C) ≤ 0 :=
@@ -65,7 +72,7 @@ theorem Q_step
       ndeg (α := α) P.C v := by
         simpa using hid
     _ ≤ 0 := by
-      linarith
+      linarith [hcon, hdel, hv_ndeg]
 
 
 /- ------------------------------------------------------------
@@ -84,8 +91,9 @@ theorem Qcorr_step
 
   have hvExists : ∃ v : α, v ∈ A :=
     Local.choose_v_in_A (α := α) (P := P) (A := A) hOK
-  let v : α := Classical.choose hvExists
-  have hvA : v ∈ A := Classical.choose_spec hvExists
+
+  refine Exists.elim hvExists ?_
+  intro v hvA
 
   have hcase := Local.erase_empty_or_nonempty (α := α) (A := A) (v := v) hvA
   cases hcase with
@@ -126,7 +134,7 @@ theorem Qcorr_step
               + ndeg (α := α) (Hole (α := α) P.C A) v) := by
             simpa using hidCorr
         _ ≤ 0 := by
-          linarith
+          linarith [hconCorr, hdelHole, hndegHole]
 
 end Step
 

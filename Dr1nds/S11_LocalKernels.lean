@@ -17,6 +17,11 @@ variable {α : Type} [DecidableEq α]
   注意：このファイルは *S10_Steps を import しない*（循環依存を避ける）。
 ============================================================ -/
 
+
+/-
+  Canonical API namespace for local kernels.
+  S10_Steps should import this file and refer to either `Local.*` or the re-exported names below.
+-/
 namespace Local
 
 structure GoodV_for_Q (n : Nat) (P : HypPack (α := α)) where
@@ -27,9 +32,22 @@ axiom exists_goodV_for_Q
   (n : Nat) (P : HypPack (α := α)) :
   Nonempty (GoodV_for_Q (α := α) n P)
 
+/-- Legacy / convenience form: just a vertex with `ndeg ≤ 0`. -/
+theorem exists_good_v_for_Q (n : Nat) (P : HypPack (α := α)) :
+    ∃ v : α, ndeg (α := α) P.C v ≤ 0 := by
+  classical
+  let gv : GoodV_for_Q (α := α) n P := Classical.choice (exists_goodV_for_Q (α := α) n P)
+  exact ⟨gv.v, gv.hndeg⟩
+
 noncomputable def choose_goodV_for_Q (n : Nat) (P : HypPack (α := α)) :
     GoodV_for_Q (α := α) n P :=
   Classical.choice (exists_goodV_for_Q (α := α) n P)
+
+/-- Spec lemma for the chosen good vertex. -/
+@[simp] theorem choose_goodV_for_Q_ndeg (n : Nat) (P : HypPack (α := α)) :
+    ndeg (α := α) P.C (choose_goodV_for_Q (α := α) n P).v ≤ 0 := by
+  simpa using (choose_goodV_for_Q (α := α) n P).hndeg
+
 
 @[simp] theorem goodV_ndeg
   {n : Nat} {P : HypPack (α := α)} (gv : GoodV_for_Q (α := α) n P) :
@@ -45,12 +63,39 @@ axiom Del_bound
   (n : Nat) (P : HypPack (α := α)) (v : α) :
   NDS (α := α) (n - 1) (Del (α := α) v P.C) ≤ 0
 
-axiom choose_v_in_A
+/-- Choose an element of `A` from `ForbidOK P A` (uses `A.Nonempty`). -/
+theorem choose_v_in_A
   (P : HypPack (α := α)) (A : Finset α) :
-  ForbidOK (α := α) P A → ∃ v : α, v ∈ A
+  ForbidOK (α := α) P A → ∃ v : α, v ∈ A := by
+  intro hOK
+  have hne : A.Nonempty := ForbidOK.nonempty (α := α) (P := P) (A := A) hOK
+  obtain ⟨v, hv⟩ := hne
+  exact ⟨v, hv⟩
 
-axiom erase_empty_or_nonempty
-  (A : Finset α) (v : α) : v ∈ A → ((A.erase v) = ∅ ∨ (A.erase v).Nonempty)
+/-- Noncomputably pick an element `v ∈ A` from `ForbidOK P A`. -/
+noncomputable def pick_v_in_A
+  (P : HypPack (α := α)) (A : Finset α) (hOK : ForbidOK (α := α) P A) : α :=
+  Classical.choose (choose_v_in_A (α := α) (P := P) (A := A) hOK)
+
+@[simp] theorem pick_v_in_A_mem
+  (P : HypPack (α := α)) (A : Finset α) (hOK : ForbidOK (α := α) P A) :
+  pick_v_in_A (α := α) P A hOK ∈ A :=
+  Classical.choose_spec (choose_v_in_A (α := α) (P := P) (A := A) hOK)
+
+/-- From `ForbidOK` we can always extract `A.Nonempty` (helper for case splits). -/
+theorem forbidOK_nonempty (P : HypPack (α := α)) (A : Finset α) :
+    ForbidOK (α := α) P A → A.Nonempty := by
+  intro h
+  exact (ForbidOK.nonempty (α := α) (P := P) (A := A) h)
+
+--/-- Case split helper for `A.erase v`: either empty or nonempty. -/
+theorem erase_empty_or_nonempty
+  (A : Finset α) (v : α) : v ∈ A → ((A.erase v) = ∅ ∨ (A.erase v).Nonempty) := by
+  intro hv
+  classical
+  by_cases h : A.erase v = ∅
+  · exact Or.inl h
+  · exact Or.inr (Finset.nonempty_iff_ne_empty.2 h)
 
 axiom Qcorr_case1_singleton
   (n : Nat) (P : HypPack (α := α)) (A : Finset α) (v : α) :
