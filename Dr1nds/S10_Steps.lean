@@ -28,6 +28,14 @@ NOTE: `S8_Statements.lean` には同名の axiom が残っている場合があ�
   Q_step（通常 NDS）
 ------------------------------------------------------------ -/
 
+/--
+Del-branch bound used in `Q_step`.
+We keep this as an axiom at the wiring layer so `S11_LocalKernels` can evolve independently.
+-/
+axiom Del_bound
+  (n : Nat) (P : HypPack (α := α)) (v : α) :
+  NDS (α := α) (n - 1) (Del (α := α) v P.C) ≤ 0
+
 theorem Q_step
   (n : Nat) (hn : 1 ≤ n)
   (P : HypPack (α := α)) :
@@ -39,24 +47,31 @@ theorem Q_step
 
   have gv : Local.GoodV_for_Q (α := α) n P :=
     Local.choose_goodV_for_Q (α := α) (n := n) (P := P)
-  let v : α := gv.v
+  set v : α := gv.v with hv
 
-  -- con 後の対象は「pack」としても取り出せる（S9 representability を埋めるための導線）
-  -- 現状は bound API を使っているが、後で `Q (n-1) Pcon` / `Qcorr (n-1) Pcon _` を直接呼ぶ形に移行しやすい。
-  have Pcon : HypPack (α := α) :=
-    Local.choose_con_pack (α := α) (P := P) (v := v)
+  -- NOTE: con 側の HypPack（`choose_con_pack`）は S11/S9 の representability を埋める段階で使う。
+  -- このファイル（S10）は配線だけに集中し、現状は `NDS (n-1) (con v P.C) ≤ 0` の bound API を使う。
 
   have hv_ndeg : ndeg (α := α) P.C v ≤ 0 := by
-    -- `v` は `let` で導入しているので、ここは `simp [v]` で確実に落とす
-    simpa [v] using gv.hndeg
+    -- `set v := ... with hv` で導入しているので、`hv` で書き換えて落とす
+    simpa [hv] using gv.hndeg
 
-  have hcon :
-      NDS (α := α) (n - 1) (con (α := α) v P.C) ≤ 0 :=
-    Local.IH_Q_gives_con_bound (α := α) (n := n) (P := P) (v := v) hIH
+  -- Choose a con-pack enumerating `con v P.C` (kernel-side representability API).
+  let Pcon : HypPack (α := α) :=
+    Local.choose_con_pack (α := α) (P := P) (v := v)
+  have hPconC : Pcon.C = con (α := α) v P.C :=
+    Local.choose_con_pack_C (α := α) (P := P) (v := v)
+
+  have hconPc : NDS (α := α) (n - 1) Pcon.C ≤ 0 :=
+    Local.IH_Q_gives_con_bound (α := α) (n := n) (P := P) (v := v)
+      (Pc := Pcon) (hPcC := hPconC) hIH
+
+  have hcon : NDS (α := α) (n - 1) (con (α := α) v P.C) ≤ 0 := by
+    simpa [hPconC] using hconPc
 
   have hdel :
       NDS (α := α) (n - 1) (Del (α := α) v P.C) ≤ 0 :=
-    Local.Del_bound (α := α) (n := n) (P := P) (v := v)
+    Step.Del_bound (α := α) (n := n) (P := P) (v := v)
 
   have hid :
       NDS (α := α) n P.C
