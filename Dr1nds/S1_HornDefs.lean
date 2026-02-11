@@ -1,5 +1,7 @@
 -- Dr1nds/S1_HornDefs.lean
 import Mathlib.Data.Finset.Basic
+import Mathlib.Data.Finset.Image
+import LeanCopilot
 
 namespace Dr1nds
 
@@ -85,7 +87,19 @@ def Horn.IsClosed (H : Horn α) (X : Finset α) : Prop :=
 /--
 There exists a rule with head h.
 -/
+
 def Horn.HasHead (H : Horn α) (h : α) : Prop :=
   ∃ P : Finset α, (P, h) ∈ H.rules
+
+/--
+Rule-level contraction at head x:
+  - Remove rules whose head is x
+  - For other rules (P, h), replace premise by P.erase x
+-/
+def Horn.contraction (H : Horn α) (x : α) : Horn α :=
+{ rules :=
+    (H.rules.filter (fun r => r.2 ≠ x)).image
+      (fun r => (r.1.erase x, r.2)) }
+
 
 end Dr1nds
