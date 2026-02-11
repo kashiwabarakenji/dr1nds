@@ -40,6 +40,12 @@ theorem Q_step
   have gv : Local.GoodV_for_Q (α := α) n P :=
     Local.choose_goodV_for_Q (α := α) (n := n) (P := P)
   let v : α := gv.v
+
+  -- con 後の対象は「pack」としても取り出せる（S9 representability を埋めるための導線）
+  -- 現状は bound API を使っているが、後で `Q (n-1) Pcon` / `Qcorr (n-1) Pcon _` を直接呼ぶ形に移行しやすい。
+  have Pcon : HypPack (α := α) :=
+    Local.choose_con_pack (α := α) (P := P) (v := v)
+
   have hv_ndeg : ndeg (α := α) P.C v ≤ 0 := by
     -- `v` は `let` で導入しているので、ここは `simp [v]` で確実に落とす
     simpa [v] using gv.hndeg
@@ -104,8 +110,11 @@ theorem Qcorr_step
       have hconCorr :
           NDS_corr (α := α) (n - 1)
             (con (α := α) v P.C)
-            (A.erase v) ≤ 0 :=
-        IH_corr_con_pack (α := α) (n := n) (P := P) (A := A) (v := v) hIH hvA hEraseNonempty
+            (A.erase v) ≤ 0 := by
+        -- 互換 API：Q だけから con 側 forbid-bound を取る
+        simpa using
+          (IH_corr_con_pack (α := α) (n := n) (P := P) (A := A) (v := v)
+            hIH hvA hEraseNonempty)
 
       have hdelHole :
           NDS (α := α) (n - 1)

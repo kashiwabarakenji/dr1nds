@@ -145,24 +145,39 @@ namespace ForbidOK
 
 end ForbidOK
 
-
 /--
-IH（通常）：n-1 で Q が成り立つ、という形。
-（実際には “最小反例” の帰納構造をどこで持つかで形が変わるが、
-  まずは最小の API として固定）
+Bundled induction hypothesis at level `n`.
+
+`IH n P` contains:
+- the usual goal `Q n P`, and
+- all forbid goals `Qcorr n P A` for admissible `A` (w.r.t. `ForbidOK`).
+
+This is the Lean-friendly interface recommended for later S9/S11 re-wiring.
 -/
-axiom IH_Q
+def IH (n : Nat) (P : HypPack α) : Prop :=
+  Q (α := α) n P ∧ (∀ A : Finset α, ForbidOK (α := α) P A → Qcorr (α := α) n P A)
+
+/-- Bundled IH provided by the global induction skeleton (axiom for now). -/
+axiom IH_pack
   (n : Nat) (P : HypPack α) :
-  Q (α := α) (n - 1) P
+  IH (α := α) (n - 1) P
 
-/--
-IH（forbid）：n-1 で Qcorr が成り立つ、という形。
-A は GoodA / GoodA2 を満たす前提をここに入れておくのが事故りにくい。
--/
-axiom IH_Qcorr
+/-- Projection: IH gives the usual goal at level `n-1`. -/
+theorem IH_Q
+  (n : Nat) (P : HypPack α) :
+  Q (α := α) (n - 1) P :=
+  (IH_pack (α := α) n P).1
+
+/-- Projection: IH gives the forbid goals at level `n-1`. -/
+theorem IH_Qcorr
   (n : Nat) (P : HypPack α) (A : Finset α) :
   ForbidOK (α := α) P A →
-  Qcorr (α := α) (n - 1) P A
+  Qcorr (α := α) (n - 1) P A :=
+by
+  intro hOK
+  exact (IH_pack (α := α) n P).2 A hOK
+
+
 
 /--
 B2（A.erase v 非空）の Case2 用にあなたが欲しがっていた IH 形。
@@ -181,6 +196,37 @@ axiom IH_corr_con_pack
   NDS_corr (α := α) (n - 1)
     (con (α := α) v P.C)
     (A.erase v) ≤ 0
+
+/--
+Preferred IH-based interface for the con-branch in forbid case2.
+This matches the bundled IH design.
+-/
+axiom IH_corr_con_pack_IH
+  (n : Nat)
+  (P : HypPack α)
+  (A : Finset α)
+  (v : α) :
+  IH (α := α) (n - 1) P →
+  v ∈ A →
+  (A.erase v).Nonempty →
+  NDS_corr (α := α) (n - 1)
+    (con (α := α) v P.C)
+    (A.erase v) ≤ 0
+
+/-- Wrapper: the IH-based interface implies the legacy one by projecting `Q (n-1) P`. -/
+lemma IH_corr_con_pack_of_IH
+  (n : Nat)
+  (P : HypPack α)
+  (A : Finset α)
+  (v : α) :
+  IH (α := α) (n - 1) P →
+  v ∈ A →
+  (A.erase v).Nonempty →
+  NDS_corr (α := α) (n - 1)
+    (con (α := α) v P.C)
+    (A.erase v) ≤ 0 := by
+  intro hIH hvA hNE
+  exact IH_corr_con_pack_IH (α := α) n P A v hIH hvA hNE
 
 
 /- ------------------------------------------------------------

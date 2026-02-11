@@ -32,6 +32,11 @@ axiom exists_goodV_for_Q
   (n : Nat) (P : HypPack (α := α)) :
   Nonempty (GoodV_for_Q (α := α) n P)
 
+/-- Nonempty witness extractor for `GoodV_for_Q` (keeps tactics-simple usage). -/
+noncomputable def choose_goodV_for_Q (n : Nat) (P : HypPack (α := α)) :
+    GoodV_for_Q (α := α) n P :=
+  Classical.choice (exists_goodV_for_Q (α := α) n P)
+
 /-- Legacy / convenience form: just a vertex with `ndeg ≤ 0`. -/
 theorem exists_good_v_for_Q (n : Nat) (P : HypPack (α := α)) :
     ∃ v : α, ndeg (α := α) P.C v ≤ 0 := by
@@ -39,20 +44,38 @@ theorem exists_good_v_for_Q (n : Nat) (P : HypPack (α := α)) :
   let gv : GoodV_for_Q (α := α) n P := Classical.choice (exists_goodV_for_Q (α := α) n P)
   exact ⟨gv.v, gv.hndeg⟩
 
-noncomputable def choose_goodV_for_Q (n : Nat) (P : HypPack (α := α)) :
-    GoodV_for_Q (α := α) n P :=
-  Classical.choice (exists_goodV_for_Q (α := α) n P)
-
 /-- Spec lemma for the chosen good vertex. -/
 @[simp] theorem choose_goodV_for_Q_ndeg (n : Nat) (P : HypPack (α := α)) :
-    ndeg (α := α) P.C (choose_goodV_for_Q (α := α) n P).v ≤ 0 := by
-  simpa using (choose_goodV_for_Q (α := α) n P).hndeg
+    ndeg (α := α) P.C (choose_goodV_for_Q (α := α) n P).v ≤ 0 :=
+  (choose_goodV_for_Q (α := α) n P).hndeg
 
 
 @[simp] theorem goodV_ndeg
   {n : Nat} {P : HypPack (α := α)} (gv : GoodV_for_Q (α := α) n P) :
   ndeg (α := α) P.C gv.v ≤ 0 :=
   gv.hndeg
+
+/--
+con 後の世界を IH の対象（HypPack）として返すための API。
+S9（Horn 保存／表現可能性）を埋める段階で中身を正当化する。
+
+最小形としては `C` の同一視だけを返す（`U` や `H` の更新は後回しでOK）。
+-/
+axiom exists_con_pack
+  (P : HypPack (α := α)) (v : α) :
+  ∃ Pcon : HypPack (α := α),
+    Pcon.C = con (α := α) v P.C
+
+/-- Noncomputably choose a con-pack. -/
+noncomputable def choose_con_pack
+  (P : HypPack (α := α)) (v : α) : HypPack (α := α) :=
+  Classical.choose (exists_con_pack (α := α) (P := P) (v := v))
+
+/-- Spec lemma: the chosen pack enumerates `con v P.C`. -/
+@[simp] theorem choose_con_pack_C
+  (P : HypPack (α := α)) (v : α) :
+  (choose_con_pack (α := α) (P := P) (v := v)).C = con (α := α) v P.C :=
+  Classical.choose_spec (exists_con_pack (α := α) (P := P) (v := v))
 
 axiom IH_Q_gives_con_bound
   (n : Nat) (P : HypPack (α := α)) (v : α) :
@@ -91,7 +114,7 @@ theorem forbidOK_nonempty (P : HypPack (α := α)) (A : Finset α) :
 --/-- Case split helper for `A.erase v`: either empty or nonempty. -/
 theorem erase_empty_or_nonempty
   (A : Finset α) (v : α) : v ∈ A → ((A.erase v) = ∅ ∨ (A.erase v).Nonempty) := by
-  intro hv
+  intro _hv
   classical
   by_cases h : A.erase v = ∅
   · exact Or.inl h
