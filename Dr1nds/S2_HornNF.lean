@@ -26,6 +26,7 @@ For each head h : α,
 is the (possibly empty) finite set of premises for rules with head h.
 -/
 structure HornNF (α : Type) [DecidableEq α] where
+  U    : Finset α
   prem : α → Finset (Finset α)
 
 
@@ -70,11 +71,8 @@ def HornNF.IsClosed (H : HornNF α) (X : Finset α) : Prop :=
     P ⊆ X →
     h ∈ X
 
-def HornNF.FixSet (H : HornNF α) (U : Finset α) : Set (Finset α) :=
-  { X | X ⊆ U ∧ H.IsClosed X }
-
-def HornNF.HornOn (H : HornNF α) (U : Finset α) : Prop :=
-  ∀ (h : α) (P : Finset α), P ∈ H.prem h → (h ∈ U ∧ P ⊆ U)
+def HornNF.FixSet (H : HornNF α) : Set (Finset α) :=
+  { X | X ⊆ H.U ∧ H.IsClosed X }
 
 def HornNF.PremOn (H : HornNF α) (U : Finset α) : Prop :=
   ∀ ⦃h : α⦄ ⦃P : Finset α⦄, P ∈ H.prem h → P ⊆ U
@@ -92,7 +90,7 @@ Horn → HornNF (definition only, no properties asserted).
 Actual construction lives in later files.
 -/
 def Horn.toHornNF (_ : Horn α) : HornNF α :=
-  { prem := fun _ => ∅ }
+  { U := ∅, prem := fun _ => ∅ }
 
 
 /-
@@ -109,7 +107,8 @@ def Horn.toHornNF (_ : Horn α) : HornNF α :=
 
 /-- Rule-level contraction at head x (skeleton definition). -/
 def HornNF.contraction (x : α) (H : HornNF α) : HornNF α :=
-{ prem := fun h =>
+{ U    := H.U.erase x
+  prem := fun h =>
     if h = x then
       ∅
     else
@@ -181,13 +180,11 @@ lemma not_mem_of_subset_erase
 theorem contraction_fix_equiv_forward
   {α : Type} [DecidableEq α]
   (H : HornNF α)
-  (U : Finset α)
   (x : α)
-  (hxU : x ∈ U)
-  (_ : HornNF.HornOn H U) --hOn
+  (hxU : x ∈ H.U)
   {Y : Finset α}
-  (hY : Y ∈ HornNF.FixSet (H.contraction x) (U.erase x)) :
-  Y ∈ ConSet x (HornNF.FixSet H U) := by
+  (hY : Y ∈ HornNF.FixSet (H.contraction x)) :
+  Y ∈ ConSet x (HornNF.FixSet H) := by
 
   -- FixSet 展開（安全）
   have hY' := hY
@@ -251,9 +248,9 @@ theorem contraction_fix_equiv_forward
   --------------------------------------------------
   · simp [X]
     have : x ∉ Y := by
-      apply Aesop.BuiltinRules.not_intro
       intro a
       specialize hYsub a
+      simp only [HornNF.contraction] at hYsub
       simp_all only [mem_erase, ne_eq, not_true_eq_false, and_true]
     exact Eq.symm (erase_eq_of_notMem this)
 
@@ -264,13 +261,11 @@ theorem contraction_fix_equiv_forward
 theorem contraction_fix_equiv_backward
   {α : Type} [DecidableEq α]
   (H : HornNF α)
-  (U : Finset α)
   (x : α)
-  (_ : x ∈ U) --hxU
-  (_ : HornNF.HornOn H U) --hOn
+  (_ : x ∈ H.U)
   {Y : Finset α}
-  (hY : Y ∈ ConSet x (HornNF.FixSet H U)) :
-  Y ∈ HornNF.FixSet (H.contraction x) (U.erase x) := by
+  (hY : Y ∈ ConSet x (HornNF.FixSet H)) :
+  Y ∈ HornNF.FixSet (H.contraction x) := by
 
   rcases hY with ⟨X, hXfix, hxX, rfl⟩
 
@@ -288,7 +283,9 @@ theorem contraction_fix_equiv_backward
     intro y hy
     have hyX := (mem_erase.mp hy).1
     have hy_ne := (mem_erase.mp hy).2
-    simp_all only [mem_erase, ne_eq, not_false_eq_true, and_self, true_and]
+    simp_all only [mem_erase, ne_eq, not_false_eq_true, and_self]
+    simp only [HornNF.contraction]
+    simp_all only [mem_erase, ne_eq, not_false_eq_true, true_and]
     exact hXsub hy_ne
 
   --------------------------------------------------
@@ -321,20 +318,18 @@ theorem contraction_fix_equiv_backward
 theorem contraction_fix_equiv
   {α : Type} [DecidableEq α]
   (H : HornNF α)
-  (U : Finset α)
   (x : α)
-  (hxU : x ∈ U)
-  (hOn : HornNF.HornOn H U) :
-  HornNF.FixSet (H.contraction x) (U.erase x)
+  (hxU : x ∈ H.U) :
+  HornNF.FixSet (H.contraction x)
   =
-  ConSet x (HornNF.FixSet H U) := by
+  ConSet x (HornNF.FixSet H) := by
   apply Set.ext
   intro Y
   constructor
   · intro hY
-    exact contraction_fix_equiv_forward H U x hxU hOn hY
+    exact contraction_fix_equiv_forward H x hxU hY
   · intro hY
-    exact contraction_fix_equiv_backward H U x hxU hOn hY
+    exact contraction_fix_equiv_backward H x hxU hY
 
 /-- DR1 is preserved under contraction (skeleton theorem). -/
 theorem HornNF.contraction_preserves_DR1

@@ -28,7 +28,12 @@ abbrev Rule (α : Type) := Finset α × α
 A (finite) Horn rule system over α.
 -/
 structure Horn (α : Type) [DecidableEq α] where
+  U     : Finset α
   rules : Finset (Rule α)
+  valid :
+    ∀ {P : Finset α} {h : α},
+      (P, h) ∈ rules →
+      P ⊆ U ∧ h ∈ U
 
 
 /- ------------------------------------------------------------
@@ -74,6 +79,7 @@ for every rule P → h,
   P ⊆ X ⇒ h ∈ X.
 -/
 def Horn.IsClosed (H : Horn α) (X : Finset α) : Prop :=
+  X ⊆ H.U ∧
   ∀ {P : Finset α} {h : α},
     (P, h) ∈ H.rules →
     P ⊆ X →
@@ -97,9 +103,36 @@ Rule-level contraction at head x:
   - For other rules (P, h), replace premise by P.erase x
 -/
 def Horn.contraction (H : Horn α) (x : α) : Horn α :=
-{ rules :=
+{
+  U := H.U.erase x
+  rules :=
     (H.rules.filter (fun r => r.2 ≠ x)).image
-      (fun r => (r.1.erase x, r.2)) }
-
-
+      (fun r => (r.1.erase x, r.2))
+  valid := by
+    intro P h hh
+    classical
+    simp at hh
+    obtain ⟨a, ha, rfl⟩ := hh
+    -- ha : (a, h) ∈ H.rules ∧ h ≠ x
+    obtain ⟨ha_rule, h_ne_x⟩ := ha
+    -- use validity of original Horn system
+    have hvalid := H.valid ha_rule
+    obtain ⟨ha_subset, h_in_U⟩ := hvalid
+    constructor
+    · -- P ⊆ H.U.erase x
+      -- P = a.erase x
+      intro y hy
+      have hy' : y ∈ a := by
+        exact Finset.mem_of_mem_erase hy
+      have hyU : y ∈ H.U := ha_subset hy'
+      have hy_ne_x : y ≠ x := by
+        exact Finset.ne_of_mem_erase hy
+      apply Finset.mem_erase.mpr
+      simp_all only [Finset.mem_erase, ne_eq, not_false_eq_true, and_self]
+    · -- h ∈ H.U.erase x
+      have hxU : h ∈ H.U := h_in_U
+      have hx_ne_x : h ≠ x := h_ne_x
+      apply Finset.mem_erase.mpr
+      simp_all only [not_false_eq_true, ne_eq, and_self]
+}
 end Dr1nds
