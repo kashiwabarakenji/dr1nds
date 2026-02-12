@@ -13,6 +13,8 @@ namespace Dr1nds
 open scoped BigOperators
 variable {α : Type} [DecidableEq α]
 
+open SetFamily
+
 /- ============================================================
   S7 : Local inequality at an SC point (FROZEN I/O, skeleton)
   Policy:
@@ -31,10 +33,10 @@ namespace S7
 --def SC (C : Finset (Finset α)) (s : α) : Prop :=
 --  ({s} : Finset α) ∈ C
 
-omit [DecidableEq α] in
-@[simp] lemma SC_iff (C : Finset (Finset α)) (s : α) :
-  SC (α := α) C s ↔ ({s} : Finset α) ∈ C := by
-  rfl
+--omit [DecidableEq α] in
+--@[simp] lemma SC_iff (C : Finset (Finset α)) (s : α) :
+--  SC (α := α) C s ↔ ({s} : Finset α) ∈ C := by
+--  rfl
 
 /- ------------------------------------------------------------
   1. The local target inequality (the exact shape used downstream)
@@ -52,14 +54,14 @@ This is the UC-S7 entry in your S11 list.
 -/
 axiom local_SC_del_ndeg_le_zero
   (n : Nat)
-  (C : Finset (Finset α))
+  (F : SetFamily α)
   (A : Finset α)
   (s : α) :
   (2 ≤ A.card) →
-  SC (α := α) C s →
-  (NDS (α := α) (n - 1) (Del (α := α) s (Hole (α := α) C A))
+  SC F s →
+  (NDS (n - 1) (Del s (Hole F.C A))
       +
-    ndeg (α := α) (Hole (α := α) C A) s
+    ndeg (Hole F.C A) s
   ≤ 0)
 
 /- ------------------------------------------------------------
@@ -67,23 +69,23 @@ axiom local_SC_del_ndeg_le_zero
 ------------------------------------------------------------ -/
 
 /-- A named abbreviation for D := Hole(C,A). -/
-def D (C : Finset (Finset α)) (A : Finset α) : Finset (Finset α) :=
-  Hole (α := α) C A
+def D (F : SetFamily α) (A : Finset α) : Finset (Finset α) :=
+  Hole F.C A
 
 /-- Same inequality, written with D := Hole(C,A). -/
 lemma local_SC_del_ndeg_le_zero'
   (n : Nat)
-  (C : Finset (Finset α))
+  (F : SetFamily α)
   (A : Finset α)
   (s : α)
   (hA : 2 ≤ A.card)
-  (hSC : SC (α := α) C s) :
-  (NDS (α := α) (n - 1) (Del (α := α) s (D (α := α) C A))
+  (hSC : SC F s) :
+  (NDS (n - 1) (Del s (D F A))
       +
-    ndeg (α := α) (D (α := α) C A) s
+    ndeg (D F A) s
   ≤ 0) := by
   -- purely a wrapper
-  simpa [D] using local_SC_del_ndeg_le_zero (α := α) (n := n) (C := C) (A := A) (s := s) hA hSC
+  simpa [D] using local_SC_del_ndeg_le_zero n F A s hA hSC
 
 /- ------------------------------------------------------------
   3. Projected bounds used by forbid-step (still skeleton)
@@ -96,12 +98,12 @@ This is exported as a standalone bound because the forbid-step splits the local 
 -/
 axiom local_SC_ndeg_hole_le_zero
   (n : Nat)
-  (C : Finset (Finset α))
+  (F : SetFamily α)
   (A : Finset α)
   (s : α) :
   (2 ≤ A.card) →
-  SC (α := α) C s →
-  ndeg (α := α) (Hole (α := α) C A) s ≤ 0
+  SC F s →
+  ndeg (Hole F.C A) s ≤ 0
 
 /--
 If `s` is an SC point (in the base family `C`), then the *Del-branch* term in the hole family is non-positive.
@@ -110,23 +112,23 @@ Kept separate because S10/S11 often call it without rewriting the full local ine
 -/
 axiom local_SC_Del_hole_bound
   (n : Nat)
-  (C : Finset (Finset α))
+  (F : SetFamily α)
   (A : Finset α)
   (s : α) :
   (2 ≤ A.card) →
-  SC (α := α) C s →
-  NDS (α := α) (n - 1) (Del (α := α) s (Hole (α := α) C A)) ≤ 0
+  SC F s →
+  NDS (n - 1) (Del s (Hole F.C A)) ≤ 0
 
 /-- Same as `local_SC_Del_hole_bound`, written with `D := Hole(C,A)` to reduce rewriting noise. -/
 lemma local_SC_Del_D_bound'
   (n : Nat)
-  (C : Finset (Finset α))
+  (F : SetFamily α)
   (A : Finset α)
   (s : α)
   (hA : 2 ≤ A.card)
-  (hSC : SC (α := α) C s) :
-  NDS (α := α) (n - 1) (Del (α := α) s (D (α := α) C A)) ≤ 0 := by
-  simpa [D] using local_SC_Del_hole_bound (α := α) (n := n) (C := C) (A := A) (s := s) hA hSC
+  (hSC : SC F s) :
+  NDS (n - 1) (Del s (D F A)) ≤ 0 := by
+  simpa [D] using local_SC_Del_hole_bound n F A s hA hSC
 
 end S7
 

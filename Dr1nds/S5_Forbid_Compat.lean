@@ -145,7 +145,7 @@ theorem CON_ID_corr
   -- now the first term matches the Hole-part of NDS_corr (n-1) (con v C) (A.erase v)
   -- and we rewrite the correction card using hcard
   -- (note: Del-part and ndeg-part already match the target shape after unfolding D)
-  simp [D, hcard, add_assoc, add_left_comm, add_comm]
+  simp [D, hcard, add_left_comm, add_comm]
 
 /--
 Optional convenience: assoc/comm reshaping, if you prefer

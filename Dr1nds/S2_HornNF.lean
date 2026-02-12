@@ -1,6 +1,7 @@
 -- Dr1nds/S2_HornNF.lean
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
+import Mathlib.Data.Finset.Powerset
 import Dr1nds.S1_HornDefs
 import LeanCopilot
 
@@ -71,8 +72,11 @@ def HornNF.IsClosed (H : HornNF α) (X : Finset α) : Prop :=
     P ⊆ X →
     h ∈ X
 
-def HornNF.FixSet (H : HornNF α) : Set (Finset α) :=
-  { X | X ⊆ H.U ∧ H.IsClosed X }
+noncomputable def HornNF.FixSet (H : HornNF α) : Finset (Finset α) :=
+by
+  classical
+  exact H.U.powerset.filter (fun X => H.IsClosed X)
+ --  { X | X ⊆ H.U ∧ H.IsClosed X }
 
 def HornNF.PremOn (H : HornNF α) (U : Finset α) : Prop :=
   ∀ ⦃h : α⦄ ⦃P : Finset α⦄, P ∈ H.prem h → P ⊆ U
@@ -124,8 +128,8 @@ open Finset
 ------------------------------------------------------------
 
 def ConSet {α : Type} [DecidableEq α]
-  (x : α) (C : Set (Finset α)) : Set (Finset α) :=
-{ Y | ∃ X ∈ C, x ∈ X ∧ Y = X.erase x }
+  (x : α) (C : Finset (Finset α)) : Finset (Finset α) :=
+  (C.filter (fun X => x ∈ X)).image (fun X => X.erase x)
 
 ------------------------------------------------------------
 -- erase 補題
@@ -186,73 +190,68 @@ theorem contraction_fix_equiv_forward
   (hY : Y ∈ HornNF.FixSet (H.contraction x)) :
   Y ∈ ConSet x (HornNF.FixSet H) := by
 
-  -- FixSet 展開（安全）
-  have hY' := hY
-  simp [HornNF.FixSet] at hY'
-  rcases hY' with ⟨hYsub, hYclosed⟩
-
   let X := insert x Y
+  classical
+  simp [HornNF.FixSet] at hY
+  rcases hY with ⟨hYsub, hYclosed⟩
 
-  refine ⟨X, ?_, ?_, ?_⟩
+  -- We must show Y ∈ ConSet x (HornNF.FixSet H)
+  unfold ConSet
+  apply Finset.mem_image.mpr
+  refine ⟨X, ?hXmem, ?hEq⟩
 
   --------------------------------------------------
-  -- X ∈ FixSet H U
+  -- X ∈ (HornNF.FixSet H).filter (fun Z => x ∈ Z)
   --------------------------------------------------
   ·
-    apply And.intro
+    apply Finset.mem_filter.mpr
+    constructor
 
-    -- subset
+    -- X ∈ FixSet H
     ·
-      intro y hy
-      have hy_split := mem_insert.mp hy
-      cases hy_split with
-      | inl h =>
-          subst h
-          exact hxU
-      | inr hyY =>
-          have hyUerase := hYsub hyY
-          exact mem_of_mem_erase (hYsub hyY)
+      have hXsub : X ⊆ H.U := by
+        intro y hy
+        cases Finset.mem_insert.mp hy with
+        | inl hx => subst hx; exact hxU
+        | inr hyY =>
+            have hyUerase := hYsub hyY
+            exact Finset.mem_of_mem_erase hyUerase
 
-    -- closed
-    ·
-      intro h P hP hsubset
-      by_cases hh : h = x
-      ·
-        subst hh
-        exact mem_insert_self h Y
-      ·
-        -- prem 展開
-        have hP' := hP
-        have hsubsetX : P ⊆ insert x Y := by
-          simpa [X] using hsubset
+      have hXclosed : HornNF.IsClosed H X := by
+        intro h P hP hsubset
+        by_cases hh : h = x
+        · subst hh; exact Finset.mem_insert_self _ _
+        ·
+          have hsubsetY : P.erase x ⊆ Y :=
+            erase_subset_insert (by simpa using hsubset)
+          have hmemY : h ∈ Y := by
+            have hPin : P.erase x ∈ (HornNF.contraction x H).prem h := by
+              simp [HornNF.contraction, hh]
+              simp_all only [X]
+              use P
+            exact hYclosed hPin hsubsetY
+          exact Finset.mem_insert.mpr (Or.inr hmemY)
 
-        have hsubsetY : P.erase x ⊆ Y :=
-          erase_subset_insert hsubsetX
+      have hFix : X ∈ HornNF.FixSet H := by
+        simp [HornNF.FixSet]
+        exact ⟨hXsub, hXclosed⟩
 
-        -- contraction 側閉性を使う
-        have hmemY : h ∈ Y := by
-          apply hYclosed
-          · dsimp [HornNF.contraction]
-            simp [hh]
-            use P
-          · exact hsubsetY
-        exact mem_insert.mpr (Or.inr hmemY)
+      exact hFix
 
-  --------------------------------------------------
-  -- x ∈ X
-  --------------------------------------------------
-  · exact mem_insert_self x Y
+    -- x ∈ X
+    · exact Finset.mem_insert_self _ _
 
   --------------------------------------------------
   -- Y = X.erase x
   --------------------------------------------------
-  · simp [X]
-    have : x ∉ Y := by
-      intro a
-      specialize hYsub a
-      simp only [HornNF.contraction] at hYsub
-      simp_all only [mem_erase, ne_eq, not_true_eq_false, and_true]
-    exact Eq.symm (erase_eq_of_notMem this)
+  ·
+    simp [X]
+    have hx_not_Y : x ∉ Y := by
+      intro hxY
+      have hxUerase := hYsub hxY
+      have hx_contra : x ≠ x := (Finset.mem_erase.mp hxUerase).1
+      exact hx_contra rfl
+    exact hx_not_Y
 
 ------------------------------------------------------------
 -- backward
@@ -267,13 +266,16 @@ theorem contraction_fix_equiv_backward
   (hY : Y ∈ ConSet x (HornNF.FixSet H)) :
   Y ∈ HornNF.FixSet (H.contraction x) := by
 
-  rcases hY with ⟨X, hXfix, hxX, rfl⟩
+  unfold ConSet at hY
+  rcases Finset.mem_image.mp hY with ⟨X, hXmem, rfl⟩
+  rcases Finset.mem_filter.mp hXmem with ⟨hXfix, hxX⟩
 
   -- FixSet 展開
   have hXfix' := hXfix
   simp [HornNF.FixSet] at hXfix'
   rcases hXfix' with ⟨hXsub, hXclosed⟩
 
+  simp [HornNF.FixSet]
   apply And.intro
 
   --------------------------------------------------
@@ -323,7 +325,7 @@ theorem contraction_fix_equiv
   HornNF.FixSet (H.contraction x)
   =
   ConSet x (HornNF.FixSet H) := by
-  apply Set.ext
+  apply Finset.ext
   intro Y
   constructor
   · intro hY
