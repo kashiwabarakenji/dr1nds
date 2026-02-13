@@ -26,6 +26,14 @@ variable {α : Type} [DecidableEq α]
   方針：
   - “定義・言明の接続層”として、ここは基本 API を固定する。
   - 証明の中身（選点・局所評価・del 上界など）は S10/S11 に寄せる。
+
+  /- ROADMAP (how axioms will be discharged) -/
+  - S8 は API 層のみを担い、ここで宣言する axiom は下流の特定ファイルで証明・実装される予定。
+  - CON_ID_pack は S6_ConDelNdegId で証明される。
+  - CON_ID_corr_pack は S5_Forbid_Compat および S5_ForbidConLemmas で扱う。
+  - Q_step, Qcorr_step などの選点・局所評価に関わる axiom は S10/S11 で構成される。
+  - IH_pack はグローバル帰納法の仮置きであり、最終的には S11/S12（または適切な集約ファイル）での最終定理証明により削除される。
+
 ============================================================ -/
 
 /- ------------------------------------------------------------
@@ -42,7 +50,6 @@ HypPack = ClosedPack + HornNF hypotheses on U.
   mem_iff : X ∈ C ↔ (X ⊆ U ∧ X ∈ H.FixSet U)
 -/
 structure HypPack (α : Type) [DecidableEq α] extends ClosedPack (α := α) where
-  hornOn : HornNF.HornOn (α := α) H U
   dr1    : HornNF.IsDR1  (α := α) H
   nep    : HornNF.IsNEP  (α := α) H
   nf     : HornNF.IsNF   (α := α) H
@@ -51,15 +58,14 @@ namespace HypPack
 
 variable (P : HypPack α)
 
-@[simp] lemma hornOn' : HornNF.HornOn (α := α) P.H P.U := P.hornOn
 @[simp] lemma dr1'    : HornNF.IsDR1  (α := α) P.H := P.dr1
 @[simp] lemma nep'    : HornNF.IsNEP  (α := α) P.H := P.nep
 @[simp] lemma nf'     : HornNF.IsNF   (α := α) P.H := P.nf
 
 /-- Convenience: membership spec for `P.C`. -/
 @[simp] theorem mem_iff' (X : Finset α) :
-    X ∈ P.C ↔ X ⊆ P.U ∧ X ∈ (HornNF.FixSet (α := α) P.H P.U) := by
-  simpa [HornNF.FixSet] using (P.mem_iff X)
+    X ∈ P.C ↔ X ∈ HornNF.FixSet (α := α) P.H := by
+  simp_all only [ClosedPack.mem_iff']
 
 end HypPack
 
@@ -82,30 +88,38 @@ def Qcorr (n : Nat) (P : HypPack α) (A : Finset α) : Prop :=
 ------------------------------------------------------------ -/
 
 /--
-ForbidOK(P,A):
-- A ⊆ U
-- A.Nonempty
-- 2 ≤ A.card
+Forbid 側で許す forbid 集合 `A` の条件。
 
-（A を「閉集合である」とする条件は、現行設計では必須にしていない。
-  必要になったら別名で追加し、S10/S11 側で使う。）
+**凍結（重要）**：S10 側の分岐設計に合わせ、`singleton` を射程外に出すため
+`2 ≤ A.card` を採用する。
+
+- `A.Nonempty` は `2 ≤ A.card` から従うので入れない（冗長・simp 事故源）。
+- `A ⊆ P.H.U` は台集合整合のため必須。
+- `A.erase v` の非空性などは、必要な箇所で補題として引き出す。
 -/
 def ForbidOK (P : HypPack α) (A : Finset α) : Prop :=
-  A ⊆ P.U ∧ A.Nonempty ∧ (2 ≤ A.card)
+  A ⊆ P.H.U ∧ (2 ≤ A.card)
 
 namespace ForbidOK
 
 @[simp] lemma subset_univ {P : HypPack α} {A : Finset α} :
-    ForbidOK (α := α) P A → A ⊆ P.U := by
+    ForbidOK (α := α) P A → A ⊆ P.H.U := by
   intro h; exact h.1
-
-@[simp] lemma nonempty {P : HypPack α} {A : Finset α} :
-    ForbidOK (α := α) P A → A.Nonempty := by
-  intro h; exact h.2.1
 
 @[simp] lemma card_ge_two {P : HypPack α} {A : Finset α} :
     ForbidOK (α := α) P A → 2 ≤ A.card := by
-  intro h; exact h.2.2
+  intro h; exact h.2
+
+/-- `ForbidOK` から `A.Nonempty` を取り出す（`2 ≤ card` なので自動）。 -/
+lemma nonempty {P : HypPack α} {A : Finset α} :
+    ForbidOK (α := α) P A → A.Nonempty := by
+  intro h
+  -- `2 ≤ card` なら `card ≠ 0` なので nonempty
+  dsimp [ForbidOK] at h
+  obtain ⟨left, right⟩ := h
+  contrapose! right
+  subst right
+  simp_all only [Finset.empty_subset, Finset.card_empty, Nat.zero_lt_succ]
 
 end ForbidOK
 
@@ -115,8 +129,12 @@ end ForbidOK
 ------------------------------------------------------------ -/
 
 /--
-通常会計（CON_ID）を pack 上で使える形に露出する。
-（S6_ConDelNdegId の CON_ID を呼ぶためのブリッジ）
+/--
+(1) 通常会計の基本恒等式（CON_ID）を HypPack 上で使いやすい形に露出する。
+(2) S6_ConDelNdegId で証明されるべき事実である。
+(3) 長期的には S6_ConDelNdegId に置き、ここでは axiom として仮置きする。
+(4) 仮定として n ≥ 1, P : HypPack α, v : α を必要とする。
+-/
 -/
 axiom CON_ID_pack
   (n : Nat) (hn : 1 ≤ n)
@@ -130,8 +148,12 @@ axiom CON_ID_pack
   ndeg (α := α) P.C v
 
 /--
-forbid 付き会計（CON_ID_corr）の最終形を pack 上で露出する。
-（実体の証明は S5_Forbid_Compat / S5_ForbidConLemmas 側で行う。）
+/--
+(1) forbid 付き会計の基本恒等式（CON_ID_corr）の最終形を HypPack 上で露出する。
+(2) S5_Forbid_Compat および S5_ForbidConLemmas で証明されるべき事実である。
+(3) 長期的には S5 系のファイルに置き、ここでは axiom として仮置きする。
+(4) 仮定として n ≥ 1, P : HypPack α, A : Finset α, v : α を必要とする。
+-/
 -/
 axiom CON_ID_corr_pack
   (n : Nat) (hn : 1 ≤ n)
@@ -145,20 +167,87 @@ axiom CON_ID_corr_pack
 
 
 /- ------------------------------------------------------------
+  Local kernel / selection API
+
+  方針：
+  - S8 は「仕様・命題・等式」を凍結する層。
+  - 選点（good v）・representability（con/del pack の存在）・Del-bound などの
+    “局所核” は最終的に S11_LocalKernels 側へ集約したい。
+
+  現時点では、依存関係を壊さないために **S8 内に置きつつ** `namespace Local`
+  に隔離し、旧名は `abbrev` で互換を維持する。
+
+  TODO（整理段階で実施）:
+  - S11 側に実装が揃ったら、ここ（S8）の `abbrev` を削除し、参照側を
+    `Dr1nds.Local.*` もしくは `S11_LocalKernels` の定義に統一する。
+------------------------------------------------------------ -/
+namespace Local
+
+/--
+(1) con 分岐の構成可能性（representability）。
+(2) `Pc.U = P.U.erase v` かつ `Pc.C = con v P.C` を満たす `HypPack` の存在。
+(3) 実装（もしくは構成の公理化）は最終的に S11_LocalKernels へ。
+-/
+axiom exists_con_pack
+  (P : HypPack α) (v : α) :
+  ∃ Pc : HypPack α,
+    Pc.H.U = P.H.U.erase v ∧
+    Pc.C = con (α := α) v P.C
+
+/-- del 分岐の構成可能性（representability）。最終的に S11 へ。 -/
+axiom exists_del_pack
+  (P : HypPack α) (v : α) :
+  ∃ Pd : HypPack α,
+    Pd.H.U = P.H.U.erase v ∧
+    Pd.C = Del (α := α) v P.C
+
+/--
+Del-branch 上界（通常会計）。
+
+注意：これは「クラス閉性」ではなく、IH を当てるための局所構成を前提にした
+Del-bound 核をまとめた入口。
+-/
+axiom del_bound_pack
+  (n : Nat) (P : HypPack α) (v : α) :
+  Q (α := α) (n - 1) P →
+  NDS (α := α) (n - 1) (Del (α := α) v P.C) ≤ 0
+
+/--
+Del-branch 上界（forbid 側：Hole 上の Del）。
+
+方針C（Del-as-Hole + Qcorr IH + 符号）で閉じる予定。
+-/
+axiom del_bound_hole_pack
+  (n : Nat) (P : HypPack α) (A : Finset α) (v : α) :
+  ForbidOK (α := α) P A →
+  Qcorr (α := α) (n - 1) P A →
+  NDS (α := α) (n - 1) (Del (α := α) v (Hole (α := α) P.C A)) ≤ 0
+
+end Local
+
+-- 互換 alias（参照側を壊さないために当面残す。最終的に削除予定）
+abbrev exists_con_pack := Local.exists_con_pack (α := α)
+abbrev exists_del_pack := Local.exists_del_pack (α := α)
+abbrev del_bound_pack := Local.del_bound_pack (α := α)
+abbrev del_bound_hole_pack := Local.del_bound_hole_pack (α := α)
+
+
+/- ------------------------------------------------------------
   4. Bundled IH interfaces (recommended)
 ------------------------------------------------------------ -/
 
 /--
-Bundled induction hypothesis at level `n`.
-
-`IH n P` contains:
-- the usual goal `Q n P`, and
-- all forbid goals `Qcorr n P A` for admissible `A`.
+(1) グローバル帰納法の仮置きとしての bundled IH を定義する。
+(2) IH n P は通常の目標 Q n P と、ForbidOK な A に対する Qcorr n P A を同時に含む。
 -/
 def IH (n : Nat) (P : HypPack α) : Prop :=
   Q (α := α) n P ∧ (∀ A : Finset α, ForbidOK (α := α) P A → Qcorr (α := α) n P A)
 
-/-- Bundled IH provided by the global induction skeleton (axiom for now). -/
+/--
+(1) グローバル帰納法のドライバとしての IH_pack は仮置きの axiom である。
+(2) 本来は S11/S12 などの最終的な証明ファイルで構成され、ここでは暫定的に宣言している。
+(3) 仮定として n : Nat, P : HypPack α を必要とする。
+-/
 axiom IH_pack
   (n : Nat) (P : HypPack α) :
   IH (α := α) (n - 1) P
@@ -176,77 +265,65 @@ theorem IH_Qcorr (n : Nat) (P : HypPack α) (A : Finset α) :
   exact (IH_pack (α := α) n P).2 A hOK
 
 
-/--
-B2（A.erase v 非空）の forbid Case2 用：IH（bundled）から con-branch の上界を引き出す API。
-
-（ここは “unary head 問題” や “選点戦略” の影響を受けやすいので、当面 axiom にしておく。）
+/-
+(1) B2（A.erase v 非空）の forbid Case2 用に、bundled IH から con-branch の上界を引き出す API。
+(2) unary head 問題や選点戦略の影響を受けやすいため、暫定的に axiom としている。
+(3) 仮定として IH (n-1) P, v ∈ A, (A.erase v).Nonempty を要求する。
 -/
-axiom IH_corr_con_pack_IH
-  (n : Nat)
-  (P : HypPack α)
-  (A : Finset α)
-  (v : α) :
-  IH (α := α) (n - 1) P →
-  v ∈ A →
-  (A.erase v).Nonempty →
-  NDS_corr (α := α) (n - 1)
-    (con (α := α) v P.C)
-    (A.erase v) ≤ 0
-
-/-- Wrapper: legacy-style interface (only assumes `Q (n-1) P`). -/
-lemma IH_corr_con_pack
-  (n : Nat)
-  (P : HypPack α)
-  (A : Finset α)
-  (v : α) :
-  Q (α := α) (n - 1) P →
-  v ∈ A →
-  (A.erase v).Nonempty →
-  NDS_corr (α := α) (n - 1)
-    (con (α := α) v P.C)
-    (A.erase v) ≤ 0 := by
-  intro hQ hvA hNE
-  have hIH : IH (α := α) (n - 1) P := by
-    refine ⟨hQ, ?_⟩
-    intro A' hOK
-    -- forbid 側の IH は bundled から引くのが基本設計。
-    -- ここは S9 の skeleton（IH_pack）に寄せるため、いったん IH_Qcorr を経由する。
-    exact IH_Qcorr (α := α) n P A' hOK
-  exact IH_corr_con_pack_IH (α := α) n P A v hIH hvA hNE
+/-
+NOTE:
+`IH_corr_con_pack_IH` とその派生（legacy wrapper）は S9_IH_Unpack.lean 側で
+実際に `theorem` として実装する。
+S8_Statements.lean では「必要になる命題の形」を固定する役割に徹し、
+同名の axiom を置かない（名前衝突・二重管理の原因になるため）。
+-/
 
 
 /- ------------------------------------------------------------
   5. Step interfaces (proof skeleton only)
+
+  ここも「局所核」なので、将来的には S11 側へ寄せたい。
+  ただし現状は依存関係を壊さないため S8 内に残し、`namespace Local` に隔離する。
 ------------------------------------------------------------ -/
 
-/-- Q_step で使う「良い v」：最小 API（ndeg ≤ 0）。 -/
+namespace Local
+
+/--
+(1) 通常ステップで使う「良い v」の最小 API。`ndeg ≤ 0` のみを要求する。
+(2) 選点は S11 側で構成し、ここは受け口のみ固定する。
+-/
 def GoodV_for_Q (P : HypPack α) (v : α) : Prop :=
   ndeg (α := α) P.C v ≤ 0
 
 /--
-通常ステップ：`∃ v, GoodV_for_Q P v` が与えられれば `Q n P` を閉じる。
-（選点は S11 側で作り、ここは受け口だけを固定する。）
+(1) 通常ステップ：`∃ v, GoodV_for_Q P v` が与えられれば `Q n P` を閉じる。
+(2) 実体は S11（S10 経由）で構成される。
 -/
 axiom Q_step
   (n : Nat) (P : HypPack α) :
   (∃ v : α, GoodV_for_Q (α := α) P v) →
   Q (α := α) n P
 
+/-- forbid ステップ：ForbidOK(P,A) の下で Qcorr n P A を閉じる。 -/
+axiom Qcorr_step
+  (n : Nat) (P : HypPack α) (A : Finset α) :
+  ForbidOK (α := α) P A →
+  Qcorr (α := α) n P A
+
+end Local
+
+-- 互換 alias（参照側を壊さないために当面残す。最終的に削除予定）
+abbrev GoodV_for_Q := Local.GoodV_for_Q (α := α)
+abbrev Q_step := Local.Q_step (α := α)
+abbrev Qcorr_step := Local.Qcorr_step (α := α)
+
 /-- 互換：`∃ v, ndeg ≤ 0` から `∃ v, GoodV_for_Q` へ。 -/
 lemma exists_goodV_for_Q_of_exists_ndeg (P : HypPack α) :
   (∃ v : α, ndeg (α := α) P.C v ≤ 0) →
   (∃ v : α, GoodV_for_Q (α := α) P v) := by
   intro h
+  -- `GoodV_for_Q` は定義的に `ndeg ≤ 0`
   simpa [GoodV_for_Q] using h
-
-/--
-forbid ステップ：ForbidOK(P,A) の下で `Qcorr n P A` を閉じる。
-（実体は S10/S11 で組む。）
--/
-axiom Qcorr_step
-  (n : Nat) (P : HypPack α) (A : Finset α) :
-  ForbidOK (α := α) P A →
-  Qcorr (α := α) n P A
 
 
 /- ------------------------------------------------------------
