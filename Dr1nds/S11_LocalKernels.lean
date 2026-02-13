@@ -90,6 +90,27 @@ lemma corr_implies_hole_bound
     linarith
   exact this
 
+/--
+Canonical singleton Del-as-Hole equality.
+
+This uses only the definitions from S0:
+  Del v C      = C.filter (fun X => v ∉ X)
+  Hole C {v}   = C.filter (fun X => ¬ ({v} ⊆ X))
+
+Since `{v} ⊆ X` is definitionally equivalent to `v ∈ X`,
+the two filters coincide.
+-/
+lemma Del_eq_Hole_singleton
+  (C : Finset (Finset α)) (v : α) :
+  Del v C = Hole C ({v} : Finset α) := by
+  classical
+  -- unfold both sides to `filter`
+  unfold Del Hole
+  -- it suffices to show the predicates coincide pointwise
+  apply Finset.ext
+  intro X
+  simp [Finset.mem_filter]
+
 /- ============================================================
   (B) good vertex 供給（S7 の責務）
 
@@ -181,55 +202,44 @@ by
   intro hQ
   exact IH_Q_gives_con_bound_pack (α := α) (n := n) (P := P) (v := v) (Pc := Pc) hPcC hQ
 
-
-/- ============================================================
-  (NEW skeleton declarations for future Del-as-Hole route)
-============================================================ -/
-
-/--
-(S5/S6 representability)
-
-Del-bound（方針C）では、`Del v P.C` を直接 IH にかけない。
-代わりに「削除世界の base family（台は通常 `P.U.erase v`）」を作り、その上の Hole として表現して
-`Qcorr` の IH を当てる。
-
-そのために必要な *局所存在* がこの補題。
-
-期待する最終形（将来こう強化する）：
-- `Pd.C = Del_base(P,v)`
-- `Pd.U = P.U.erase v`
--/
-axiom exists_del_base_pack
-  (P : HypPack (α := α)) (v : α) :
-  ∃ Pd : HypPack (α := α), True
-
-/--
-(S5/S6 heavy kernel) Del-as-Hole 同一視。
-
-直観：削除枝 `Del v P.C` は、削除世界の base family `Del_base(P,v)` の上で
-forbid 集合（DR1 の唯一前提）`Pv` を使った `Hole` と一致する、という同一視。
-
-いまは将来差し替えしやすいよう、プレースホルダとして `True` を返す。
--/
-axiom del_as_hole
-  (P : HypPack (α := α)) (v : α) (Pv : Finset α) :
-  True
-
-/--
-(Plumbing) Universe compatibility for con-pack.
-
-将来の最終形は `Pc.U = P.U.erase v` を返すのが理想。
-現状は配線を壊さないため `True` のプレースホルダ。
--/
-axiom con_pack_universe
-  (P : HypPack (α := α)) (v : α)
-  (Pc : HypPack (α := α)) (hPcC : Pc.C = con (α := α) v P.C) :
-  True
-
-
 /- ============================================================
   (D) Del-bound kernels (C-route via Qcorr)
 ============================================================ -/
+
+/-
+  (Normal Del-bound for Q_step)
+
+  Used in S10.Q_step.
+  This is the non-forbid version:
+    Q(n-1,P) ⇒ NDS(n-1)(Del v P.C) ≤ 0.
+
+  This will later be proved via the Del-as-Hole route
+  and Qcorr induction, but for wiring we freeze it here.
+  -/
+
+axiom Del_bound
+  (n : Nat) (hn : 1 ≤ n)
+  (P : HypPack (α := α))
+  (v : α) :
+  Q (α := α) (n - 1) P →
+  NDS (α := α) (n - 1) (Del v P.C) ≤ 0
+
+/--
+Wrapper lemma for the plain Del-bound.
+
+This is currently just a thin layer over the axiom `Del_bound`,
+but it gives S10 (and future refactors) a stable theorem name
+that can later be reimplemented via `Del_bound_from_branch`
+without changing call sites.
+-/
+theorem Del_bound_of_Q
+  (n : Nat) (hn : 1 ≤ n)
+  (P : HypPack (α := α))
+  (v : α)
+  (hQ : Q (α := α) (n - 1) P) :
+  NDS (α := α) (n - 1) (Del v P.C) ≤ 0 :=
+by
+  exact Del_bound (α := α) (n := n) (hn := hn) (P := P) (v := v) hQ
 
 /--
 (Purpose)
@@ -270,6 +280,20 @@ noncomputable def pick_prem
   simpa [pick_prem] using (prem_contains_head_choice (α := α) (P := P) (v := v) h)
 
 /--
+(New primary Del-as-Hole API — preferred over `exists_del_base_pack` / `del_as_hole`.)
+
+Canonical Del-as-Hole formulation (moved here so that `pick_prem` is already defined).
+-/
+axiom del_eq_hole
+  (P : HypPack (α := α))
+  (v : α)
+  (h : (P.H.prem v).Nonempty) :
+  Del v P.C
+    =
+  Hole P.C
+    (pick_prem P v h)
+
+/--
 Del-bound（方針C）の最終 API。
 
 Proof idea (future, S5/S6):
@@ -288,6 +312,58 @@ axiom Del_branch_bound
   (v ∈ Pv) →
   Qcorr (α := α) (n - 1) Pc (Pv.erase v) →
   NDS (α := α) (n - 1) (Del (α := α) v P.C) ≤ 0
+
+/--
+Bridge lemma: derive the plain Del-bound from the branch-style API.
+
+This is the first step toward eliminating the axiom `Del_bound`.
+It uses:
+  - representability of `con` via `choose_con_pack`
+  - `Del_branch_bound`
+and packages them into a direct bound on `Del v P.C`.
+-/
+theorem Del_bound_from_branch
+  (n : Nat) (hn : 1 ≤ n)
+  (P : HypPack (α := α))
+  (v : α)
+  (hPrem : (P.H.prem v).Nonempty)
+  (hQprev : Q (α := α) (n - 1) P)
+  (hQcorr :
+    Qcorr (α := α)
+      (n - 1)
+      (choose_con_pack (α := α) (P := P) (v := v))
+      ((pick_prem (α := α) P v hPrem).erase v)
+  ) :
+  NDS (α := α) (n - 1) (Del v P.C) ≤ 0 :=
+by
+  classical
+  -- representability: Pc enumerates con v P.C
+  let Pc :=
+    choose_con_pack (α := α) (P := P) (v := v)
+  have hPcC :
+      Pc.C = con (α := α) v P.C :=
+    choose_con_pack_C (α := α) (P := P) (v := v)
+
+  -- extract Pv from prem
+  let Pv := pick_prem (α := α) P v hPrem
+  have hvPv : v ∈ Pv :=
+    pick_prem_contains_head (α := α) (P := P) (v := v) hPrem
+
+  -- apply branch-style Del bound
+  have hDel :=
+    Del_branch_bound
+      (α := α)
+      (n := n)
+      (hn := hn)
+      (P := P)
+      (v := v)
+      (Pc := Pc)
+      (hPcC := hPcC)
+      (Pv := Pv)
+      hvPv
+      hQcorr
+
+  exact hDel
 
 
 /- ============================================================

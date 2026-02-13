@@ -144,10 +144,6 @@ S10 は wiring 専用なので **ここでは axiom のまま保持**する。
 --   の形に差し替える。
 -- （S10 は import と呼び出し先の変更だけで済ませるのが目的。）
 -/
-axiom Del_bound
-  (n : Nat) (P : HypPack (α := α)) (v : α) :
-  NDS (α := α) (n - 1) (Del (α := α) v P.C) ≤ 0
-
 theorem Q_step
   (n : Nat) (hn : 1 ≤ n)
   (P : HypPack (α := α)) :
@@ -180,8 +176,8 @@ theorem Q_step
     exact IH_Q_gives_con_bound (α := α) (n := n) (P := P) (v := v) hIH
 
   have hdel :
-      NDS (α := α) (n - 1) (Del (α := α) v P.C) ≤ 0 :=
-    Step.Del_bound (α := α) (n := n) (P := P) (v := v)
+      NDS (n - 1) (Del v P.C) ≤ 0 :=
+    Del_bound_of_Q n hn P v hIH
 
   have hid :
       NDS (α := α) n P.C

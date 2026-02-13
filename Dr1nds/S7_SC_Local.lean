@@ -181,17 +181,6 @@ lemma local_SC_Del_D_bound'
 （いまは証明を書かない：S11 で証明が入ったタイミングで差し替える。）
 -/
 
-axiom local_SC_Del_hole_bound_of_main
-  (n : Nat) (F : SetFamily α) (A : Finset α) (s : α) :
-  (2 ≤ A.card) → SC F s →
-  (ndeg (Hole F.C A) s ≤ 0) →
-  (NDS (n - 1) (Del s (Hole F.C A)) ≤ 0)
-
-axiom local_SC_ndeg_hole_le_zero_of_main
-  (n : Nat) (F : SetFamily α) (A : Finset α) (s : α) :
-  (2 ≤ A.card) → SC F s →
-  (NDS (n - 1) (Del s (Hole F.C A)) ≤ 0) →
-  (ndeg (Hole F.C A) s ≤ 0)
 
 end S7
 
