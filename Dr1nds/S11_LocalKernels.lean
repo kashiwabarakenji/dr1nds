@@ -54,6 +54,38 @@ variable {α : Type} [DecidableEq α]
 ※注意：このファイルは **S10_Steps を import しない**（循環依存回避）。
 -/
 
+/-
+====================
+S11 棚卸しメモ（親スレ用）
+====================
+
+S11 は「S10 が呼ぶ局所核 API の集約点」。このファイル内の宣言は次の3種類に分類する。
+
+(A) 完全に確定した plumbing（theorem）
+    - 純粋に定義展開＋算術で閉じるもの。
+    - 例: `Up_card_nonneg`, `corr_implies_hole_bound`, `Del_eq_Hole_singleton`。
+
+(B) “軽い representability”
+    - `choose_*` で pack を選び、`*.C = ...` で書き戻すだけのもの。
+    - 例: `choose_con_pack`, `choose_con_pack_C_eq`。
+    - これは IH を当てるための配線であり、数学的核ではない。
+
+(C) “重い核”（axiom のまま凍結しているもの）
+    - good v の供給（S7）: `exists_good_v_for_Q`
+    - Del-bound（方針C）: `Del_branch_bound`（＋必要なら `del_eq_hole` など）
+    - premise choice（S2/HornNF）: `choose_prem_of_hasHead` など
+
+運用ルール：
+  * S10 は wiring のみ。中身が重い議論は S11 の axiom/theorem に切り出し、S10 を増やさない。
+  * 置換の順序は「呼び出し側を変えずに中身を theorem 化」：
+      1) `Del_bound` を直接使わず `Del_bound_of_Q` へ寄せる
+      2) `Del_bound_of_Q` の実装を `Del_bound_from_branch` 経由へ差し替える
+      3) 最後に `Del_bound`（axiom）自体を削除
+
+注意：`prem_contains_head_choice` は NF 方針（head ∉ prem）と整合しない可能性がある。
+  - ここは “prem の意味” を S8 側の仕様に合わせて最終決定する。
+  - NF を常時仮定する設計なら、むしろ `v ∉ Pv` が欲しい（＝ここは差し替え候補）。
+-/
 
 /- ============================================================
   (A) Proven arithmetic/definition lemmas
@@ -104,12 +136,11 @@ lemma Del_eq_Hole_singleton
   (C : Finset (Finset α)) (v : α) :
   Del v C = Hole C ({v} : Finset α) := by
   classical
-  -- unfold both sides to `filter`
   unfold Del Hole
-  -- it suffices to show the predicates coincide pointwise
   apply Finset.ext
   intro X
   simp [Finset.mem_filter]
+
 
 /- ============================================================
   (B) good vertex 供給（S7 の責務）
@@ -155,19 +186,32 @@ noncomputable def choose_con_pack
   (P : HypPack (α := α)) (v : α) : HypPack (α := α) :=
   Classical.choose (exists_con_pack (α := α) (P := P) (v := v))
 
-/-- Spec lemma: the chosen pack enumerates `con v P.C`. -/
+-- NOTE:
+-- `choose_con_pack_C_eq` を本体として置き、`choose_con_pack_C` を simp-lemma として別名で出す。
+-- 以前 `@[simp]` のみで運用すると、文脈によっては `simp` が等式を `True` に潰してしまい
+-- `by simpa using ...` が意図と違う型で通る事故が起きたため、両方を残す。
+/-- Spec lemma (non-simp): the chosen pack enumerates `con v P.C`.
+
+NOTE: We deliberately do **not** tag this lemma with `[simp]` because `simp` can rewrite
+`t = t` to `True` via `eq_self_iff_true`, and then `by simpa using ...` could typecheck
+against `True` rather than the intended equality.
+-/
+theorem choose_con_pack_C_eq
+  (P : HypPack (α := α)) (v : α) :
+  (choose_con_pack (α := α) (P := P) (v := v)).C = con (α := α) v P.C := by
+  exact (Classical.choose_spec (exists_con_pack (α := α) (P := P) (v := v))).2
+
+/-- Simp lemma: rewrite the chosen con-pack family. -/
 @[simp] theorem choose_con_pack_C
   (P : HypPack (α := α)) (v : α) :
   (choose_con_pack (α := α) (P := P) (v := v)).C = con (α := α) v P.C := by
-  -- `exists_con_pack` now returns both universe compatibility and the family equality.
-  -- We only need the `.C` component here.
-  exact (Classical.choose_spec (exists_con_pack (α := α) (P := P) (v := v))).2
+  exact choose_con_pack_C_eq (α := α) (P := P) (v := v)
 
 /-- Alias simp-lemma (kept for backward compatibility with earlier S10 code). -/
 @[simp] theorem choose_con_pack_C'
   (P : HypPack (α := α)) (v : α) :
   (choose_con_pack (α := α) (P := P) (v := v)).C = con (α := α) v P.C := by
-  simpa using (choose_con_pack_C (α := α) (P := P) (v := v))
+  exact choose_con_pack_C_eq (α := α) (P := P) (v := v)
 
 /--
 (Purpose)
@@ -206,17 +250,20 @@ by
   (D) Del-bound kernels (C-route via Qcorr)
 ============================================================ -/
 
-/-
-  (Normal Del-bound for Q_step)
+/--
+(D) Del-bound の「段階的な置き換え」
 
-  Used in S10.Q_step.
-  This is the non-forbid version:
-    Q(n-1,P) ⇒ NDS(n-1)(Del v P.C) ≤ 0.
+現状：`Del_bound` は *axiom* として凍結している（S10 の Q_step を先に通すため）。
 
-  This will later be proved via the Del-as-Hole route
-  and Qcorr induction, but for wiring we freeze it here.
-  -/
+目標：方針C（自然言語証明）に沿って、最終的には
+  `Del_branch_bound`（Qcorr から Del を落とす API）
+  → `Del_bound_from_branch`（branch API から plain bound を導出）
+  → `Del_bound_of_Q`（S10 の呼び出し口を固定）
+という順で、呼び出し側を壊さずに theorem 化していく。
 
+つまり、S10 側は常に `Del_bound_of_Q` を呼ぶだけにしておき、
+S11 内で実装を差し替えるのが基本方針。
+-/
 axiom Del_bound
   (n : Nat) (hn : 1 ≤ n)
   (P : HypPack (α := α))
@@ -224,12 +271,11 @@ axiom Del_bound
   Q (α := α) (n - 1) P →
   NDS (α := α) (n - 1) (Del v P.C) ≤ 0
 
-/--
-Wrapper lemma for the plain Del-bound.
+/-- Wrapper lemma for the plain Del-bound.
 
 This is currently just a thin layer over the axiom `Del_bound`,
 but it gives S10 (and future refactors) a stable theorem name
-that can later be reimplemented via `Del_bound_from_branch`
+that can later be reimplemented via a branch-style API
 without changing call sites.
 -/
 theorem Del_bound_of_Q
@@ -237,8 +283,7 @@ theorem Del_bound_of_Q
   (P : HypPack (α := α))
   (v : α)
   (hQ : Q (α := α) (n - 1) P) :
-  NDS (α := α) (n - 1) (Del v P.C) ≤ 0 :=
-by
+  NDS (α := α) (n - 1) (Del v P.C) ≤ 0 := by
   exact Del_bound (α := α) (n := n) (hn := hn) (P := P) (v := v) hQ
 
 /--
@@ -255,8 +300,15 @@ axiom choose_prem_of_hasHead
   { Pv : Finset α // Pv ∈ P.H.prem v }
 
 /--
-(Optional strengthening)
-選ばれた `Pv` が head `v` を含む、という形を後で使いたい場合の補助。
+WARNING（仕様未確定）
+
+`prem_contains_head_choice` は「選んだ前提 Pv が head v を含む」ことを主張している。
+しかし NF 方針（全規則で head ∉ prem）を常時仮定する設計の場合、これは逆（`v ∉ Pv`）が自然。
+
+ここは S8 側の `prem` の意味論（prem が『前提集合そのもの』か『前提∪{head} のような符号化』か）で
+結論が変わるので、埋める段階で必ず整合チェックする。
+
+当面は「将来差し替える可能性が高い」ことを明示するために axiom のまま置いている。
 -/
 axiom prem_contains_head_choice
   (P : HypPack (α := α)) (v : α)
@@ -280,9 +332,17 @@ noncomputable def pick_prem
   simpa [pick_prem] using (prem_contains_head_choice (α := α) (P := P) (v := v) h)
 
 /--
-(New primary Del-as-Hole API — preferred over `exists_del_base_pack` / `del_as_hole`.)
+(Del-as-Hole) 仕様の置き場所
 
-Canonical Del-as-Hole formulation (moved here so that `pick_prem` is already defined).
+`del_eq_hole` は Del を Hole として表現する“本丸”の同一視。
+方針Cでは、この同一視と `corr_implies_hole_bound` を組み合わせて Del-bound を落とす。
+
+注意：現状の `del_eq_hole` は「base family を作り直す」版ではなく、
+単に `Hole P.C (pick_prem ...)` にしている（暫定）。
+将来、削除世界の base family を明示する設計に切り替える場合は、
+この axiom を
+  Del v P.C = Hole (Del_base(P,v)) Pv
+の形へ差し替えてよい（呼び出し側は `Del_bound_from_branch` の中だけに閉じ込める）。
 -/
 axiom del_eq_hole
   (P : HypPack (α := α))
@@ -332,24 +392,19 @@ theorem Del_bound_from_branch
     Qcorr (α := α)
       (n - 1)
       (choose_con_pack (α := α) (P := P) (v := v))
-      ((pick_prem (α := α) P v hPrem).erase v)
+      ((pick_prem P v hPrem).erase v)
   ) :
   NDS (α := α) (n - 1) (Del v P.C) ≤ 0 :=
 by
   classical
-  -- representability: Pc enumerates con v P.C
-  let Pc :=
-    choose_con_pack (α := α) (P := P) (v := v)
-  have hPcC :
-      Pc.C = con (α := α) v P.C :=
-    choose_con_pack_C (α := α) (P := P) (v := v)
+  let Pc := choose_con_pack (α := α) (P := P) (v := v)
+  have hPcC : Pc.C = con (α := α) v P.C :=
+    choose_con_pack_C_eq (α := α) (P := P) (v := v)
 
-  -- extract Pv from prem
-  let Pv := pick_prem (α := α) P v hPrem
+  let Pv := pick_prem P v hPrem
   have hvPv : v ∈ Pv :=
     pick_prem_contains_head (α := α) (P := P) (v := v) hPrem
 
-  -- apply branch-style Del bound
   have hDel :=
     Del_branch_bound
       (α := α)
@@ -410,6 +465,18 @@ theorem erase_empty_or_nonempty
 ============================================================ -/
 
 /--
+====================
+削除予定（cleanup）
+====================
+
+- `Del_bound`（axiom）：`Del_bound_of_Q` を theorem 実装に置換できたら削除。
+- `Qcorr_case1_singleton`：`ForbidOK` を `2 ≤ card` に固定し、S10 側の分岐を消したら削除。
+- `Del_hole_bound`, `ndeg_hole_le_zero_of_choice`：方針Cが `Del_branch_bound` に集約できたら削除候補。
+
+S11 は「呼び出し口の安定」が最優先なので、削除は S10/S9 が落ちないことを確認してから行う。
+-/
+
+/-
 (LEGACY)
 ForbidOK を `2 ≤ A.card` に凍結している限り singleton 分岐は本来起きない。
 S10 側に古い分岐が残る場合だけの互換用。最終的に削除する。

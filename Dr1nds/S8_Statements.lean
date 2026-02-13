@@ -30,11 +30,41 @@ variable {α : Type} [DecidableEq α]
   /- ROADMAP (how axioms will be discharged) -/
   - S8 は API 層のみを担い、ここで宣言する axiom は下流の特定ファイルで証明・実装される予定。
   - CON_ID_pack は S6_ConDelNdegId で証明される。
-  - CON_ID_corr_pack は S5_Forbid_Compat および S5_ForbidConLemmas で扱う。
+  - CON_ID_corr_pack は forbid 系（S5/S6 相当）で扱う（現状は API として仮置き）。
   - Q_step, Qcorr_step などの選点・局所評価に関わる axiom は S10/S11 で構成される。
   - IH_pack はグローバル帰納法の仮置きであり、最終的には S11/S12（または適切な集約ファイル）での最終定理証明により削除される。
 
 ============================================================ -/
+
+/-!
+# S8 棚卸し（親スレ用メモ）
+
+S8 は「仕様・命題・等式(API)の固定」専用。
+ここに *証明の中身*（選点・representability 構成・Del-as-Hole 本体など）を増やすと、
+S10/S11 の wiring 方針と衝突して破綻しやすい。
+
+## このファイルで“固定”しているもの（下流が依存してよい）
+- `HypPack`（`ClosedPack` + `HornNF` 仮定 DR1/NEP/NF）
+- 目標述語 `Q`, `Qcorr`
+- forbid 側許容条件 `ForbidOK`（凍結：`2 ≤ A.card` を採用）
+- 会計等式 API：`CON_ID_pack`, `CON_ID_corr_pack`（S6 / forbid 系で後日証明）
+- bundled IH：`IH`（※ただし `IH_pack` は「仮置き」で、最終的に削除/置換される）
+
+## このファイルで“仮置き(axiom)”になっているもの（重い核。S11 へ移す/消す対象）
+- `CON_ID_pack`, `CON_ID_corr_pack`（証明の置き場所はコメント通り）
+- `IH_pack`（グローバル帰納 driver の暫定入口）
+- `Local.exists_*`, `Local.del_bound_*`, `Local.Q_step`, `Local.Qcorr_step` など
+  ※これらは「S8 内に残しつつ Local に隔離」しているだけで、最終的に S11 へ集約する。
+
+## “やってはいけない”運用（事故防止）
+- S8 に新しい補題名を乱立させない（unknown identifier / 二重定義の温床）
+- `namespace Local` の外に、下流が直接参照する新しい axiom を追加しない
+
+## 将来の cleanup 方針（目標）
+- S11 側に API が揃ったら、S8 の `namespace Local` と `abbrev` 群は段階的に削除
+  （参照側は S10/S11 の名前へ寄せる）
+- `IH_pack` は最終定理（S11/S12 相当）で置換し、S8 から削除
+-/
 
 /- ------------------------------------------------------------
   0. Hypothesis pack (finite enumeration of FixSet)
@@ -100,6 +130,9 @@ Forbid 側で許す forbid 集合 `A` の条件。
 def ForbidOK (P : HypPack α) (A : Finset α) : Prop :=
   A ⊆ P.H.U ∧ (2 ≤ A.card)
 
+-- NOTE: `A.Nonempty` は `2 ≤ A.card` から自動で出るため含めない。
+-- S10 の `A.erase v` 分岐削除（singleton forbid を射程外へ）と相性が良い。
+
 namespace ForbidOK
 
 @[simp] lemma subset_univ {P : HypPack α} {A : Finset α} :
@@ -129,12 +162,10 @@ end ForbidOK
 ------------------------------------------------------------ -/
 
 /--
-/--
 (1) 通常会計の基本恒等式（CON_ID）を HypPack 上で使いやすい形に露出する。
 (2) S6_ConDelNdegId で証明されるべき事実である。
 (3) 長期的には S6_ConDelNdegId に置き、ここでは axiom として仮置きする。
 (4) 仮定として n ≥ 1, P : HypPack α, v : α を必要とする。
--/
 -/
 axiom CON_ID_pack
   (n : Nat) (hn : 1 ≤ n)
@@ -148,12 +179,10 @@ axiom CON_ID_pack
   ndeg (α := α) P.C v
 
 /--
-/--
 (1) forbid 付き会計の基本恒等式（CON_ID_corr）の最終形を HypPack 上で露出する。
-(2) S5_Forbid_Compat および S5_ForbidConLemmas で証明されるべき事実である。
-(3) 長期的には S5 系のファイルに置き、ここでは axiom として仮置きする。
+(2) forbid 系（S5/S6 相当）で証明されるべき事実である。
+(3) 長期的には forbid 系の集約ファイルに置き、ここでは axiom として仮置きする。
 (4) 仮定として n ≥ 1, P : HypPack α, A : Finset α, v : α を必要とする。
--/
 -/
 axiom CON_ID_corr_pack
   (n : Nat) (hn : 1 ≤ n)
@@ -182,6 +211,10 @@ axiom CON_ID_corr_pack
     `Dr1nds.Local.*` もしくは `S11_LocalKernels` の定義に統一する。
 ------------------------------------------------------------ -/
 namespace Local
+
+-- NOTE(運用): S8.Local は「暫定の受け口」。
+-- ここに中身の証明を足さない（S10=配線, S11=局所核 の分離を守る）。
+-- 追加で必要な局所核は S11_LocalKernels 側に集約し、S8 には alias/abbrev だけ残す方針。
 
 /--
 (1) con 分岐の構成可能性（representability）。
@@ -332,5 +365,14 @@ lemma exists_goodV_for_Q_of_exists_ndeg (P : HypPack α) :
 
 -- SC は S1_Families の定義を使う方針なら、ここで再定義しない。
 -- “P.C 上の SC” の補題は S7_SC_Local 側に置く。
+
+/-!
+## Cleanup checklist（削除/移動の目安）
+
+- [ ] `namespace Local`（S8 内）の axiom 群を S11 へ集約できたら、S8 側は `abbrev` のみにして段階的削除
+- [ ] `IH_pack` を最終定理（最終集約ファイル）で置換したら、S8 から削除
+- [ ] `exists_goodV_for_Q_of_exists_ndeg` は参照側が S11 の goodV API に揃ったら移動/削除
+- [ ] `ForbidOK.nonempty` の実装は「simp 事故を起こさない」ことを最優先（必要なら最小補題に差し替え）
+-/
 
 end Dr1nds

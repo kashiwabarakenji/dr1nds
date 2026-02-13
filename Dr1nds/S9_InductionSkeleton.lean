@@ -6,15 +6,11 @@ import Mathlib.Algebra.BigOperators.Group.Finset.Basic
 import Mathlib.Tactic
 
 import Dr1nds.S0_CoreDefs
-import Dr1nds.S4_FixFamily
 import Dr1nds.S8_Statements
 import Dr1nds.S10_Steps
-import Dr1nds.S11_LocalKernels
 
 namespace Dr1nds
 
-open Dr1nds
-open Dr1nds.Local
 open scoped BigOperators
 variable {α : Type} [DecidableEq α]
 
@@ -71,10 +67,7 @@ namespace Induction
 いずれにせよ **S10 の会計ステップは使わない**（n≥1 が前提のため）。
 ここは「定義の確定」に依存するので、S11（局所核）側で最終的に証明するのが安全。
 -/
-lemma base_Q (P : HypPack α) : Q (α := α) 0 P := by
-  -- TODO: 後で `S11_LocalKernels` に移して証明を完成させる。
-  -- このファイルでは“配線”を壊さないために placeholder を置く。
-  sorry
+axiom base_Q (P : HypPack α) : Q (α := α) 0 P
 
 /--
 (base) n=0 の forbid 側。
@@ -86,58 +79,47 @@ lemma base_Q (P : HypPack α) : Q (α := α) 0 P := by
 注意：`ForbidOK`（2 ≤ card）を前提にする必要があるかは仕様次第。
 この骨格では「後で必要なら前提を足す」方針で、いったん前提無しに置く。
 -/
-lemma base_Qcorr (P : HypPack α) (A : Finset α) : Qcorr (α := α) 0 P A := by
-  -- TODO: 後で `S11_LocalKernels` に移して証明を完成させる。
-  sorry
+axiom base_Qcorr (P : HypPack α) (A : Finset α) : Qcorr (α := α) 0 P A
 
 /-- 相互帰納の主定理（骨格） -/
-theorem main_mutual (n : Nat) (P : HypPack α) :
-    Q (α := α) n P ∧ (∀ A : Finset α, ForbidOK (α := α) P A → Qcorr (α := α) n P A) := by
+theorem main_mutual (n : Nat) :
+    ∀ P : HypPack α, IH (α := α) n P := by
   classical
-
   induction n with
   | zero =>
-      -- n = 0
-      -- NOTE: `Step.Q_step` / `Step.Qcorr_step` は会計ステップ（n≥1）用。
-      -- base case は定義に依存するため、ここでは `base_Q` / `base_Qcorr` に委譲して凍結する。
+      intro P
       refine ⟨base_Q (α := α) P, ?_⟩
       intro A hOK
       -- `hOK` はここでは未使用（将来 `base_Qcorr` の前提にする可能性はある）。
       exact base_Qcorr (α := α) P A
-
   | succ n ih =>
+      intro P
       -- n = n+1
-      -- ここでは「枠の固定」が目的なので、IH は名前付けして保持しておく
-      have hQ_prev : Q (α := α) n P := ih.1
-      have hQcorr_prev : (∀ A : Finset α, ForbidOK (α := α) P A → Qcorr (α := α) n P A) := ih.2
-
-      -- 将来 `Step.Q_step` / `Step.Qcorr_step` の引数が `IH n P`（bundled）を要求する形に
-      -- 変わった場合は、ここで
-      --   have hIH_prev : IH (α := α) n P := ⟨hQ_prev, hQcorr_prev⟩
-      -- を作って渡す。
-      -- いまは Step 側 API が `Q (n-1)` を受け取る形なので `hQ_prev` のみ渡している。
-
-      -- 現段階では hQ_prev / hQcorr_prev を内部で使うステップは S10/S11 側に置く
-      -- （ここでは Q_step / Qcorr_step が骨格 API を提供している想定）
+      -- IH is already the polymorphic bundled statement: ∀ P', IH n P'
       have hn' : 1 ≤ Nat.succ n := by
         exact Nat.succ_le_succ (Nat.zero_le n)
 
       have hQ : Q (α := α) (Nat.succ n) P :=
-        Step.Q_step (α := α) (n := Nat.succ n) (hn := hn') (P := P) hQ_prev
+        Step.Q_step (α := α) (n := Nat.succ n) (hn := hn') (P := P) ih
 
       refine ⟨hQ, ?_⟩
       intro A hOK
-      -- forbid 側は Step 側（S10_Steps）に委譲：必要な前提は明示して渡す
-      have hQcorr : Qcorr (α := α) (Nat.succ n) P A :=
-        Step.Qcorr_step (α := α) (n := Nat.succ n) (hn := hn') (P := P) (A := A) hOK hQ_prev
-      exact hQcorr
+      exact Step.Qcorr_step (α := α)
+        (n := Nat.succ n) (hn := hn') (P := P) (A := A) hOK ih
 
-/-- 通常会計だけ取り出し -/
-theorem main_Q (n : Nat) (P : HypPack α) : Q (α := α) n P := by
+
+/- 通常会計だけ取り出し -/
+theorem main_Q (n : Nat) : ∀ P : HypPack α, Q (α := α) n P := by
+  intro P
   exact (main_mutual (α := α) n P).1
 
-/-- forbid 付き会計だけ取り出し（ForbidOK 前提つき） -/
-theorem main_Qcorr (n : Nat) (P : HypPack α) (A : Finset α) :
-    ForbidOK (α := α) P A → Qcorr (α := α) n P A := by
-  intro hOK
+/- forbid 付き会計だけ取り出し（ForbidOK 前提つき） -/
+theorem main_Qcorr (n : Nat) :
+    ∀ (P : HypPack α) (A : Finset α), ForbidOK (α := α) P A → Qcorr (α := α) n P A := by
+  intro P A hOK
+
   exact (main_mutual (α := α) n P).2 A hOK
+
+end Induction
+
+end Dr1nds
