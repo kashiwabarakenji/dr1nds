@@ -5,6 +5,7 @@ import Mathlib.Tactic.Linarith
 import Dr1nds.S0_CoreDefs
 import Dr1nds.S9_IH_Unpack
 import Dr1nds.S8_Statements          -- Q / Qcorr / ForbidOK / HypPack / CON_ID_pack / CON_ID_corr_pack
+import Dr1nds.S5_Forbid_Compat       -- forbid / Hole / Up 互換補題（Del-bound branch で使用）
 import Dr1nds.S11_LocalKernels       -- v選択・局所評価 API
 
 

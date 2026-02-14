@@ -3,6 +3,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Data.Int.Basic
 import Mathlib.Algebra.BigOperators.Group.Finset.Basic
+import LeanCopilot
 
 import Dr1nds.S0_CoreDefs
 import Dr1nds.S6_ConDelNdegId  -- CON_ID（通常会計）を参照する前提
@@ -68,88 +69,185 @@ lemma mem_of_subset_of_mem {A X : Finset α} {v : α} (hvA : v ∈ A) (hAX : A �
 
 備考：この補題が通れば、con_Up_eq_Up_con / con_Hole_eq_Hole_con は ext だけで落ちやすい。
 -/
-axiom erase_subset_erase_iff
+lemma erase_subset_erase_iff
   (A X : Finset α) (v : α) :
   v ∈ A → v ∈ X →
-  (A.erase v ⊆ X.erase v) ↔ (A ⊆ X)
+  ((A.erase v ⊆ X.erase v) ↔ (A ⊆ X)) := by
+  classical
+  intro hvA hvX
+  constructor
+  · intro h a haA
+    by_cases hav : a = v
+    · subst hav
+      simp_all only
+    ·
+      have haAerase : a ∈ A.erase v := by
+        exact Finset.mem_erase.mpr ⟨hav, haA⟩
+      have haXerase : a ∈ X.erase v := by
+        apply h
+        rw [Finset.mem_erase] at haAerase
+        simp_all only [not_false_eq_true, ne_eq, Finset.mem_erase, and_self]
 
-/--
-【TODO】con_Up_eq_Up_con の lemma 化（erase_subset_erase_iff に依存）
+      exact (Finset.mem_erase.mp haXerase).2
+  · intro h
+    -- monotonicity of erase
+    intro a haAerase
+    have haA : a ∈ A := (Finset.mem_erase.mp haAerase).2
+    have haX : a ∈ X := h haA
+    have hav : a ≠ v := (Finset.mem_erase.mp haAerase).1
+    exact Finset.mem_erase.mpr ⟨hav, haX⟩
 
-狙い：v∈A の下で
-  con v (Up C A) = Up (con v C) (A.erase v)
-
-方針：
-* `Finset.ext` で集合等式に落とし、要素 `X` について
-    X∈con v (Up C A) ↔ X∈Up (con v C) (A.erase v)
-  を示す。
-* 左辺の membership は「∃Y, Y∈Up C A ∧ Y.erase v = X」の形に展開される（con の定義）。
-* `Up` 側は「A ⊆ Y」の条件を持つので、erase_subset_erase_iff で
-    (A.erase v ⊆ Y.erase v) ↔ (A ⊆ Y)
-  を繋げるのが核心。
-
-実装ヒント：
-* con の定義が `image (erase v)` なら、`Finset.mem_image` を使う。
-* `Up` が filter なら、`Finset.mem_filter` を使う。
-* injectivity が必要なら `Finset.erase_inj` ではなく、mem 前提付きの `injOn` を組む。
--/
-axiom con_Up_eq_Up_con
+lemma con_Up_eq_Up_con
   (C : Finset (Finset α)) (A : Finset α) (v : α) :
   v ∈ A →
   con (α := α) v (Up (α := α) C A)
     =
-  Up (α := α) (con (α := α) v C) (A.erase v)
+  Up (α := α) (con (α := α) v C) (A.erase v) := by
+  classical
+  intro hvA
+  ext X
+  constructor
+  · intro hX
+    -- unpack membership in `con`
+    rcases Finset.mem_image.mp hX with ⟨Y, hY, rfl⟩
+    rcases Finset.mem_filter.mp hY with ⟨hYUp, hvY⟩
+    rcases Finset.mem_filter.mp hYUp with ⟨hYC, hAY⟩
+    -- show membership in RHS filter
+    refine Finset.mem_filter.mpr ?_
+    refine And.intro ?hXcon ?hAerase
+    · -- X ∈ con v C
+      refine Finset.mem_image.mpr ?_
+      refine ⟨Y, ?_, rfl⟩
+      exact Finset.mem_filter.mpr ⟨hYC, hvY⟩
+    · -- (A.erase v) ⊆ (Y.erase v)
+      have hvY' : v ∈ Y := hvY
+      have hiff := (erase_subset_erase_iff (α := α) (A := A) (X := Y) (v := v)) hvA hvY'
+      exact (hiff.2 hAY)
+  · intro hX
+    rcases Finset.mem_filter.mp hX with ⟨hXcon, hAerase⟩
+    -- unpack membership in con v C
+    rcases Finset.mem_image.mp hXcon with ⟨Y, hY, hYX⟩
+    rcases Finset.mem_filter.mp hY with ⟨hYC, hvY⟩
+    -- want: Y ∈ Up C A and v ∈ Y, and X = Y.erase v
+    -- rewrite goal using hYX
+    subst hYX
+    refine Finset.mem_image.mpr ?_
+    refine ⟨Y, ?_, rfl⟩
+    -- show Y ∈ (Up C A).filter (v∈_)
+    refine Finset.mem_filter.mpr ?_
+    refine And.intro ?hYUp hvY
+    refine Finset.mem_filter.mpr ?_
+    refine And.intro hYC ?hAY
+    have hvY' : v ∈ Y := hvY
+    have hiff := (erase_subset_erase_iff (α := α) (A := A) (X := Y) (v := v)) hvA hvY'
+    exact (hiff.1 hAerase)
 
-/--
-【TODO】con_Hole_eq_Hole_con の lemma 化（con_Up_eq_Up_con と同型）
-
-狙い：v∈A の下で
-  con v (Hole C A) = Hole (con v C) (A.erase v)
-
-方針：
-* `Hole C A = C \ Up C A`（定義がそうなっている前提）を展開し、
-  con が差集合とどう絡むかを ext で押さえる。
-* 実装上は「membership を直接展開」する方が安定：
-    X∈Hole C A ↔ X∈C ∧ ¬(A ⊆ X)
-  の形にしてから erase_subset_erase_iff を当てる。
-
-注意：
-* `simp` が効かない場合は `constructor` で二方向を手で書く。
--/
-axiom con_Hole_eq_Hole_con
+lemma con_Hole_eq_Hole_con
   (C : Finset (Finset α)) (A : Finset α) (v : α) :
   v ∈ A →
   con (α := α) v (Hole (α := α) C A)
     =
-  Hole (α := α) (con (α := α) v C) (A.erase v)
+  Hole (α := α) (con (α := α) v C) (A.erase v) := by
+  classical
+  intro hvA
+  ext X
+  constructor
+  · intro hX
+    rcases Finset.mem_image.mp hX with ⟨Y, hY, rfl⟩
+    rcases Finset.mem_filter.mp hY with ⟨hYHole, hvY⟩
+    rcases Finset.mem_filter.mp hYHole with ⟨hYC, hNotAY⟩
+    -- RHS: X ∈ con v C and ¬(A.erase v ⊆ X)
+    refine Finset.mem_filter.mpr ?_
+    refine And.intro ?hXcon ?hNot
+    · refine Finset.mem_image.mpr ?_
+      refine ⟨Y, Finset.mem_filter.mpr ⟨hYC, hvY⟩, rfl⟩
+    · -- if A.erase v ⊆ Y.erase v then A ⊆ Y (since v∈A and v∈Y) contradicting hNotAY
+      intro hSub
+      have hiff := (erase_subset_erase_iff (α := α) (A := A) (X := Y) (v := v)) hvA hvY
+      have hAY : A ⊆ Y := (hiff.1 hSub)
+      exact hNotAY hAY
+  · intro hX
+    rcases Finset.mem_filter.mp hX with ⟨hXcon, hNot⟩
+    rcases Finset.mem_image.mp hXcon with ⟨Y, hY, hYX⟩
+    rcases Finset.mem_filter.mp hY with ⟨hYC, hvY⟩
+    subst hYX
+    -- show membership in LHS: Y ∈ Hole C A and v∈Y
+    refine Finset.mem_image.mpr ?_
+    refine ⟨Y, ?_, rfl⟩
+    refine Finset.mem_filter.mpr ?_
+    refine And.intro ?hYHole hvY
+    refine Finset.mem_filter.mpr ?_
+    refine And.intro hYC ?hNotAY
+    -- ¬(A ⊆ Y): otherwise A.erase v ⊆ Y.erase v and contradict hNot
+    intro hAY
+    have hiff := (erase_subset_erase_iff (α := α) (A := A) (X := Y) (v := v)) hvA hvY
+    have : A.erase v ⊆ Y.erase v := (hiff.2 hAY)
+    exact hNot this
 
-/--
-【TODO】card_Up_eq_card_Up_con の lemma 化（実は con_Up_eq_Up_con から従う）
-
-狙い：v∈A の下で
-  |Up(C,A)| = |Up(con v C, A.erase v)|
-
-方針：
-* まず con_Up_eq_Up_con を lemma 化して、
-    Up C A の con 像が右辺の Up と等しいことを得る。
-* その上で「con が card を保存する条件（= erase が injOn）」を別補題として用意し、
-  card の等式に落とす。
-
-代替（より簡単）：
-* 直接 `Finset.card_congr` で双射を作る：
-    Y ↦ Y.erase v
-  を Up C A 上で取り、逆写像は `insert v` などでは一般に戻れないので、
-  右辺の候補集合が con 像であること（con_Up_eq_Up_con）を先に確立するのが安全。
-
-実装では、この補題は“後回しでよい”：S10 の配線で必要なのは多くの場合
-NDS_corr の定義展開で出る card(Up) の項を移送できることだけ。
--/
-axiom card_Up_eq_card_Up_con
+lemma card_Up_eq_card_Up_con
   (C : Finset (Finset α)) (A : Finset α) (v : α) :
   v ∈ A →
   (Up (α := α) C A).card
     =
-  (Up (α := α) (con (α := α) v C) (A.erase v)).card
+  (Up (α := α) (con (α := α) v C) (A.erase v)).card := by
+  classical
+  intro hvA
+
+  -- Every X in Up C A contains v.
+  have hv_mem_up : ∀ {X : Finset α}, X ∈ Up (α := α) C A → v ∈ X := by
+    intro X hX
+    have hAX : A ⊆ X := (Finset.mem_filter.mp hX).2
+    exact hAX hvA
+
+  -- On Up C A, the filter (v ∈ ·) is redundant.
+  have hfilter : (Up (α := α) C A).filter (fun X => v ∈ X) = Up (α := α) C A := by
+    ext X
+    constructor
+    · intro h
+      exact (Finset.mem_filter.mp h).1
+    · intro h
+      exact Finset.mem_filter.mpr ⟨h, hv_mem_up (X := X) h⟩
+
+  -- Rewrite con v (Up C A) as an image by erase.
+  have hcon_as_image :
+      con (α := α) v (Up (α := α) C A)
+        = (Up (α := α) C A).image (fun X => X.erase v) := by
+    simp [con, hfilter]
+
+  -- `erase v` is injective on the carrier `Up C A` (because every member contains v).
+  have hinjOn : Set.InjOn (fun X : Finset α => X.erase v)
+      (↑(Up (α := α) C A) : Set (Finset α)) := by
+    intro X hX Y hY hEq
+    have hvX : v ∈ X := hv_mem_up (X := X) (by simpa using hX)
+    have hvY : v ∈ Y := hv_mem_up (X := Y) (by simpa using hY)
+    -- Insert v back to recover the original set.
+    have : insert v (X.erase v) = insert v (Y.erase v) := by
+      simpa [hEq]
+    simpa [Finset.insert_erase hvX, Finset.insert_erase hvY] using this
+
+  -- Therefore the image has the same cardinality.
+  have hcard_image :
+      (con (α := α) v (Up (α := α) C A)).card = (Up (α := α) C A).card := by
+    -- card(image f s) = card s iff f is injective on s
+    have hci : ((Up (α := α) C A).image (fun X => X.erase v)).card = (Up (α := α) C A).card :=
+      (Finset.card_image_iff).2 hinjOn
+    -- rewrite con to image
+    simpa [hcon_as_image] using hci
+
+  -- Now rewrite con(Up C A) using the set equality con_Up_eq_Up_con.
+  have hEq : con (α := α) v (Up (α := α) C A)
+      = Up (α := α) (con (α := α) v C) (A.erase v) :=
+    con_Up_eq_Up_con (α := α) (C := C) (A := A) (v := v) hvA
+
+  -- Combine.
+  -- hcard_image : card(con v (Up C A)) = card(Up C A)
+  -- so card(Up C A) = card(Up (con v C) (A.erase v))
+  have : (Up (α := α) C A).card = (Up (α := α) (con (α := α) v C) (A.erase v)).card := by
+    -- flip hcard_image and rewrite by hEq
+    have : (Up (α := α) C A).card = (con (α := α) v (Up (α := α) C A)).card := by
+      exact Eq.symm hcard_image
+    simpa [hEq] using this
+  exact this
 
 /-
 【置き換えロードマップ（推奨順）】

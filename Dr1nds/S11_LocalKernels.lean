@@ -1,5 +1,6 @@
 -- Dr1nds/S11_LocalKernels.lean
 import Mathlib.Data.Int.Basic
+import Mathlib.Data.Finset.Card
 import Mathlib.Tactic
 
 import Dr1nds.S0_CoreDefs
@@ -41,7 +42,7 @@ variable {α : Type} [DecidableEq α]
 - `exists_del_base_pack` / `del_as_hole` / `con_pack_universe`：Del-as-Hole ルートの表現核
 
 ### (S2 など) DR1/NEP 由来の軽い選択補題
-- `choose_prem_of_hasHead` / `prem_contains_head_choice`
+- `choose_prem_of_hasHead` / `pick_prem_mem`
 
 ### (S5/S6) Del-bound（方針C）
 - 推奨 API は `Del_branch_bound`。
@@ -96,7 +97,7 @@ lemma Up_card_nonneg
   (C : Finset (Finset α)) (A : Finset α) :
   (0 : Int) ≤ (Up (α := α) C A).card := by
   -- `card` is a Nat; its coercion to Int is nonnegative.
-  simpa using Int.ofNat_nonneg (Up (α := α) C A).card
+  simp_all only [Nat.cast_nonneg]
 
 /-- From a corrected bound we can drop the nonnegative `Up` term
     and obtain the plain `Hole` bound. -/
@@ -142,6 +143,189 @@ lemma Del_eq_Hole_singleton
   simp [Finset.mem_filter]
 
 
+/-
+============================================================
+  (A2) Del-as-Hole for HornNF.FixSet (ported from vPATCH-DEL-AS-HOLE-ADMIT0-1.0c)
+
+  位置づけ：
+  - HypPack レベルの `del_as_hole`（axiom）とは別物。
+  - こちらは HornNF の closure system と FixSet（閉集合族）だけで完結する
+    「Del = Hole(削除世界, Pv)」の表現補題。
+
+  注意：
+  - ここで使う `HornNF.del` は filter 型（prem の filter + U.erase）を想定。
+  - DR1（prem v の一意性）を使う。
+  - 既存の API 名が違う場合は、このブロックだけを S2 側の実名に合わせて rename してください。
+============================================================ -/
+
+namespace HornNF
+
+variable (H : HornNF α)
+
+/-- Membership in `FixSet` can be expressed as `X ⊆ U` plus closure. -/
+lemma mem_FixSet_iff (X : Finset α) :
+    X ∈ HornNF.FixSet H ↔ X ⊆ H.U ∧ H.IsClosed X := by
+  -- `FixSet := U.powerset.filter IsClosed`
+  -- `X ∈ U.powerset` is definitional to `X ⊆ U`.
+  simp [HornNF.FixSet, Finset.mem_powerset]
+
+/-- Elements of `FixSet` are subsets of the universe `U`. -/
+lemma mem_FixSet_subset_U {X : Finset α}
+    (hX : X ∈ HornNF.FixSet H) : X ⊆ H.U :=
+  (mem_FixSet_iff (H := H) (X := X)).1 hX |>.1
+
+/-- DR1 uniqueness: if `P,Q ∈ prem v` then `P = Q`. -/
+lemma prem_eq_of_mem_of_mem
+    (v : α)
+    (hDR1 : HornNF.IsDR1 H)
+    {P Q : Finset α}
+    (hP : P ∈ H.prem v) (hQ : Q ∈ H.prem v) :
+    P = Q := by
+  have hcard : (H.prem v).card ≤ 1 := hDR1 v
+  -- `Finset.card_le_one.mp` produces the uniqueness function, but we pass args explicitly
+  -- to avoid Lean mis-inferring `hP` as the element.
+  have hunique := Finset.card_le_one.mp hcard
+  exact hunique (a := P) (b := Q) hP hQ
+
+/-- Del-as-Hole (case R1): head=v に premise Pv があるとき
+
+`Del v (FixSet H) = Hole (FixSet (H.del v)) Pv`.
+
+(移植版)
+-/
+theorem del_as_hole_caseR1
+    (v : α)
+    (hDR1 : HornNF.IsDR1 H)
+    (Pv : Finset α) (hPv : Pv ∈ H.prem v) :
+    Del v (HornNF.FixSet H)
+      =
+    Hole (HornNF.FixSet (HornNF.del H v)) Pv :=
+by
+  classical
+  ext X
+  -- Del/Hole だけを展開して、FixSet の中身（powerset/filter）は必要な箇所でだけ展開する。
+  simp [Del, Hole]
+  constructor
+  · -- (⇒)
+    rintro ⟨hXFix, hvX⟩
+    -- `simp [Del, Hole]` により、`hXFix` は既に `X ∈ FixSet H` の形で来ることもあれば
+    -- `X ⊆ H.U ∧ H.IsClosed X` にまで展開されて来ることもある。
+    -- どちらでも扱えるように、ここでは一度 `hXFix' : X ⊆ H.U ∧ H.IsClosed X` を作る。
+    have hXFix' : X ⊆ H.U ∧ H.IsClosed X := by
+      -- もし `hXFix` が membership なら `mem_FixSet_iff` で、
+      -- もし既に pair ならそのまま。
+      first
+        | exact (mem_FixSet_iff (H := H) (X := X)).1 hXFix
+        | exact hXFix
+
+    refine And.intro ?hXFixDel ?hNotPv
+    · -- X ∈ FixSet (H.del v)
+      have hXU : X ⊆ H.U := hXFix'.1
+      have hXU' : X ⊆ H.U.erase v := by
+        intro x hxX
+        have hxU : x ∈ H.U := hXU hxX
+        have hxne : x ≠ v := by
+          intro hxeq; subst hxeq; exact hvX hxX
+        exact Finset.mem_erase.mpr ⟨hxne, hxU⟩
+
+      have hClosedH : H.IsClosed X := hXFix'.2
+
+      have hClosedDel : (HornNF.del H v).IsClosed X := by
+        intro h P hPdel hPX
+        by_cases hh : h = v
+        · subst hh
+          -- prem_del(v)=∅
+          simp_all only [and_self, del_prem_self, Finset.notMem_empty]
+        · -- h≠v: prem_del(h) is a filter of `H.prem h`
+          have hP : P ∈ H.prem h := by
+            have : P ∈ (H.prem h).filter (fun Q => v ∉ Q) := by
+              -- ここは `simp` の方が頑丈
+              simp [HornNF.del, hh] at hPdel
+              -- `hPdel : P ∈ H.prem h ∧ v ∉ P`
+              exact Finset.mem_filter.mpr ⟨hPdel.1, hPdel.2⟩
+            exact (Finset.mem_filter.mp this).1
+          exact hClosedH (h := h) (P := P) hP hPX
+
+      -- FixSet の membership を組み立てる
+      have : X ∈ HornNF.FixSet (HornNF.del H v) := by
+        -- `(H.del v).U` は definitional に `H.U.erase v`
+        -- ここでだけ FixSet を展開
+        have : X ⊆ (HornNF.del H v).U ∧ (HornNF.del H v).IsClosed X := by
+          simp_all only [and_self, del_U]
+        exact (mem_FixSet_iff (H := HornNF.del H v) (X := X)).2 this
+      simp_all only [and_self, Dr1nds.mem_FixSet_iff, del_U, Finset.mem_powerset]
+
+    · -- ¬Pv ⊆ X
+      intro hPvX
+      have hClosedH : H.IsClosed X := hXFix'.2
+      have : v ∈ X := hClosedH (h := v) (P := Pv) hPv hPvX
+      exact hvX this
+
+  · -- (⇐)
+    rintro ⟨hXFixDel, hNotPvX⟩
+    -- 同様に、`hXFixDel` を pair 形式に正規化
+    have hXFixDel' : X ⊆ (HornNF.del H v).U ∧ (HornNF.del H v).IsClosed X := by
+      first
+        | exact (mem_FixSet_iff (H := HornNF.del H v) (X := X)).1 hXFixDel
+        | exact hXFixDel
+
+    refine And.intro ?hXFix ?hvX
+
+    · -- X ∈ FixSet H
+      have hXU' : X ⊆ (HornNF.del H v).U := hXFixDel'.1
+      have hClosedDel : (HornNF.del H v).IsClosed X := hXFixDel'.2
+
+      have hvX : v ∉ X := by
+        intro hvX'
+        have : v ∈ (HornNF.del H v).U := hXU' hvX'
+        have : v ∈ H.U.erase v := by
+          simp_all only [and_true, del_U, and_self, Finset.mem_erase, ne_eq, not_true_eq_false, false_and]
+        exact (Finset.notMem_erase v H.U) this
+
+      have hXU : X ⊆ H.U := by
+        intro x hxX
+        have : x ∈ (HornNF.del H v).U := hXU' hxX
+        have : x ∈ H.U.erase v := by
+          simpa [HornNF.del] using this
+        exact (Finset.mem_erase.mp this).2
+
+      have hClosedH : H.IsClosed X := by
+        intro h P hP hPX
+        by_cases hh : h = v
+        · subst hh
+          have hPeq : P = Pv := by
+            apply prem_eq_of_mem_of_mem (H := H)
+            simp_all only [and_true, del_U, and_self]
+            exact hP
+            exact hPv
+          subst hPeq
+          exfalso
+          exact hNotPvX hPX
+        · by_cases hvP : v ∈ P
+          · exfalso
+            exact hvX (hPX hvP)
+          · have hPdel : P ∈ (HornNF.del H v).prem h := by
+              have : P ∈ (H.prem h).filter (fun Q => v ∉ Q) :=
+                Finset.mem_filter.mpr ⟨hP, hvP⟩
+              simpa [HornNF.del, hh] using this
+            exact hClosedDel (h := h) (P := P) hPdel hPX
+
+      -- FixSet membership
+      have : X ∈ HornNF.FixSet H :=
+        (mem_FixSet_iff (H := H) (X := X)).2 ⟨hXU, hClosedH⟩
+      simp_all only [and_true, del_U, and_self, Dr1nds.mem_FixSet_iff, Finset.mem_powerset]
+
+    · -- v ∉ X
+      have hXU' : X ⊆ (HornNF.del H v).U := hXFixDel'.1
+      intro hvX'
+      have : v ∈ (HornNF.del H v).U := hXU' hvX'
+      have : v ∈ H.U.erase v := by
+        simp_all only [and_true, del_U, true_and, Finset.mem_erase, ne_eq, not_true_eq_false, false_and]
+      exact (Finset.notMem_erase v H.U) this
+
+end HornNF
+
+
 /- ============================================================
   (B) good vertex 供給（S7 の責務）
 
@@ -181,7 +365,7 @@ noncomputable def choose_good_v_for_Q
 
 -- NOTE: exists_con_pack は S8_Statements.lean 側で定義済み。S11 で再定義すると衝突するので、ここでは S8 のものを利用する。
 
-/-- Noncomputably choose a con-pack. -/
+/- Noncomputably choose a con-pack. -/
 noncomputable def choose_con_pack
   (P : HypPack (α := α)) (v : α) : HypPack (α := α) :=
   Classical.choose (exists_con_pack (α := α) (P := P) (v := v))
@@ -196,10 +380,33 @@ NOTE: We deliberately do **not** tag this lemma with `[simp]` because `simp` can
 `t = t` to `True` via `eq_self_iff_true`, and then `by simpa using ...` could typecheck
 against `True` rather than the intended equality.
 -/
+
 theorem choose_con_pack_C_eq
   (P : HypPack (α := α)) (v : α) :
   (choose_con_pack (α := α) (P := P) (v := v)).C = con (α := α) v P.C := by
   exact (Classical.choose_spec (exists_con_pack (α := α) (P := P) (v := v))).2
+
+/-- Spec lemma (non-simp): the chosen con-pack has universe `P.H.U.erase v`.
+
+NOTE: We deliberately do **not** tag this lemma with `[simp]` for the same reason as
+`choose_con_pack_C_eq`: avoiding accidental rewriting of goals into `True` via `eq_self_iff_true`.
+-/
+theorem choose_con_pack_U_eq
+  (P : HypPack (α := α)) (v : α) :
+  (choose_con_pack (α := α) (P := P) (v := v)).H.U = P.H.U.erase v := by
+  exact (Classical.choose_spec (exists_con_pack (α := α) (P := P) (v := v))).1
+
+/-- Simp lemma: rewrite the chosen con-pack universe. -/
+@[simp] theorem choose_con_pack_U
+  (P : HypPack (α := α)) (v : α) :
+  (choose_con_pack (α := α) (P := P) (v := v)).H.U = P.H.U.erase v := by
+  exact choose_con_pack_U_eq (α := α) (P := P) (v := v)
+
+/-- Alias simp-lemma (kept for backward compatibility with earlier code). -/
+@[simp] theorem choose_con_pack_U'
+  (P : HypPack (α := α)) (v : α) :
+  (choose_con_pack (α := α) (P := P) (v := v)).H.U = P.H.U.erase v := by
+  exact choose_con_pack_U_eq (α := α) (P := P) (v := v)
 
 /-- Simp lemma: rewrite the chosen con-pack family. -/
 @[simp] theorem choose_con_pack_C
@@ -212,6 +419,25 @@ theorem choose_con_pack_C_eq
   (P : HypPack (α := α)) (v : α) :
   (choose_con_pack (α := α) (P := P) (v := v)).C = con (α := α) v P.C := by
   exact choose_con_pack_C_eq (α := α) (P := P) (v := v)
+
+/-/ === (C) Representability for IH targets (del-pack) === -/
+
+/-- Noncomputably choose a del-pack. -/
+noncomputable def choose_del_pack
+  (P : HypPack (α := α)) (v : α) : HypPack (α := α) :=
+  Classical.choose (exists_del_pack (α := α) (P := P) (v := v))
+
+/-- Spec lemma (non-simp): the chosen pack enumerates `Del v P.C`. -/
+theorem choose_del_pack_C_eq
+  (P : HypPack (α := α)) (v : α) :
+  (choose_del_pack (α := α) (P := P) (v := v)).C = Del (α := α) v P.C := by
+  exact (Classical.choose_spec (exists_del_pack (α := α) (P := P) (v := v))).2
+
+/-- Simp lemma: rewrite the chosen del-pack family. -/
+@[simp] theorem choose_del_pack_C
+  (P : HypPack (α := α)) (v : α) :
+  (choose_del_pack (α := α) (P := P) (v := v)).C = Del (α := α) v P.C := by
+  exact choose_del_pack_C_eq (α := α) (P := P) (v := v)
 
 /--
 (Purpose)
@@ -271,21 +497,6 @@ axiom Del_bound
   Q (α := α) (n - 1) P →
   NDS (α := α) (n - 1) (Del v P.C) ≤ 0
 
-/-- Wrapper lemma for the plain Del-bound.
-
-This is currently just a thin layer over the axiom `Del_bound`,
-but it gives S10 (and future refactors) a stable theorem name
-that can later be reimplemented via a branch-style API
-without changing call sites.
--/
-theorem Del_bound_of_Q
-  (n : Nat) (hn : 1 ≤ n)
-  (P : HypPack (α := α))
-  (v : α)
-  (hQ : Q (α := α) (n - 1) P) :
-  NDS (α := α) (n - 1) (Del v P.C) ≤ 0 := by
-  exact Del_bound (α := α) (n := n) (hn := hn) (P := P) (v := v) hQ
-
 /--
 (Purpose)
 DR1 implies `prem v` has at most one element; when it is nonempty we can pick the unique premise.
@@ -299,22 +510,6 @@ axiom choose_prem_of_hasHead
   (P.H.prem v).Nonempty →
   { Pv : Finset α // Pv ∈ P.H.prem v }
 
-/--
-WARNING（仕様未確定）
-
-`prem_contains_head_choice` は「選んだ前提 Pv が head v を含む」ことを主張している。
-しかし NF 方針（全規則で head ∉ prem）を常時仮定する設計の場合、これは逆（`v ∉ Pv`）が自然。
-
-ここは S8 側の `prem` の意味論（prem が『前提集合そのもの』か『前提∪{head} のような符号化』か）で
-結論が変わるので、埋める段階で必ず整合チェックする。
-
-当面は「将来差し替える可能性が高い」ことを明示するために axiom のまま置いている。
--/
-axiom prem_contains_head_choice
-  (P : HypPack (α := α)) (v : α)
-  (h : (P.H.prem v).Nonempty) :
-  let Pv := (choose_prem_of_hasHead (α := α) (P := P) (v := v) h).1
-  v ∈ Pv
 
 /-- Noncomputably pick `Pv` from `prem v` when nonempty. -/
 noncomputable def pick_prem
@@ -326,32 +521,269 @@ noncomputable def pick_prem
   pick_prem (α := α) P v h ∈ P.H.prem v :=
   (choose_prem_of_hasHead (α := α) (P := P) (v := v) h).2
 
-@[simp] theorem pick_prem_contains_head
-  (P : HypPack (α := α)) (v : α) (h : (P.H.prem v).Nonempty) :
-  v ∈ pick_prem (α := α) P v h := by
-  simpa [pick_prem] using (prem_contains_head_choice (α := α) (P := P) (v := v) h)
+
+
+/-/
+Kernel: supply the specific `Qcorr` fact needed by the Del-branch when `prem v` is nonempty.
+
+This is expected to be proved in S5/S6 using the Del-as-Hole identification on the deletion world,
+then applying the global IH on the appropriate pack.
+
+We keep it as an axiom for now so that `Del_bound_of_Q` can be implemented via the branch route
+without changing any call sites.
+-/
+
+axiom prem_erase_Qcorr
+  (n : Nat) (hn : 1 ≤ n)
+  (P : HypPack (α := α)) (v : α)
+  (hPrem : (P.H.prem v).Nonempty) :
+  Qcorr (α := α)
+    (n - 1)
+    (choose_con_pack (α := α) (P := P) (v := v))
+    ((pick_prem (α := α) P v hPrem).erase v)
+
 
 /--
-(Del-as-Hole) 仕様の置き場所
+Kernel: supply the specific `Qcorr` fact needed by the Del-branch when `prem v` is nonempty
+and the chosen premise has size at least 2.
 
-`del_eq_hole` は Del を Hole として表現する“本丸”の同一視。
-方針Cでは、この同一視と `corr_implies_hole_bound` を組み合わせて Del-bound を落とす。
-
-注意：現状の `del_eq_hole` は「base family を作り直す」版ではなく、
-単に `Hole P.C (pick_prem ...)` にしている（暫定）。
-将来、削除世界の base family を明示する設計に切り替える場合は、
-この axiom を
-  Del v P.C = Hole (Del_base(P,v)) Pv
-の形へ差し替えてよい（呼び出し側は `Del_bound_from_branch` の中だけに閉じ込める）。
+This is the intended non-singleton API; singleton (`card = 1`) is handled by a separate route.
 -/
-axiom del_eq_hole
+/-
+Kernel: supply the specific `Qcorr` fact needed by the Del-branch when `prem v` is nonempty
+and the chosen premise has size at least 2.
+
+This is the intended non-singleton API; singleton (`card = 1`) is handled by a separate route.
+
+Implementation note:
+We apply `IH_Qcorr` *directly* to the con-pack, after constructing `ForbidOK`.
+This avoids any Del→con transport.
+-/
+theorem prem_erase_Qcorr_ge2
+  (n : Nat) (hn : 1 ≤ n)
+  (P : HypPack (α := α)) (v : α)
+  (hPrem : (P.H.prem v).Nonempty)
+  (hCard : 2 ≤ (pick_prem (α := α) P v hPrem).card) :
+  Qcorr (α := α)
+    (n - 1)
+    (choose_con_pack (α := α) (P := P) (v := v))
+    ((pick_prem (α := α) P v hPrem).erase v)
+:= by
+  classical
+
+  -- Fix names
+  let Pv := pick_prem (α := α) P v hPrem
+  have hmem : Pv ∈ P.H.prem v := by
+    simp_all only [pick_prem_mem, Pv]
+
+  -- NF: head is not in its premise
+  have hv_not : v ∉ Pv := by
+    simpa [Pv] using P.H.nf hmem
+
+  -- card condition survives erase (since v ∉ Pv)
+  have hCard' : 2 ≤ (Pv.erase v).card := by
+    simpa [Pv, Finset.erase_eq_of_notMem hv_not] using hCard
+
+  -- inclusion into the con-pack universe
+  have hsubset :
+      Pv.erase v ⊆
+        (choose_con_pack (α := α) (P := P) (v := v)).H.U := by
+    intro x hx
+    have hxne : x ≠ v := (Finset.mem_erase.mp hx).1
+    have hxPv : x ∈ Pv := (Finset.mem_erase.mp hx).2
+    have hxU : x ∈ P.H.U :=
+      P.H.prem_subset_U hmem hxPv
+    have hUeq :
+      (choose_con_pack (α := α) (P := P) (v := v)).H.U = P.H.U.erase v :=
+      choose_con_pack_U_eq (α := α) (P := P) (v := v)
+    -- move to `P.H.U.erase v` and rewrite the target universe
+    have : x ∈ P.H.U.erase v := Finset.mem_erase.mpr ⟨hxne, hxU⟩
+    simpa [hUeq] using this
+
+  -- build ForbidOK and apply IH_Qcorr directly on the con-pack
+  have hForbid :
+      ForbidOK (α := α)
+        (choose_con_pack (α := α) (P := P) (v := v))
+        (Pv.erase v) := by
+    exact And.intro hsubset hCard'
+
+  exact
+    IH_Qcorr
+      (α := α)
+      (n := n)
+      (P := choose_con_pack (α := α) (P := P) (v := v))
+      (A := Pv.erase v)
+      hForbid
+
+/--
+Pd-based version of prem_erase_Qcorr_ge2.
+
+This supplies the Qcorr fact directly on the deletion-world pack.
+For now we keep it as an axiom; it will later be proved via IH_Qcorr
+applied to the deletion base pack.
+-/
+axiom prem_erase_Qcorr_ge2_Pd
+  (n : Nat) (hn : 1 ≤ n)
+  (P : HypPack (α := α)) (v : α)
+  (hPrem : (P.H.prem v).Nonempty)
+  (hCard : 2 ≤ (pick_prem (α := α) P v hPrem).card) :
+  Qcorr (α := α)
+    (n - 1)
+    (choose_del_base_pack (P := P) (v := v) (hPrem := hPrem))
+    ((pick_prem (α := α) P v hPrem).erase v)
+
+
+/-/
+(Del-as-Hole) 仕様の置き場所（台=U.erase v を明示した版）
+
+ここで固定したい設計は次の通り：
+- `Del v P.C` は “削除世界（台 `P.U.erase v`）” の family として扱う。
+- したがって Del-as-Hole は **削除世界の base pack** `Pd` 上で述べる。
+
+このファイル（S11）では呼び出し口の安定が最優先なので、
+実体は当面 axiom として置き、後で S5/S6 で theorem 化する。
+
+注意：以前の暫定 `Hole P.C (pick_prem ...)` は、母体 family の台が `U` のまま
+の可能性があり、`U.erase v` 固定設計と整合しないため削除した。
+-/
+axiom exists_del_base_pack
+  (P : HypPack (α := α)) (v : α) :
+  ∃ Pd : HypPack (α := α),
+    Pd.H.U = P.H.U.erase v ∧ Pd.C = Del (α := α) v P.C
+
+/-
+Del-as-Hole（削除世界 base pack 版）
+
+`prem v` が nonempty のとき、唯一前提 `Pv` を取り、
+削除世界 base pack `Pd` の上で
+  `Pd.C = Hole Pd.C (Pv.erase v)`
+を与える。
+
+※ここでは `Pd` の取り方を `exists_del_base_pack` によって固定する。
+-/
+/-
+Del-as-Hole（削除世界 base pack 版）
+
+`prem v` が nonempty のとき、唯一前提 `Pv` を取り、
+削除世界 base pack `Pd`（`Pd.H.U = P.H.U.erase v` かつ `Pd.C = Del v P.C`）の上で
+  `Pd.C = Hole Pd.C (Pv.erase v)`
+を与える。
+
+※ここでは `Pd` の取り方を `exists_del_base_pack` によって固定する。
+-/
+
+/--
+Del-as-Hole（削除世界 base pack 版）
+
+`prem v` が nonempty のとき、唯一前提 `Pv` を取り、
+削除世界 base pack `Pd`（`Pd.H.U = P.H.U.erase v` かつ `Pd.C = Del v P.C`）の上で
+  `Pd.C = Hole Pd.C (Pv.erase v)`
+を与える。
+-/
+theorem del_as_hole
   (P : HypPack (α := α))
   (v : α)
-  (h : (P.H.prem v).Nonempty) :
-  Del v P.C
-    =
-  Hole P.C
-    (pick_prem P v h)
+  (hPrem : (P.H.prem v).Nonempty) :
+  ∃ Pd : HypPack (α := α),
+    Pd.H.U = P.H.U.erase v ∧
+    Pd.C = Del (α := α) v P.C ∧
+    (let Pv := pick_prem (α := α) P v hPrem
+     Pd.C = Hole (α := α) Pd.C (Pv.erase v))
+:= by
+  classical
+  obtain ⟨Pd, hU, hC⟩ :=
+    exists_del_base_pack (α := α) (P := P) (v := v)
+
+  let Pv := pick_prem (α := α) P v hPrem
+  have hPv : Pv ∈ P.H.prem v := by
+    simp_all only [pick_prem_mem, Pv]
+
+  have hv_not : v ∉ Pv := by
+    simpa using P.H.nf hPv
+
+  refine ⟨Pd, hU, hC, ?_⟩
+
+  -- FixSet-level Del-as-Hole
+  have hFixSet :
+      Del v (HornNF.FixSet P.H)
+        = Hole (HornNF.FixSet (HornNF.del P.H v)) Pv :=
+    HornNF.del_as_hole_caseR1
+      (H := P.H)
+      (v := v)
+      (hDR1 := P.dr1)
+      (Pv := Pv)
+      (hPv := hPv)
+
+  -- First show: Del v P.C = Del v (FixSet P.H)
+  have hDel_eq : Del v P.C = Del v (HornNF.FixSet P.H) := by
+    -- P.C = FixSet P.H via P.mem_iff'
+    have hPC : P.C = HornNF.FixSet P.H := by
+      ext X
+      simp_all only [pick_prem_mem, ClosedPack.mem_iff', mem_FixSet_iff, Finset.mem_powerset, Pv]
+    rw [hPC]
+
+  -- Combine with hFixSet
+  have hFix :
+      Del v P.C
+        = Hole (HornNF.FixSet (HornNF.del P.H v)) Pv := by
+    rw [hDel_eq]
+    exact hFixSet
+
+  -- Return to Pd-level and convert Pv to Pv.erase v
+  have hFinal :
+      Pd.C = Hole Pd.C (Pv.erase v) := by
+    -- rewrite Pd.C to Del v P.C
+    rw [hC]
+    -- rewrite Del v P.C using hFix
+    rw [hFix]
+    -- replace Pv.erase v with Pv (since v ∉ Pv)
+    have hErase : Pv.erase v = Pv :=
+      Finset.erase_eq_of_notMem hv_not
+    rw [hErase]
+    -- now we need: Hole F Pv = Hole (Hole F Pv) Pv
+    -- this is idempotence of filtering with the same predicate
+    apply Finset.ext
+    intro X
+    unfold Hole
+    simp
+
+  exact hFinal
+
+/-- Noncomputably choose a del base pack as in del_as_hole. -/
+noncomputable def choose_del_base_pack
+  (P : HypPack α) (v : α)
+  (hPrem : (P.H.prem v).Nonempty) : HypPack α :=
+  (del_as_hole P v hPrem).choose
+
+@[simp] theorem choose_del_base_pack_spec_U
+  (P : HypPack (α := α)) (v : α) (hPrem : (P.H.prem v).Nonempty) :
+  (choose_del_base_pack (α := α) (P := P) (v := v) (hPrem := hPrem)).H.U = P.H.U.erase v := by
+  have h := Classical.choose_spec (del_as_hole (α := α) (P := P) (v := v) (hPrem := hPrem))
+  exact h.1
+
+@[simp] theorem choose_del_base_pack_spec_C
+  (P : HypPack (α := α)) (v : α) (hPrem : (P.H.prem v).Nonempty) :
+  (choose_del_base_pack (α := α) (P := P) (v := v) (hPrem := hPrem)).C = Del (α := α) v P.C := by
+  have h := Classical.choose_spec (del_as_hole (α := α) (P := P) (v := v) (hPrem := hPrem))
+  exact h.2.1
+
+theorem choose_del_base_pack_spec_hole
+  (P : HypPack (α := α)) (v : α) (hPrem : (P.H.prem v).Nonempty) :
+  let Pv := pick_prem (α := α) P v hPrem
+  (choose_del_base_pack (α := α) (P := P) (v := v) (hPrem := hPrem)).C
+    = Hole (α := α)
+        (choose_del_base_pack (α := α) (P := P) (v := v) (hPrem := hPrem)).C
+        (Pv.erase v)
+:= by
+  classical
+  -- Unpack the spec coming from `del_as_hole`.
+  have hs :=
+    Classical.choose_spec
+      (del_as_hole (α := α) (P := P) (v := v) (hPrem := hPrem))
+  -- `hs.2.2` is exactly the Hole-equality, but written for `Classical.choose ...`.
+  -- Rewrite `Classical.choose ...` as `choose_del_base_pack ...`.
+  simpa [choose_del_base_pack] using hs.2.2
+
 
 /--
 Del-bound（方針C）の最終 API。
@@ -362,15 +794,15 @@ Proof idea (future, S5/S6):
   3) `Qcorr(n-1, Pc, Pv.erase v)` と `corr_implies_hole_bound` で Hole の NDS を落とす。
   4) Hole=Del の同一視で結論へ。
 -/
-axiom Del_branch_bound
+axiom Del_branch_bound_Pd
   (n : Nat) (hn : 1 ≤ n)
   (P : HypPack (α := α))
   (v : α)
-  (Pc : HypPack (α := α))
-  (hPcC : Pc.C = con (α := α) v P.C)
-  (Pv : Finset α) :
-  (v ∈ Pv) →
-  Qcorr (α := α) (n - 1) Pc (Pv.erase v) →
+  (Pd : HypPack (α := α))
+  (hPdU : Pd.H.U = P.H.U.erase v)
+  (hPdC : Pd.C = Del (α := α) v P.C)
+  (A : Finset α) :
+  Qcorr (α := α) (n - 1) Pd A →
   NDS (α := α) (n - 1) (Del (α := α) v P.C) ≤ 0
 
 /--
@@ -387,38 +819,83 @@ theorem Del_bound_from_branch
   (P : HypPack (α := α))
   (v : α)
   (hPrem : (P.H.prem v).Nonempty)
-  (hQprev : Q (α := α) (n - 1) P)
   (hQcorr :
     Qcorr (α := α)
       (n - 1)
-      (choose_con_pack (α := α) (P := P) (v := v))
+      (choose_del_base_pack P v hPrem)
       ((pick_prem P v hPrem).erase v)
   ) :
   NDS (α := α) (n - 1) (Del v P.C) ≤ 0 :=
 by
   classical
-  let Pc := choose_con_pack (α := α) (P := P) (v := v)
-  have hPcC : Pc.C = con (α := α) v P.C :=
-    choose_con_pack_C_eq (α := α) (P := P) (v := v)
+  let Pd :=
+    choose_del_base_pack P v hPrem
+
+  have hPdU :
+      Pd.H.U = P.H.U.erase v :=
+    choose_del_base_pack_spec_U (α := α) (P := P) (v := v) (hPrem := hPrem)
+
+  have hPdC :
+      Pd.C = Del (α := α) v P.C :=
+    choose_del_base_pack_spec_C (α := α) (P := P) (v := v) (hPrem := hPrem)
 
   let Pv := pick_prem P v hPrem
-  have hvPv : v ∈ Pv :=
-    pick_prem_contains_head (α := α) (P := P) (v := v) hPrem
 
   have hDel :=
-    Del_branch_bound
+    Del_branch_bound_Pd
       (α := α)
       (n := n)
       (hn := hn)
       (P := P)
       (v := v)
-      (Pc := Pc)
-      (hPcC := hPcC)
-      (Pv := Pv)
-      hvPv
+      (Pd := Pd)
+      (hPdU := hPdU)
+      (hPdC := hPdC)
+      (A := Pv.erase v)
       hQcorr
 
   exact hDel
+
+
+/-- Wrapper lemma for the plain Del-bound.
+
+This is currently just a thin layer over the axiom `Del_bound`,
+but it gives S10 (and future refactors) a stable theorem name
+that can later be reimplemented via a branch-style API
+without changing call sites.
+-/
+theorem Del_bound_of_Q
+  (n : Nat) (hn : 1 ≤ n)
+  (P : HypPack (α := α))
+  (v : α)
+  (hQ : Q (α := α) (n - 1) P) :
+  NDS (α := α) (n - 1) (Del v P.C) ≤ 0 :=
+by
+  classical
+  by_cases hPrem : (P.H.prem v).Nonempty
+  ·
+    let Pv := pick_prem (α := α) P v hPrem
+    by_cases hCard : 2 ≤ Pv.card
+    ·
+      have hQcorrPd :=
+        prem_erase_Qcorr_ge2_Pd
+          (n := n) (hn := hn)
+          (P := P) (v := v)
+          (hPrem := hPrem)
+          (hCard := by simpa [Pv] using hCard)
+
+      exact
+        Del_bound_from_branch
+          (α := α) (n := n) (hn := hn)
+          (P := P) (v := v)
+          (hPrem := hPrem)
+          hQcorrPd
+    ·
+      -- singleton route (legacy fallback)
+      exact Del_bound (α := α) (n := n) (hn := hn) (P := P) (v := v) hQ
+  ·
+    -- no premise at v: fallback to legacy axiom
+    exact Del_bound (α := α) (n := n) (hn := hn) (P := P) (v := v) hQ
 
 
 /- ============================================================
