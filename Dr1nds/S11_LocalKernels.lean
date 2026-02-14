@@ -345,18 +345,21 @@ S10 needs *some* vertex `v` with `ndeg(P.C,v) ≤ 0` to run the main induction s
 S7（NoParallel→SC→good vertex など）で埋める。
 -/
 axiom exists_good_v_for_Q
-  (n : Nat) (P : HypPack (α := α)) :
+  (n : Nat) (P : HypPack α) :
   ∃ v : α, ndeg (α := α) P.C v ≤ 0
 
 /-- Noncomputably pick a good vertex from `exists_good_v_for_Q`. -/
 noncomputable def choose_good_v_for_Q
-  (n : Nat) (P : HypPack (α := α)) : α :=
+  (n : Nat) (P : HypPack α) : α :=
   Classical.choose (exists_good_v_for_Q (α := α) n P)
 
+
 @[simp] theorem choose_good_v_for_Q_spec
-  (n : Nat) (P : HypPack (α := α)) :
+  (n : Nat) (P : HypPack α) :
   ndeg (α := α) P.C (choose_good_v_for_Q (α := α) n P) ≤ 0 :=
   Classical.choose_spec (exists_good_v_for_Q (α := α) n P)
+
+
 
 
 /- ============================================================
@@ -367,7 +370,7 @@ noncomputable def choose_good_v_for_Q
 
 /- Noncomputably choose a con-pack. -/
 noncomputable def choose_con_pack
-  (P : HypPack (α := α)) (v : α) : HypPack (α := α) :=
+  (P : HypPack α) (v : α) : HypPack α :=
   Classical.choose (exists_con_pack (α := α) (P := P) (v := v))
 
 -- NOTE:
@@ -382,7 +385,7 @@ against `True` rather than the intended equality.
 -/
 
 theorem choose_con_pack_C_eq
-  (P : HypPack (α := α)) (v : α) :
+  (P : HypPack α) (v : α) :
   (choose_con_pack (α := α) (P := P) (v := v)).C = con (α := α) v P.C := by
   exact (Classical.choose_spec (exists_con_pack (α := α) (P := P) (v := v))).2
 
@@ -392,31 +395,31 @@ NOTE: We deliberately do **not** tag this lemma with `[simp]` for the same reaso
 `choose_con_pack_C_eq`: avoiding accidental rewriting of goals into `True` via `eq_self_iff_true`.
 -/
 theorem choose_con_pack_U_eq
-  (P : HypPack (α := α)) (v : α) :
+  (P : HypPack α) (v : α) :
   (choose_con_pack (α := α) (P := P) (v := v)).H.U = P.H.U.erase v := by
   exact (Classical.choose_spec (exists_con_pack (α := α) (P := P) (v := v))).1
 
 /-- Simp lemma: rewrite the chosen con-pack universe. -/
 @[simp] theorem choose_con_pack_U
-  (P : HypPack (α := α)) (v : α) :
+  (P : HypPack α) (v : α) :
   (choose_con_pack (α := α) (P := P) (v := v)).H.U = P.H.U.erase v := by
   exact choose_con_pack_U_eq (α := α) (P := P) (v := v)
 
 /-- Alias simp-lemma (kept for backward compatibility with earlier code). -/
 @[simp] theorem choose_con_pack_U'
-  (P : HypPack (α := α)) (v : α) :
+  (P : HypPack α) (v : α) :
   (choose_con_pack (α := α) (P := P) (v := v)).H.U = P.H.U.erase v := by
   exact choose_con_pack_U_eq (α := α) (P := P) (v := v)
 
 /-- Simp lemma: rewrite the chosen con-pack family. -/
 @[simp] theorem choose_con_pack_C
-  (P : HypPack (α := α)) (v : α) :
+  (P : HypPack α) (v : α) :
   (choose_con_pack (α := α) (P := P) (v := v)).C = con (α := α) v P.C := by
   exact choose_con_pack_C_eq (α := α) (P := P) (v := v)
 
 /-- Alias simp-lemma (kept for backward compatibility with earlier S10 code). -/
 @[simp] theorem choose_con_pack_C'
-  (P : HypPack (α := α)) (v : α) :
+  (P : HypPack α) (v : α) :
   (choose_con_pack (α := α) (P := P) (v := v)).C = con (α := α) v P.C := by
   exact choose_con_pack_C_eq (α := α) (P := P) (v := v)
 
@@ -424,18 +427,18 @@ theorem choose_con_pack_U_eq
 
 /-- Noncomputably choose a del-pack. -/
 noncomputable def choose_del_pack
-  (P : HypPack (α := α)) (v : α) : HypPack (α := α) :=
+  (P : HypPack α) (v : α) : HypPack α :=
   Classical.choose (exists_del_pack (α := α) (P := P) (v := v))
 
 /-- Spec lemma (non-simp): the chosen pack enumerates `Del v P.C`. -/
 theorem choose_del_pack_C_eq
-  (P : HypPack (α := α)) (v : α) :
+  (P : HypPack α) (v : α) :
   (choose_del_pack (α := α) (P := P) (v := v)).C = Del (α := α) v P.C := by
   exact (Classical.choose_spec (exists_del_pack (α := α) (P := P) (v := v))).2
 
 /-- Simp lemma: rewrite the chosen del-pack family. -/
 @[simp] theorem choose_del_pack_C
-  (P : HypPack (α := α)) (v : α) :
+  (P : HypPack α) (v : α) :
   (choose_del_pack (α := α) (P := P) (v := v)).C = Del (α := α) v P.C := by
   exact choose_del_pack_C_eq (α := α) (P := P) (v := v)
 
@@ -450,8 +453,8 @@ S10 の con-branch を抑えるための「配線用」補題。
 `Pc.C` を `con v P.C` に書き換えて閉じる。
 -/
 theorem IH_Q_gives_con_bound_pack
-  (n : Nat) (P : HypPack (α := α)) (v : α)
-  (Pc : HypPack (α := α)) (hPcC : Pc.C = con (α := α) v P.C) :
+  (n : Nat) (P : HypPack α) (v : α)
+  (Pc : HypPack α) (hPcC : Pc.C = con (α := α) v P.C) :
   Q (α := α) (n - 1) P →
   NDS (α := α) (n - 1) Pc.C ≤ 0
 := by
@@ -464,8 +467,8 @@ theorem IH_Q_gives_con_bound_pack
 
 /-- Backward-compatibility: old name (non-pack) lived in S9; the pack version lives in S11. -/
 @[simp] theorem IH_Q_gives_con_bound'
-  (n : Nat) (P : HypPack (α := α)) (v : α)
-  (Pc : HypPack (α := α)) (hPcC : Pc.C = con (α := α) v P.C) :
+  (n : Nat) (P : HypPack α) (v : α)
+  (Pc : HypPack α) (hPcC : Pc.C = con (α := α) v P.C) :
   Q (α := α) (n - 1) P →
   NDS (α := α) (n - 1) Pc.C ≤ 0 :=
 by
@@ -477,27 +480,23 @@ by
 ============================================================ -/
 
 /--
-(D) Del-bound の「段階的な置き換え」
+ (S11 kernel) Del-bound when `prem v` is empty.
 
-現状：`Del_bound` は *axiom* として凍結している（S10 の Q_step を先に通すため）。
-
-目標：方針C（自然言語証明）に沿って、最終的には
-  `Del_branch_bound`（Qcorr から Del を落とす API）
-  → `Del_bound_from_branch`（branch API から plain bound を導出）
-  → `Del_bound_of_Q`（S10 の呼び出し口を固定）
-という順で、呼び出し側を壊さずに theorem 化していく。
-
-つまり、S10 側は常に `Del_bound_of_Q` を呼ぶだけにしておき、
-S11 内で実装を差し替えるのが基本方針。
+ Design note: S10 is pure wiring; the mathematical content for this branch
+ is handled in S11.
 -/
-axiom Del_bound
+axiom Del_bound_of_Q_empty
   (n : Nat) (hn : 1 ≤ n)
-  (P : HypPack (α := α))
-  (v : α) :
-  Q (α := α) (n - 1) P →
-  NDS (α := α) (n - 1) (Del v P.C) ≤ 0
+  (P : HypPack α)
+  (v : α)
+  (hPrem : ¬ (P.H.prem v).Nonempty)
+  (hQ : Q (α := α) (n - 1) P) :
+  NDS (α := α) (n - 1) (Del (α := α) v P.C) ≤ 0
 
-/--
+
+
+
+/-
 (Purpose)
 DR1 implies `prem v` has at most one element; when it is nonempty we can pick the unique premise.
 S10 uses this to extract the premise for the Del-branch.
@@ -505,24 +504,47 @@ S10 uses this to extract the premise for the Del-branch.
 (Intended proof location)
 S2_HornNF or S1_HornNF (premise choice facts).
 -/
-axiom choose_prem_of_hasHead
-  (P : HypPack (α := α)) (v : α) :
-  (P.H.prem v).Nonempty →
-  { Pv : Finset α // Pv ∈ P.H.prem v }
+
+/-
+(Purpose)
+Pick a premise `Pv ∈ prem v` from nonemptiness.
+
+Design note:
+This is a pure choice lemma; DR1 uniqueness is not required for existence.
+-/
+noncomputable def choose_prem_of_hasHead
+  (P : HypPack α) (v : α)
+  (hne : (P.H.prem v).Nonempty) :
+  { Pv : Finset α // Pv ∈ P.H.prem v } :=
+  by
+    classical
+    refine ⟨Classical.choose hne, ?_⟩
+    exact Classical.choose_spec hne
 
 
 /-- Noncomputably pick `Pv` from `prem v` when nonempty. -/
 noncomputable def pick_prem
-  (P : HypPack (α := α)) (v : α) (h : (P.H.prem v).Nonempty) : Finset α :=
+  (P : HypPack α) (v : α) (h : (P.H.prem v).Nonempty) : Finset α :=
   (choose_prem_of_hasHead (α := α) (P := P) (v := v) h).1
 
 @[simp] theorem pick_prem_mem
-  (P : HypPack (α := α)) (v : α) (h : (P.H.prem v).Nonempty) :
+  (P : HypPack α) (v : α) (h : (P.H.prem v).Nonempty) :
   pick_prem (α := α) P v h ∈ P.H.prem v :=
-  (choose_prem_of_hasHead (α := α) (P := P) (v := v) h).2
+  Classical.choose_spec h
 
+/--
+ (S11 kernel) Del-bound when `prem v` is nonempty but the chosen premise has card < 2.
 
-
+ In the intended design this covers the singleton-prem branch.
+-/
+axiom Del_bound_of_Q_singleton
+  (n : Nat) (hn : 1 ≤ n)
+  (P : HypPack α)
+  (v : α)
+  (hPrem : (P.H.prem v).Nonempty)
+  (hCard : ¬ 2 ≤ (pick_prem  P v hPrem).card)
+  (hQ : Q (α := α) (n - 1) P) :
+  NDS (α := α) (n - 1) (Del (α := α) v P.C) ≤ 0
 /-/
 Kernel: supply the specific `Qcorr` fact needed by the Del-branch when `prem v` is nonempty.
 
@@ -533,14 +555,6 @@ We keep it as an axiom for now so that `Del_bound_of_Q` can be implemented via t
 without changing any call sites.
 -/
 
-axiom prem_erase_Qcorr
-  (n : Nat) (hn : 1 ≤ n)
-  (P : HypPack (α := α)) (v : α)
-  (hPrem : (P.H.prem v).Nonempty) :
-  Qcorr (α := α)
-    (n - 1)
-    (choose_con_pack (α := α) (P := P) (v := v))
-    ((pick_prem (α := α) P v hPrem).erase v)
 
 
 /--
@@ -560,8 +574,8 @@ We apply `IH_Qcorr` *directly* to the con-pack, after constructing `ForbidOK`.
 This avoids any Del→con transport.
 -/
 theorem prem_erase_Qcorr_ge2
-  (n : Nat) (hn : 1 ≤ n)
-  (P : HypPack (α := α)) (v : α)
+  (n : Nat) (_hn : 1 ≤ n)
+  (P : HypPack α) (v : α)
   (hPrem : (P.H.prem v).Nonempty)
   (hCard : 2 ≤ (pick_prem (α := α) P v hPrem).card) :
   Qcorr (α := α)
@@ -622,15 +636,59 @@ This supplies the Qcorr fact directly on the deletion-world pack.
 For now we keep it as an axiom; it will later be proved via IH_Qcorr
 applied to the deletion base pack.
 -/
-axiom prem_erase_Qcorr_ge2_Pd
+
+theorem prem_erase_Qcorr_ge2_Pd
   (n : Nat) (hn : 1 ≤ n)
-  (P : HypPack (α := α)) (v : α)
+  (P : HypPack α) (v : α)
   (hPrem : (P.H.prem v).Nonempty)
-  (hCard : 2 ≤ (pick_prem (α := α) P v hPrem).card) :
+  (hCard : 2 ≤ (pick_prem (α := α) P v hPrem).card)
+  (Pd : HypPack α)
+  (hPdU : Pd.H.U = P.H.U.erase v)
+  (hPdC : Pd.C = Del (α := α) v P.C) :
   Qcorr (α := α)
     (n - 1)
-    (choose_del_base_pack (P := P) (v := v) (hPrem := hPrem))
+    Pd
     ((pick_prem (α := α) P v hPrem).erase v)
+:= by
+  classical
+  let Pv := pick_prem (α := α) P v hPrem
+
+  have hmem : Pv ∈ P.H.prem v := by
+    simp [Pv]
+
+  -- NF: head is not in its premise
+  have hv_not : v ∉ Pv := by
+    simpa [Pv] using P.H.nf hmem
+
+  -- card condition survives erase
+  have hCard' : 2 ≤ (Pv.erase v).card := by
+    simpa [Pv, Finset.erase_eq_of_notMem hv_not] using hCard
+
+  -- inclusion into deletion-world universe
+  have hsubset :
+      Pv.erase v ⊆ Pd.H.U := by
+    intro x hx
+    have hxne : x ≠ v := (Finset.mem_erase.mp hx).1
+    have hxPv : x ∈ Pv := (Finset.mem_erase.mp hx).2
+    have hxU : x ∈ P.H.U :=
+      P.H.prem_subset_U hmem hxPv
+    have : x ∈ P.H.U.erase v :=
+      Finset.mem_erase.mpr ⟨hxne, hxU⟩
+    simpa [hPdU] using this
+
+  -- build ForbidOK on Pd
+  have hForbid :
+      ForbidOK (α := α) Pd (Pv.erase v) :=
+    And.intro hsubset hCard'
+
+  -- apply IH_Qcorr directly on Pd
+  exact
+    IH_Qcorr
+      (α := α)
+      (n := n)
+      (P := Pd)
+      (A := Pv.erase v)
+      hForbid
 
 
 /-/
@@ -646,10 +704,12 @@ axiom prem_erase_Qcorr_ge2_Pd
 注意：以前の暫定 `Hole P.C (pick_prem ...)` は、母体 family の台が `U` のまま
 の可能性があり、`U.erase v` 固定設計と整合しないため削除した。
 -/
-axiom exists_del_base_pack
-  (P : HypPack (α := α)) (v : α) :
-  ∃ Pd : HypPack (α := α),
-    Pd.H.U = P.H.U.erase v ∧ Pd.C = Del (α := α) v P.C
+theorem exists_del_base_pack
+  (P : HypPack α) (v : α) :
+  ∃ Pd : HypPack α,
+    Pd.H.U = P.H.U.erase v ∧ Pd.C = Del (α := α) v P.C := by
+  -- Reuse the representability lemma provided in S8.
+  simpa using (exists_del_pack (α := α) (P := P) (v := v))
 
 /-
 Del-as-Hole（削除世界 base pack 版）
@@ -681,10 +741,10 @@ Del-as-Hole（削除世界 base pack 版）
 を与える。
 -/
 theorem del_as_hole
-  (P : HypPack (α := α))
+  (P : HypPack α)
   (v : α)
   (hPrem : (P.H.prem v).Nonempty) :
-  ∃ Pd : HypPack (α := α),
+  ∃ Pd : HypPack α,
     Pd.H.U = P.H.U.erase v ∧
     Pd.C = Del (α := α) v P.C ∧
     (let Pv := pick_prem (α := α) P v hPrem
@@ -756,19 +816,19 @@ noncomputable def choose_del_base_pack
   (del_as_hole P v hPrem).choose
 
 @[simp] theorem choose_del_base_pack_spec_U
-  (P : HypPack (α := α)) (v : α) (hPrem : (P.H.prem v).Nonempty) :
+  (P : HypPack α) (v : α) (hPrem : (P.H.prem v).Nonempty) :
   (choose_del_base_pack (α := α) (P := P) (v := v) (hPrem := hPrem)).H.U = P.H.U.erase v := by
   have h := Classical.choose_spec (del_as_hole (α := α) (P := P) (v := v) (hPrem := hPrem))
   exact h.1
 
 @[simp] theorem choose_del_base_pack_spec_C
-  (P : HypPack (α := α)) (v : α) (hPrem : (P.H.prem v).Nonempty) :
+  (P : HypPack α) (v : α) (hPrem : (P.H.prem v).Nonempty) :
   (choose_del_base_pack (α := α) (P := P) (v := v) (hPrem := hPrem)).C = Del (α := α) v P.C := by
   have h := Classical.choose_spec (del_as_hole (α := α) (P := P) (v := v) (hPrem := hPrem))
   exact h.2.1
 
 theorem choose_del_base_pack_spec_hole
-  (P : HypPack (α := α)) (v : α) (hPrem : (P.H.prem v).Nonempty) :
+  (P : HypPack α) (v : α) (hPrem : (P.H.prem v).Nonempty) :
   let Pv := pick_prem (α := α) P v hPrem
   (choose_del_base_pack (α := α) (P := P) (v := v) (hPrem := hPrem)).C
     = Hole (α := α)
@@ -794,16 +854,44 @@ Proof idea (future, S5/S6):
   3) `Qcorr(n-1, Pc, Pv.erase v)` と `corr_implies_hole_bound` で Hole の NDS を落とす。
   4) Hole=Del の同一視で結論へ。
 -/
-axiom Del_branch_bound_Pd
+theorem Del_branch_bound_Pd
   (n : Nat) (hn : 1 ≤ n)
-  (P : HypPack (α := α))
+  (P : HypPack α)
   (v : α)
-  (Pd : HypPack (α := α))
+  (Pd : HypPack α)
   (hPdU : Pd.H.U = P.H.U.erase v)
   (hPdC : Pd.C = Del (α := α) v P.C)
-  (A : Finset α) :
+  (A : Finset α)
+  (hHoleEq : Pd.C = Hole (α := α) Pd.C A) :
   Qcorr (α := α) (n - 1) Pd A →
   NDS (α := α) (n - 1) (Del (α := α) v P.C) ≤ 0
+:= by
+  classical
+  intro hQcorr
+
+  -- Step 1: unfold Qcorr to get the corrected bound
+  have hCorr :
+      NDS_corr (α := α) (n - 1) Pd.C A ≤ 0 := by
+    simpa [Qcorr] using hQcorr
+
+  -- Step 2: drop the Up-term to get a Hole-bound
+  have hHole :
+      NDS (α := α) (n - 1) (Hole (α := α) Pd.C A) ≤ 0 :=
+    corr_implies_hole_bound
+      (α := α)
+      (n := n - 1)
+      (C := Pd.C)
+      (A := A)
+      hCorr
+
+  -- Step 3: rewrite Hole Pd.C A back to Pd.C
+  have hPd :
+      NDS (α := α) (n - 1) Pd.C ≤ 0 := by
+    exact le_of_eq_of_le (congrArg (NDS (n - 1)) hHoleEq) hHole
+
+
+  -- Step 4: rewrite Pd.C to Del v P.C
+  simpa [hPdC] using hPd
 
 /--
 Bridge lemma: derive the plain Del-bound from the branch-style API.
@@ -816,7 +904,7 @@ and packages them into a direct bound on `Del v P.C`.
 -/
 theorem Del_bound_from_branch
   (n : Nat) (hn : 1 ≤ n)
-  (P : HypPack (α := α))
+  (P : HypPack α)
   (v : α)
   (hPrem : (P.H.prem v).Nonempty)
   (hQcorr :
@@ -852,50 +940,69 @@ by
       (hPdU := hPdU)
       (hPdC := hPdC)
       (A := Pv.erase v)
-      hQcorr
+  -- supply the Hole-equality coming from del_as_hole
+  have hHoleEq :
+      Pd.C = Hole (α := α) Pd.C (Pv.erase v) :=
+    choose_del_base_pack_spec_hole
+      (α := α) (P := P) (v := v) (hPrem := hPrem)
 
-  exact hDel
+  exact hDel hHoleEq hQcorr
 
 
-/-- Wrapper lemma for the plain Del-bound.
-
-This is currently just a thin layer over the axiom `Del_bound`,
-but it gives S10 (and future refactors) a stable theorem name
-that can later be reimplemented via a branch-style API
-without changing call sites.
+/-/
+-- Branch-only Del-bound (nonempty + card ≥ 2 route).
+--
+-- This version matches the S10 wiring:
+--   - hPrem : prem v is nonempty
+--   - hCard : 2 ≤ Pv.card
+--   - hQ    : Q (n-1) P
+--
+-- Singleton / empty cases are handled upstream in S10.
 -/
 theorem Del_bound_of_Q
   (n : Nat) (hn : 1 ≤ n)
-  (P : HypPack (α := α))
+  (P : HypPack α)
   (v : α)
+  (hPrem : (P.H.prem v).Nonempty)
+  (hCard : 2 ≤ (pick_prem (α := α) P v hPrem).card)
   (hQ : Q (α := α) (n - 1) P) :
   NDS (α := α) (n - 1) (Del v P.C) ≤ 0 :=
 by
   classical
-  by_cases hPrem : (P.H.prem v).Nonempty
-  ·
-    let Pv := pick_prem (α := α) P v hPrem
-    by_cases hCard : 2 ≤ Pv.card
-    ·
-      have hQcorrPd :=
-        prem_erase_Qcorr_ge2_Pd
-          (n := n) (hn := hn)
-          (P := P) (v := v)
-          (hPrem := hPrem)
-          (hCard := by simpa [Pv] using hCard)
 
-      exact
-        Del_bound_from_branch
-          (α := α) (n := n) (hn := hn)
-          (P := P) (v := v)
-          (hPrem := hPrem)
-          hQcorrPd
-    ·
-      -- singleton route (legacy fallback)
-      exact Del_bound (α := α) (n := n) (hn := hn) (P := P) (v := v) hQ
-  ·
-    -- no premise at v: fallback to legacy axiom
-    exact Del_bound (α := α) (n := n) (hn := hn) (P := P) (v := v) hQ
+  let Pd := choose_del_base_pack P v hPrem
+  have hPdU :
+      Pd.H.U = P.H.U.erase v :=
+    choose_del_base_pack_spec_U (α := α) (P := P) (v := v) (hPrem := hPrem)
+
+  have hPdC :
+      Pd.C = Del (α := α) v P.C :=
+    choose_del_base_pack_spec_C (α := α) (P := P) (v := v) (hPrem := hPrem)
+
+  -- supply Qcorr on the deletion-world pack
+  have hQcorrPd :=
+    prem_erase_Qcorr_ge2_Pd
+      (α := α)
+      (n := n)
+      (hn := hn)
+      (P := P)
+      (v := v)
+      (hPrem := hPrem)
+      (hCard := hCard)
+      (Pd := Pd)
+      (hPdU := hPdU)
+      (hPdC := hPdC)
+
+  -- conclude via the branch API
+  exact
+    Del_bound_from_branch
+      (α := α)
+      (n := n)
+      (hn := hn)
+      (P := P)
+      (v := v)
+      (hPrem := hPrem)
+      hQcorrPd
 
 
 /- ============================================================
@@ -904,7 +1011,7 @@ by
 
 /-- Choose an element of `A` from `ForbidOK P A` (uses `A.Nonempty`). -/
 theorem choose_v_in_A
-  (P : HypPack (α := α)) (A : Finset α) :
+  (P : HypPack α) (A : Finset α) :
   ForbidOK (α := α) P A → ∃ v : α, v ∈ A := by
   intro hOK
   have hne : A.Nonempty := ForbidOK.nonempty (α := α) (P := P) (A := A) hOK
@@ -913,16 +1020,16 @@ theorem choose_v_in_A
 
 /-- Noncomputably pick an element `v ∈ A` from `ForbidOK P A`. -/
 noncomputable def pick_v_in_A
-  (P : HypPack (α := α)) (A : Finset α) (hOK : ForbidOK (α := α) P A) : α :=
+  (P : HypPack α) (A : Finset α) (hOK : ForbidOK (α := α) P A) : α :=
   Classical.choose (choose_v_in_A (α := α) (P := P) (A := A) hOK)
 
 @[simp] theorem pick_v_in_A_mem
-  (P : HypPack (α := α)) (A : Finset α) (hOK : ForbidOK (α := α) P A) :
+  (P : HypPack α) (A : Finset α) (hOK : ForbidOK (α := α) P A) :
   pick_v_in_A (α := α) P A hOK ∈ A :=
   Classical.choose_spec (choose_v_in_A (α := α) (P := P) (A := A) hOK)
 
 /-- From `ForbidOK` we can always extract `A.Nonempty` (helper for case splits). -/
-theorem forbidOK_nonempty (P : HypPack (α := α)) (A : Finset α) :
+theorem forbidOK_nonempty (P : HypPack α) (A : Finset α) :
     ForbidOK (α := α) P A → A.Nonempty := by
   intro h
   exact (ForbidOK.nonempty (α := α) (P := P) (A := A) h)
@@ -946,24 +1053,13 @@ theorem erase_empty_or_nonempty
 削除予定（cleanup）
 ====================
 
-- `Del_bound`（axiom）：`Del_bound_of_Q` を theorem 実装に置換できたら削除。
-- `Qcorr_case1_singleton`：`ForbidOK` を `2 ≤ card` に固定し、S10 側の分岐を消したら削除。
 - `Del_hole_bound`, `ndeg_hole_le_zero_of_choice`：方針Cが `Del_branch_bound` に集約できたら削除候補。
 
 S11 は「呼び出し口の安定」が最優先なので、削除は S10/S9 が落ちないことを確認してから行う。
 -/
 
-/-
-(LEGACY)
-ForbidOK を `2 ≤ A.card` に凍結している限り singleton 分岐は本来起きない。
-S10 側に古い分岐が残る場合だけの互換用。最終的に削除する。
--/
-axiom Qcorr_case1_singleton
-  (n : Nat) (P : HypPack (α := α)) (A : Finset α) (v : α) :
-  ForbidOK (α := α) P A → v ∈ A → (A.erase v) = ∅ →
-  NDS_corr (α := α) n P.C A ≤ 0
 
-/--
+/-
 (LEGACY)
 Del-hole bound used in the Del-bound step.
 
@@ -971,7 +1067,7 @@ Del-hole bound used in the Del-bound step.
 S5/S6 (Del-world representability + sign bookkeeping).
 -/
 axiom Del_hole_bound
-  (n : Nat) (P : HypPack (α := α)) (A : Finset α) (v : α) :
+  (n : Nat) (P : HypPack α) (A : Finset α) (v : α) :
   ForbidOK (α := α) P A → v ∈ A →
   NDS (α := α) (n - 1) (Del (α := α) v (Hole (α := α) P.C A)) ≤ 0
 
@@ -983,7 +1079,7 @@ Bound on `ndeg` for hole families at the chosen vertex.
 S5/S6 (Del-world representability + sign bookkeeping).
 -/
 axiom ndeg_hole_le_zero_of_choice
-  (n : Nat) (P : HypPack (α := α)) (A : Finset α) (v : α) :
+  (n : Nat) (P : HypPack α) (A : Finset α) (v : α) :
   ForbidOK (α := α) P A → v ∈ A →
   ndeg (α := α) (Hole (α := α) P.C A) v ≤ 0
 
