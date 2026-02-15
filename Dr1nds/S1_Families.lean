@@ -39,6 +39,25 @@ namespace SetFamily
 F.subset_univ hX
 
 
+/-- NEP (No Empty Premise) at the family level:
+    the empty set belongs to the family. -/
+def NEP (F : SetFamily α) : Prop :=
+  (∅ : Finset α) ∈ F.C
+
+/-- The universe itself belongs to the family (top element present). -/
+def HasTop (F : SetFamily α) : Prop :=
+  F.U ∈ F.C
+
+/-- If `X ∈ F.C` and `x ∈ X`, then `x ∈ F.U`. -/
+lemma mem_univ_of_mem_mem
+  (F : SetFamily α) {X : Finset α} {x : α}
+  (hX : X ∈ F.C) (hx : x ∈ X) :
+  x ∈ F.U :=
+by
+  have hsub := F.subset_univ hX
+  exact hsub hx
+
+
 def SC (F : SetFamily α) (x : α) : Prop :=
   ({x} : Finset α) ∈ F.C
 
@@ -50,3 +69,7 @@ def SC (F : SetFamily α) (x : α) : Prop :=
 end SetFamily
 
 end Dr1nds
+
+/- The support (ambient universe) naturally induced by a finite family. -/
+--def Dr1nds.support (C : Finset (Finset α)) : Finset α :=
+--  C.biUnion id

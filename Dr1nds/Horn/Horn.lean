@@ -3,7 +3,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Data.Fintype.Card
 import Mathlib.Data.Finset.Powerset
-import Dr1nds.S1_HornDefs
+--import Dr1nds.S1_HornDefs
 import LeanCopilot
 
 namespace Dr1nds
@@ -122,7 +122,7 @@ lemma mem_FixSet_subset_U (H : HornNF α) {X : Finset α}
   We only drop premises that contain v.
 ------------------------------------------------------------ -/
 
-def HornNF.del (H : HornNF α) (v : α) : HornNF α :=
+def HornNF.deleteRules (H : HornNF α) (v : α) : HornNF α :=
 { U    := H.U.erase v
   prem := fun h =>
     if h = v then
@@ -185,15 +185,40 @@ def HornNF.del (H : HornNF α) (v : α) : HornNF α :=
       exact H.nf hP'
 }
 
-@[simp] lemma del_U (H : HornNF α) (v : α) : (HornNF.del H v).U = H.U.erase v := by
+@[simp] lemma deleteRules_U (H : HornNF α) (v : α) : (HornNF.deleteRules H v).U = H.U.erase v := by
   rfl
 
-@[simp] lemma del_prem_self (H : HornNF α) (v : α) : (HornNF.del H v).prem v = ∅ := by
-  simp [HornNF.del]
+@[simp] lemma deleteRules_prem_self (H : HornNF α) (v : α) : (HornNF.deleteRules H v).prem v = ∅ := by
+  simp [HornNF.deleteRules]
 
-@[simp] lemma del_prem_of_ne (H : HornNF α) {v h : α} (hh : h ≠ v) :
-    (HornNF.del H v).prem h = (H.prem h).filter (fun P => v ∉ P) := by
-  simp [HornNF.del, hh]
+
+@[simp] lemma deleteRules_prem_of_ne (H : HornNF α) {v h : α} (hh : h ≠ v) :
+    (HornNF.deleteRules H v).prem h = (H.prem h).filter (fun P => v ∉ P) := by
+  simp [HornNF.deleteRules, hh]
+
+/-
+Head-free case:
+If a head `v` has no premises in `H`,
+then rule-level deletion at `v` coincides with
+simple filtering of premises (i.e. no rule interaction occurs).
+
+This is the formal "head-free deletion" statement
+used in the Del=Hole plan.
+-/
+lemma deleteRules_head_free
+    (H : HornNF α)
+    (v : α)
+    (hfree : (H.prem v) = ∅) :
+    HornNF.deleteRules H v =
+    { U    := H.U.erase v
+      prem := fun h =>
+        if h = v then ∅ else (H.prem h).filter (fun P => v ∉ P)
+      prem_subset_U := (HornNF.deleteRules H v).prem_subset_U
+      head_mem_U    := (HornNF.deleteRules H v).head_mem_U
+      nf            := (HornNF.deleteRules H v).nf } := by
+  classical
+  -- This is definitional; no interaction occurs when prem v = ∅.
+  rfl
 
 /-
 ------------------------------------------------------------
@@ -216,11 +241,11 @@ lemma prem_eq_of_mem_of_mem
   3. Conversion targets (placeholders only)
 ------------------------------------------------------------ -/
 
-/--
+/-
 Intended conversion:
 Horn → HornNF (definition only, no properties asserted).
 Actual construction lives in later files.
--/
+
 def Horn.toHornNF (_ : Horn α) : HornNF α :=
   { U := ∅
     prem := fun _ => ∅
@@ -237,6 +262,7 @@ def Horn.toHornNF (_ : Horn α) : HornNF α :=
       intro h P hP
       simp at hP
   }
+-/
 
 
 /-
@@ -327,6 +353,27 @@ def HornNF.contraction (x : α) (H : HornNF α) : HornNF α :=
 
 
 
+
+/-
+============================================================
+  SECTION: Contraction–Family Bridge Layer
+
+  NOTE:
+  The definitions and lemmas below conceptually belong to a
+  separate module (e.g. HornContraction.lean or HornDeletion.lean).
+
+  They are temporarily kept here for compilation stability,
+  but are logically distinct from the core HornNF definition
+  layer above.
+
+  Future refactor plan:
+    • Move ConSet and erase lemmas to HornContraction.lean
+    • Move deletion–family equivalence lemmas to HornDeletion.lean
+    • Keep this file definition-only (HornNF + basic operations)
+
+============================================================
+-/
+
 open Finset
 
 ------------------------------------------------------------
@@ -382,6 +429,120 @@ lemma not_mem_of_subset_erase
   intro hxY
   have hxUerase := h hxY
   simp_all only [mem_erase, ne_eq, not_true_eq_false, false_and]
+
+------------------------------------------------------------
+-- Family-level deletion (set-family side)
+------------------------------------------------------------
+
+/--
+Family-level deletion:
+Remove all closed sets containing `v`.
+This is purely a set-family operation (no rule interaction).
+-/
+def DelSet {α : Type} [DecidableEq α]
+  (v : α) (C : Finset (Finset α)) : Finset (Finset α) :=
+  C.filter (fun X => v ∉ X)
+
+@[simp] lemma mem_DelSet
+  {α : Type} [DecidableEq α]
+  {v : α} {C : Finset (Finset α)} {X : Finset α} :
+  X ∈ DelSet v C ↔ X ∈ C ∧ v ∉ X := by
+  simp [DelSet]
+
+/--
+Head-free case (rule-level deletion = family-level deletion).
+
+If `v` has no premises in `H`, then deleting rules at `v`
+coincides with simply removing closed sets containing `v`.
+-/
+theorem deleteRules_head_free_fix_equiv
+  (H : HornNF α)
+  (v : α)
+  (hfree : H.prem v = ∅) :
+  HornNF.FixSet (HornNF.deleteRules H v)
+  =
+  DelSet v (HornNF.FixSet H) := by
+  classical
+  apply Finset.ext
+  intro X
+  constructor
+
+  ------------------------------------------------------------------
+  -- → direction
+  ------------------------------------------------------------------
+  · intro hX
+    simp [HornNF.FixSet, DelSet] at *
+    rcases hX with ⟨hXsub, hXclosed⟩
+    constructor
+
+    -- X ∈ FixSet H
+    ·
+      have hXsubU : X ⊆ H.U := by
+        intro x hx
+        have hxUerase := hXsub hx
+        exact (Finset.mem_erase.mp hxUerase).2
+
+      have hXclosedU : HornNF.IsClosed H X := by
+        intro h P hP hsubset
+        by_cases hh : h = v
+        ·
+          subst hh
+          -- since prem v = ∅, no premise can exist
+          simp [hfree] at hP
+        ·
+          -- hP : P ∈ (H.deleteRules v).prem h
+          -- rewrite deleteRules premise description
+          have hPfilter :
+              P ∈ (H.prem h).filter (fun Q => v ∉ Q) := by
+            simp
+            constructor
+            · exact hP
+            · exact not_mem_of_subset_erase fun ⦃a⦄ a_1 => hXsub (hsubset a_1)
+          have hP' : P ∈ H.prem h :=
+            (Finset.mem_filter.mp hPfilter).1
+          simp_all only [mem_filter, true_and]
+          apply hXclosed
+          on_goal 2 => { exact hsubset
+          }
+          · simp_all only [ne_eq, not_false_eq_true, deleteRules_prem_of_ne, mem_filter, and_self]
+
+      exact ⟨hXsubU, hXclosedU⟩
+
+    -- v ∉ X
+    · intro hvX
+      have hvUerase := hXsub hvX
+      exact (Finset.mem_erase.mp hvUerase).1 rfl
+
+  ------------------------------------------------------------------
+  -- ← direction
+  ------------------------------------------------------------------
+  · intro hX
+    simp [HornNF.FixSet, DelSet] at *
+    rcases hX with ⟨⟨hXsub, hXclosed⟩, hvX⟩
+    constructor
+
+    -- subset
+    ·
+      intro x hx
+      have hxU := hXsub hx
+      have hxne : x ≠ v := by
+        intro hxeq
+        subst hxeq
+        exact hvX hx
+      exact Finset.mem_erase.mpr ⟨hxne, hxU⟩
+
+    -- closedness in deleteRules world
+    ·
+      intro h P hP hsubset
+      by_cases hh : h = v
+      · subst hh
+        simp [HornNF.deleteRules] at hP
+      ·
+        have hPfilter : P ∈ (H.prem h).filter (fun Q => v ∉ Q) := by
+          simpa [HornNF.deleteRules, hh] using hP
+        have hP' : P ∈ H.prem h :=
+          (Finset.mem_filter.mp hPfilter).1
+        exact hXclosed hP' hsubset
 
 ------------------------------------------------------------
 -- forward
