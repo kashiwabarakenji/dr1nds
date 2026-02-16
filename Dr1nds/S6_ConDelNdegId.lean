@@ -3,6 +3,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Data.Int.Basic
 import Mathlib.Algebra.BigOperators.Group.Finset.Basic
+import LeanCopilot
 
 import Dr1nds.S0_CoreDefs
 
@@ -44,6 +45,7 @@ namespace Accounting
   下流のファイルは証明ではなく定理の「命題文」のみを依存すべきです。
 ============================================================ -/
 
+omit [DecidableEq α] in
 /-- succ shift: w (n+1) X = w n X - 1 -/
 lemma w_succ (n : Nat) (X : Finset α) :
     w (α := α) n.succ X = w (α := α) n X - 1 := by
@@ -55,7 +57,17 @@ lemma w_succ (n : Nat) (X : Finset α) :
   【場所】
   ここで証明してもよいし、基本ファイルに移してもよい。
   -/
-  sorry
+  simp [Dr1nds.w, Nat.succ_eq_add_one, Int.natCast_succ, sub_eq_add_neg,
+    add_assoc, add_left_comm, add_comm]
+
+omit [DecidableEq α] in
+/-- succ shift for NDS: NDS (n+1) C = NDS n C - |C| -/
+lemma NDS_succ (n : Nat) (C : Finset (Finset α)) :
+    NDS (α := α) n.succ C = NDS (α := α) n C - (C.card : Int) := by
+  classical
+  -- expand NDS and apply `w_succ` pointwise
+  simp [Dr1nds.NDS, w_succ, sub_eq_add_neg]
+  simp [Finset.sum_add_distrib]
 
 /--
 If u∈X and n≥1, then
