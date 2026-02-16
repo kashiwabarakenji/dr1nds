@@ -232,7 +232,6 @@ lemma card_cases
   (A : Finset α) :
   A.card = 0 ∨ A.card = 1 ∨ 2 ≤ A.card := by
   classical
-  -- use Nat.lt_trichotomy / linear arithmetic on Nat
   have h : A.card = 0 ∨ A.card = 1 ∨ 2 ≤ A.card := by
     omega
   exact h
@@ -242,13 +241,23 @@ lemma card_cases
 
 
 /--
-Helper axiom (temporary): in the DR1 world, if a head exists then the premise is unique.
+Helper lemma: in the DR1 world, if a head exists then the premise is unique.
 
-This is a placeholder to keep the wiring stable while we move the real lemma into the HornNF/Statements layer.
+This is used only at the wiring layer: once we know `HasHead1 P h`, DR1 forces
+`(prem h).card = 1`.
 -/
-axiom prem_card_eq_one_of_hasHead1
+theorem prem_card_eq_one_of_hasHead1
   (P : Pack1 α) (h : α) :
-  HasHead1 P h → (P.S.H.prem h).card = 1
+  HasHead1 P h → (P.S.H.prem h).card = 1 := by
+  intro hHead
+  have hle : (P.S.H.prem h).card ≤ 1 := by
+    simpa using (P.S.hDR1 h)
+  have hpos : 0 < (P.S.H.prem h).card := by
+    exact Finset.card_pos.mpr hHead
+  have hone_le : 1 ≤ (P.S.H.prem h).card :=
+    Nat.succ_le_of_lt hpos
+  exact Nat.le_antisymm hle hone_le
+
 
 /--
 Singleton-forbid kernel (head-free case).
@@ -288,16 +297,14 @@ theorem Qcorr_handle_A_singleton
   Qcorr n P → Qcorr (n+1) P := by
   classical
   intro hAcard hIH
-  -- obtain the unique element a with A = {a}
   rcases Finset.card_eq_one.mp hAcard with ⟨a, hAeq⟩
-  -- split by whether a has an incoming head rule
   by_cases hHead : HasHead1 P a
-  · -- has-head case
-    rcases hHead with ⟨P0, hP0mem⟩
-    have hUnique : (P.S.H.prem a).card = 1 := prem_card_eq_one_of_hasHead1 (P := P) (h := a) ⟨P0, hP0mem⟩
-    exact qcorr_singleton_hasHead_P (n := n) (P := P) (a := a) (P0 := P0) hAeq hP0mem hUnique hIH
-  · -- no-head case
-    have hNoHead : NoHead1 P a := by
+  · rcases hHead with ⟨P0, hP0mem⟩
+    have hUnique : (P.S.H.prem a).card = 1 :=
+      prem_card_eq_one_of_hasHead1 (P := P) (h := a) ⟨P0, hP0mem⟩
+    exact qcorr_singleton_hasHead_P (n := n) (P := P) (a := a) (P0 := P0)
+      hAeq hP0mem hUnique hIH
+  · have hNoHead : NoHead1 P a := by
       exact hHead
     exact qcorr_singleton_noHead (n := n) (P := P) (a := a) hAeq hNoHead hIH
 
@@ -319,7 +326,6 @@ axiom Qcorr_handle_A_empty
 |A| ≥ 2 branch (SC step inside the forbid set).
 
 Frozen intent: pick `h ∈ A` which is SC in the forbid-pack sense, and apply the SC-contraction step.
-This is the branch where we use the monotonicity of `NDS_corr` under contraction at an SC point.
 The side condition `h ∈ A` is essential: contracting outside `A` could introduce a new forbid set.
 In this branch, it is expected that `NDS_corr` is **monotone (nondecreasing) under contraction at SC points**.
 -/

@@ -14,19 +14,21 @@ family だけでなく (rules + forbid) 側の操作が必要になるので、
 まずは「言明として」固定しておく。
 -/
 
--- 例：contraction すると forbid は A.erase h になる（通常の forbid-1 ルート）
+/-- (SPEC) contraction で forbid を更新した結果（後で定義に置き換える）。 -/
 axiom forbid_update_contraction
-  (A : Finset α) (h : α) :
-  True
+  (A : Finset α) (h : α) : Finset α
 
--- 例：deletion では forbid が「置換」される（P->h があれば new forbid = cl(P)）
+/-- (SPEC) deletion で forbid を更新した結果（後で定義に置き換える）。 -/
 axiom forbid_update_deletion
-  (A : Finset α) (h : α) :
-  True
+  (A : Finset α) (h : α) : Finset α
 
--- 例：trace でも同様に “rules の minor” が走る
+/-- (SPEC) trace で forbid を更新した結果（後で定義に置き換える）。 -/
 axiom forbid_update_trace
-  (A : Finset α) (h : α) :
-  True
+  (A : Finset α) (h : α) : Finset α
+
+/-- (SPEC) contraction の singleton forbid は `erase`（期待される最小仕様）。 -/
+axiom forbid_update_contraction_singleton
+  (a h : α) :
+  forbid_update_contraction ({a} : Finset α) h = ({a} : Finset α).erase h
 
 end Dr1nds

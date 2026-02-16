@@ -1,4 +1,3 @@
-
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Data.Fintype.Card
@@ -257,6 +256,111 @@ by
       simp [this] at hP
       rcases hP with ⟨hP, hvP⟩
       exact hH hP hsubset
+
+/--
+If no premise in `H` contains `v`, then in the trace world the premises for any head `h ≠ v`
+are unchanged (the `biUnion` branch never fires).
+
+This lemma is the key simplification used in the `|A|=1` has-head Up-card bijection.
+-/
+lemma trace_prem_eq_of_noPremContains
+  (H : HornNF α)
+  (v : α)
+  (hNoPremV : ∀ {h : α} {P : Finset α}, P ∈ H.prem h → v ∉ P)
+  {h : α}
+  (hneq : h ≠ v) :
+  (H.trace v).prem h = H.prem h := by
+  classical
+  -- unfold the trace definition at `h ≠ v`
+  unfold HornNF.trace
+  simp [hneq]
+  -- abbreviate the original premise set
+  set S : Finset (Finset α) := H.prem h
+  -- the trace construction is `biUnion` (which collapses to `S`) followed by filtering `h ∉ P`
+  ext Q
+  constructor
+  · intro hQ
+    -- unpack membership in `filter`
+    rcases (Finset.mem_filter.mp hQ) with ⟨hQbi, hnot⟩
+    -- unpack membership in `biUnion`
+    rcases (Finset.mem_biUnion.mp hQbi) with ⟨P, hP, hQP⟩
+    -- since `v ∉ P`, the trace branch is the singleton `{P}`
+    have hvP : v ∉ P := hNoPremV (h := h) (P := P) (by simpa [S] using hP)
+    have hcase : (if v ∈ P then (H.prem v).image (fun Pu => (P.erase v) ∪ Pu) else ({P} : Finset (Finset α))) = {P} := by
+      simp [hvP]
+    -- so `Q ∈ {P}` implies `Q = P`
+    have hQP' : Q = P := by
+      simpa [hcase] using hQP
+    subst hQP'
+    -- conclude `P ∈ S` and rewrite `S`
+    simpa [S] using hP
+  · intro hQ
+    -- show membership in the filtered `biUnion`
+    refine Finset.mem_filter.mpr ?_
+    refine ⟨?_, ?_⟩
+    · -- membership in `biUnion`: choose `P := Q`
+      refine Finset.mem_biUnion.mpr ?_
+      refine ⟨Q, ?_, ?_⟩
+      · simpa [S] using hQ
+      · -- again, since `v ∉ Q`, the branch is `{Q}`
+        have hvQ : v ∉ Q := hNoPremV (h := h) (P := Q) (by simpa [S] using hQ)
+        simp [hvQ]
+    · -- the final filter condition `h ∉ Q` holds by NF of `H`
+      -- (every premise of head `h` avoids containing its head)
+      exact H.nf (by simpa [S] using hQ)
+
+/--
+If no premise in `H` contains `v`, then adding `v` to a trace-closed set
+preserves closedness in the original world.
+
+This is the forward direction needed for the `|A|=1` has-head Up-card bijection:
+`Y ∈ FixSet (trace v)` implies `Y ∪ {v} ∈ FixSet H` (after handling the subset-to-U part).
+-/
+lemma isClosed_union_singleton_of_noPremContains
+  (H : HornNF α)
+  (v : α)
+  (hNoPremV : ∀ {h : α} {Q : Finset α}, Q ∈ H.prem h → v ∉ Q)
+  {Y : Finset α}
+  (hY : HornNF.IsClosed (H.trace v) Y) :
+  HornNF.IsClosed H (Y ∪ ({v} : Finset α)) := by
+  classical
+  unfold HornNF.IsClosed at *
+  intro h Q hQ hQsub
+  by_cases h_eq_v : h = v
+  · subst h_eq_v
+    -- goal: v ∈ Y ∪ {v}
+    simp
+  ·
+    -- show Q ⊆ Y (since v ∉ Q)
+    have hQsubY : Q ⊆ Y := by
+      intro x hxQ
+      have hxIn : x ∈ Y ∪ ({v} : Finset α) := hQsub hxQ
+      by_cases hxv : x = v
+      · subst hxv
+        exact False.elim ((hNoPremV (h := h) (Q := Q) hQ) hxQ)
+      ·
+        -- from hxIn : x ∈ Y ∪ {v} and x ≠ v, infer x ∈ Y
+        have : x ∈ Y := by
+          have hx : x ∈ Y ∨ x ∈ ({v} : Finset α) := by
+            exact Finset.mem_union.mp (hQsub hxQ)
+          cases hx with
+          | inl hxy => exact hxy
+          | inr hxsing =>
+              have : x = v := by
+                simpa [Finset.mem_singleton] using hxsing
+              exact False.elim (hxv this)
+        exact this
+    -- rewrite premises for h ≠ v
+    have hEq : (H.trace v).prem h = H.prem h :=
+      trace_prem_eq_of_noPremContains H v (by
+        intro h' P' hP'
+        exact hNoPremV (h := h') (Q := P') hP'
+      ) (h := h) h_eq_v
+    have hQtrace : Q ∈ (H.trace v).prem h := by
+      simpa [hEq] using hQ
+    have hhY : h ∈ Y := hY hQtrace hQsubY
+    -- conclude h ∈ Y ∪ {v}
+    exact Finset.mem_union_left _ (by simpa using hhY)
 
 /--
 In the head-free case, closure for trace coincides with

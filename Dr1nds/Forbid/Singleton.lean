@@ -11,49 +11,17 @@ variable {α : Type} [DecidableEq α]
 /-!
 # Forbid singleton (A = {a})
 
-このファイルは Horn を使わず、
-`Up`/`Hole`/`NDS_corr` の **singleton 展開**だけを theorem として固定する。
+このファイルは Horn を使わず、`Up`/`Hole`/`NDS_corr` の **singleton 展開**だけを theorem として固定する。
 
-Horn + forbid の「表現の正規化」(A を前提に含む規則の削除など) は
-このファイルでは扱わない（それは `Forbid/HornBridge.lean` 側で凍結する）。
+## Scope
+
+このファイルは **family-level** の等式変形（`Up`/`Hole`/`NDS_corr` の singleton 展開）だけを扱う。
+
+Horn ルールの「正規化」（例：`a` を前提に含む規則の削除が `Hole/Up` に与える影響）に関する主張は、
+family 単体では仮定を正しく書けないため、このファイルには置かない。
+それらは `Forbid/HornBridge.lean`（Horn 側のデータと一緒に）で lemma/axiom として扱う。
 -/
 
-/- ============================================================
-  2. |A|=1 ケースで必要になる「表現正規化」(Horn 側で埋める仕様)
-     ここは “family-level” の statement として凍結するだけ。
-============================================================ -/
-
-/-!
-あなたの自然言語の方針では、|A|=1 のときは
-
-- 「A を前提に含む規則は意味がないので削除してよい」
-- その削除で family は変わらず、NDS_corr も悪化しない（Up が減らない）
-
-を使って分岐処理します。
-
-ただしこれらは Horn ルールの意味論に依存するので、
-このファイルでは **axiom として “仕様だけ” を凍結**し、
-後で `Forbid/HornBridge.lean`（または Horn 側ファイル）で埋めます。
--/
-
-/-- (SPEC) singleton forbid `A={a}` のとき、`A ⊆ prem` な規則を削除しても family は変わらない、という仕様。 -/
-axiom singleton_forbid_drop_Aprem_rules_preserves_family
-  (n : Nat)
-  (C_before C_after : Finset (Finset α))
-  (a : α) :
-  True
-  -- ここは後で Horn 側の「表現→family」定義が確定したら、
-  -- `C_after = C_before` の形に置き換える。
-
-/-- (SPEC) 上の削除で `NDS_corr` が悪化しない（= 値が増えない/減らないのどちらを採るかは後で固定）。 -/
-axiom singleton_forbid_drop_Aprem_rules_ndscorr_monotone
-  (n : Nat)
-  (C_before C_after : Finset (Finset α))
-  (a : α) :
-  True
-  -- ここも後で
-  --   `NDS_corr n C_before {a} ≤ NDS_corr n C_after {a}`
-  -- など、あなたの単調性の向きに合わせて確定させる。
 
 /-- `NDS_corr n C {a}` の definitional 展開（Up/Hole をそのまま残す版）。 -/
 lemma NDS_corr_singleton_unfold
@@ -75,5 +43,82 @@ lemma NDS_corr_singleton_rewrite
   simp [NDS_corr,
     Dr1nds.Hole_singleton_eq_filter_notmem (α := α),
     Dr1nds.Up_singleton_eq_filter_mem (α := α)]
+
+
+
+omit [DecidableEq α] in
+/-- A convenient wrapper of Mathlib's `Finset.card_filter_add_card_filter_not`.
+
+We keep this in the `Dr1nds` namespace because we use it repeatedly when rewriting
+`Up/Hole` for singleton forbids.
+-/
+lemma card_filter_add_card_filter_not
+  (s : Finset α) (p : α → Prop) [DecidablePred p] :
+  (s.filter p).card + (s.filter (fun x => ¬ p x)).card = s.card := by
+  classical
+  simpa using (Finset.filter_card_add_filter_neg_card_eq_card (s := s) (p := p))
+
+
+/-- For singleton forbids, `Up` and `Hole` partition the family. -/
+lemma card_up_add_card_hole_singleton
+  (C : Finset (Finset α)) (a : α) :
+  (Up (α := α) C ({a} : Finset α)).card
+    + (Hole (α := α) C ({a} : Finset α)).card
+    = C.card := by
+  classical
+  -- rewrite `Up/Hole` as filters and use the generic filter-card partition
+  simpa [
+    Dr1nds.Up_singleton_eq_filter_mem (α := α),
+    Dr1nds.Hole_singleton_eq_filter_notmem (α := α)
+  ] using (card_filter_add_card_filter_not (α := Finset α)
+        (s := C) (p := fun X : Finset α => a ∈ X))
+
+/-- A rearranged form of `card_up_add_card_hole_singleton`. -/
+lemma card_up_singleton_eq
+  (C : Finset (Finset α)) (a : α) :
+  (Up (α := α) C ({a} : Finset α)).card
+    = C.card - (Hole (α := α) C ({a} : Finset α)).card := by
+  classical
+  -- `u + h = c`  ⇒  `u = c - h`
+  have hpart :
+      (Up (α := α) C ({a} : Finset α)).card
+        + (Hole (α := α) C ({a} : Finset α)).card
+        = C.card :=
+    card_up_add_card_hole_singleton (α := α) (C := C) (a := a)
+  exact Nat.eq_sub_of_add_eq hpart
+
+/-- Same as `card_up_singleton_eq`, but coerced to `Int`.
+
+This is convenient when the surrounding goal lives in `Int` (e.g. inside `NDS`).
+-/
+lemma int_card_up_singleton_eq
+  (C : Finset (Finset α)) (a : α) :
+  (↑(Up (α := α) C ({a} : Finset α)).card : Int)
+    = (↑C.card : Int) - (↑(Hole (α := α) C ({a} : Finset α)).card : Int) := by
+  classical
+  have hNat := card_up_singleton_eq (α := α) (C := C) (a := a)
+  -- Coerce the Nat equality into Int.
+  -- We also rewrite the RHS using `int_ofNat_sub_of_le`.
+  have hle : (Hole (α := α) C ({a} : Finset α)).card ≤ C.card := by
+    -- from the partition lemma: `u + h = c`
+    have hpart := card_up_add_card_hole_singleton (α := α) (C := C) (a := a)
+    apply Nat.le_of_add_le_add_left
+    simp_all only [Up_singleton_eq_filter_mem, Hole_singleton_eq_filter_notmem, add_le_add_iff_left]
+    linarith
+    simp_all only [Up_singleton_eq_filter_mem, Hole_singleton_eq_filter_notmem]
+    constructor
+  -- now rewrite
+  simp
+  simp_all only [Up_singleton_eq_filter_mem, Hole_singleton_eq_filter_notmem, Nat.cast_sub]
+
+/--- `Int.ofNat` compatibility for subtraction when the RHS is known to be ≤ LHS.
+
+This lemma is often what remains after rewriting cardinalities and switching between
+`Nat` and `Int` in NDS/NDSCorr calculations.
+-/
+lemma int_ofNat_sub_of_le (a b : Nat) (h : b ≤ a) :
+  (↑a : Int) - (↑b : Int) = (↑(a - b) : Int) := by
+  -- `Int.ofNat_sub` expects the `≤` proof.
+  simp [Int.ofNat_sub h]
 
 end Dr1nds
