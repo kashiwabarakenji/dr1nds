@@ -130,10 +130,42 @@ lemma int_card_up_singleton_eq
 This lemma is often what remains after rewriting cardinalities and switching between
 `Nat` and `Int` in NDS/NDSCorr calculations.
 -/
+
 lemma int_ofNat_sub_of_le (a b : Nat) (h : b ≤ a) :
   (↑a : Int) - (↑b : Int) = (↑(a - b) : Int) := by
   -- `Int.ofNat_sub` expects the `≤` proof.
   simp [Int.ofNat_sub h]
+
+
+/-- `card_filter_add_card_filter_not` coerced to `Int`.
+
+This is useful when the surrounding goal is an `Int` identity (e.g. inside NDS/NDS_corr).
+-/
+lemma int_card_filter_add_card_filter_not
+  (s : Finset α) (p : α → Prop) [DecidablePred p] :
+  (↑(s.filter p).card : Int) + (↑(s.filter (fun x => ¬ p x)).card : Int) = (↑s.card : Int) := by
+  classical
+  -- cast the Nat partition identity and simplify
+  have hNat : (s.filter p).card + (s.filter (fun x => ¬ p x)).card = s.card :=
+    card_filter_add_card_filter_not (s := s) (p := p)
+  -- `simp` rewrites `↑(a+b)` into `↑a + ↑b`
+  simpa [Int.ofNat_add] using congrArg (fun z : Nat => (z : Int)) hNat
+
+
+omit [DecidableEq α] in
+/-- Rearranged form of `NDS_succ_eq_sub_card`.
+
+Often you want to *add back* `|C|` rather than subtract it.
+-/
+lemma NDS_succ_add_card
+  (n : Nat) (C : Finset (Finset α)) :
+  NDS (α := α) (n + 1) C + (C.card : Int) = NDS (α := α) n C := by
+  classical
+  -- start from the existing identity and rearrange
+  have h := NDS_succ_eq_sub_card (α := α) (n := n) (C := C)
+  -- `h : NDS (n+1) C = NDS n C - |C|`
+  -- move `|C|` to the left
+  linarith
 
 #print axioms Dr1nds.NDS_corr_singleton_unfold
 #print axioms Dr1nds.NDS_corr_singleton_rewrite

@@ -69,13 +69,42 @@ def Pack1.A (P : Pack1 α) : Finset α :=
     そのまま Lean で閉じられる。
 ------------------------------------------------------------ -/
 
-/-- forbid なし世界（Pack0）での主命題：`NDS ≤ 0`。 -/
+-- forbid なし世界（Pack0）での主命題：`NDS ≤ 0`。
 def Q (n : Nat) (P : Pack0 α) : Prop :=
   _root_.Dr1nds.NDS n (Pack0.C P) ≤ 0
 
-/-- forbid あり世界（Pack1）での主命題：`NDS_corr ≤ 0`。 -/
+-- forbid あり世界（Pack1）での主命題：`NDS_corr ≤ 0`。
 def Qcorr (n : Nat) (P : Pack1 α) : Prop :=
   _root_.Dr1nds.NDS_corr n (Pack1.C P) (Pack1.A P) ≤ 0
+
+
+/--
+`T n` is the *forall-pack* form of `Q n`.
+
+This is intended as the induction hypothesis shape carried by `Steps.lean`.
+-/
+def T (n : Nat) : Prop :=
+  ∀ P : Pack0 α, Q n P
+
+/--
+`Tcorr n` is the *forall-pack* form of `Qcorr n`.
+
+This is intended as the induction hypothesis shape carried by `Steps.lean`.
+-/
+def Tcorr (n : Nat) : Prop :=
+  ∀ P : Pack1 α, Qcorr n P
+
+/-- Extract `Q n P` from `T n`. -/
+theorem T_elim (n : Nat) (P : Pack0 α) :
+  T (α := α) n → Q (α := α) n P := by
+  intro hT
+  exact hT P
+
+/-- Extract `Qcorr n P` from `Tcorr n`. -/
+theorem Tcorr_elim (n : Nat) (P : Pack1 α) :
+  Tcorr (α := α) n → Qcorr (α := α) n P := by
+  intro hT
+  exact hT P
 
 
 /- ------------------------------------------------------------
@@ -109,6 +138,17 @@ by
 axiom Q_base (P : Pack0 α) : Q 0 P
 
 axiom Qcorr_base (P : Pack1 α) : Qcorr 0 P
+
+
+/-- Base case in the forall-pack form. -/
+theorem T_base (P : Pack0 α) : T (α := α) 0 := by
+  intro P0
+  exact Q_base (α := α) P0
+
+/-- Base case in the forall-pack form (with forbid). -/
+theorem Tcorr_base (P : Pack1 α) : Tcorr (α := α) 0 := by
+  intro P1
+  exact Qcorr_base (α := α) P1
 
 
 /- ------------------------------------------------------------

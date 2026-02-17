@@ -85,36 +85,75 @@ forbid あり版の帰納ステップ（構造のみ）：
 Parallel なら独立核へ、NoParallel なら
 |A|=1 を専用核、|A|≥2 を “A 内 SC” で進める。
 -/
+/-/
+forbid あり版の帰納ステップ（構造のみ）。
+
+NOTE (freeze): `|A|=1` の分岐は “同一 pack のまま n→n+1” ではなく、
+trace/deletion により **別 pack（台 n）** に IH を当てる構造なので、
+このステップは `T n` / `Tcorr n`（∀pack 形）を IH として受け取る。
+-/
 theorem Qcorr_step1
   (n : Nat) (P : Pack1 α) :
-  Qcorr n P → Qcorr (n+1) P := by
-  intro hQ
+  T (α := α) n → Tcorr (α := α) n → Qcorr (α := α) (n+1) P := by
+  intro hT hTcorr
   classical
   by_cases hPar : Parallel1 P
   · -- parallel branch（独立核）
-    exact Qcorr_succ_of_parallel (α := α) (n := n) (P := P) hPar hQ
+    exact Qcorr_succ_of_parallel (α := α) (n := n) (P := P) hPar (hTcorr P)
   · -- no-parallel branch：A の大きさで分岐
-    -- NOTE (凍結): この `card_cases` による分岐構造自体を S10(wiring) の仕様として固定する。
     have hNP : NoParallel1 P := by
       trivial
     have hCardCases := card_cases (α := α) P.A
-    -- A.card = 0 は理論上排除したい（forbid は1つで Nonempty を仮定する設計が自然）
-    -- ただし wiring の骨格としては一旦受けて、0 の場合は singleton 分岐に合流させる等で扱える。
-    -- 今は “0 or 1 は専用核” へ寄せる。
     rcases hCardCases with h0 | h1 | hge2
     · -- A.card=0（暫定：専用核）
-      /-
-      NOTE (設計メモ / 凍結)
-      - 仕様としては `Pack1` 側で `A.Nonempty` を仮定してこの分岐自体を消すのが本筋。
-      - ただし現段階では wiring を total に保つため、空 forbid は専用核へ投げる。
-      -/
-      exact Qcorr_handle_A_empty (α := α) (n := n) (P := P) h0 hQ
-    · -- A.card=1 branch（専用核）
-      exact Qcorr_handle_A_singleton (α := α) (n := n) (P := P) h1 hQ
-    · -- A.card≥2 branch（A 内 SC を取って進める）
+      exact Qcorr_handle_A_empty (α := α) (n := n) (P := P) h0 (hTcorr P)
+    · -- A.card=1（専用核：台落ち）
+      -- `A.card = 1` から代表元 `a` を取り、`A = {a}` を得る
+      obtain ⟨a, hAeq⟩ := Finset.card_eq_one.mp h1
+      -- singleton kernel は trace-world への IH を要求するので、`T/Tcorr` から供給する
+      refine Qcorr_handle_A_singleton (α := α) (n := n) (P := P) (a := a) ?_ ?_ ?_
+      · -- `A = {a}`
+        simpa [Pack1.A] using hAeq
+      · -- NoHead branch IH : Q n (tracePack0 ...)
+        intro hNo
+        exact hT (Pack1.tracePack0 (α := α) P a)
+      · -- HasHead branch IH : ∃Pprem, ... ∧ Qcorr n (tracePack1WithPrem ...)
+        intro hHead
+        classical
+        -- Choose the (unique) premise for head `a` (DR1 guarantees card = 1).
+        let Pprem := choose_prem1_LK (α := α) P a hHead
+        refine ⟨Pprem, ?_, ?_, ?_⟩
+        · -- membership
+          simpa [Pprem] using (choose_prem1_LK_mem (α := α) P a hHead)
+        · -- uniqueness (card = 1)
+          simpa [Pprem] using (prem_card_eq_one_of_choose_prem1_LK (α := α) P a hHead)
+        · -- IH on the trace-with-prem pack comes from `Tcorr n`
+          exact hTcorr (Pack1.tracePack1WithPrem (α := α) P a Pprem)
+    · -- A.card≥2（A 内 SC を取って進める）
       let h := choose_SC_in_forbid (α := α) P hNP
       have hmem : h ∈ P.A := choose_SC_in_forbid_mem (α := α) P hNP
       have hSC : IsSC1 P h := choose_SC_in_forbid_spec (α := α) P hNP
-      exact Qcorr_branch_A_ge2 (α := α) (n := n) (P := P) (h := h) hSC hmem hQ
+      exact Qcorr_branch_A_ge2 (α := α) (n := n) (P := P) (h := h) hSC hmem (hTcorr P)
+
+
+/- ============================================================
+  (S10-global) Lift local steps to global (∀-quantified) steps.
+
+  These are the steps that the mutual induction should use.
+============================================================ -/
+
+/-- Global step for forbid-free statement. -/
+theorem T_step0
+  (n : Nat) : T (α := α) n → T (α := α) (n+1) := by
+  intro IH
+  intro P
+  exact Q_step0 (n := n) (P := P) (IH P)
+
+/-- Global step for forbid statement. -/
+theorem Tcorr_step1
+  (n : Nat) : T (α := α) n → Tcorr (α := α) n → Tcorr (α := α) (n+1) := by
+  intro IH_T IH_Tcorr
+  intro P
+  exact Qcorr_step1 (n := n) (P := P) IH_T IH_Tcorr
 
 end Dr1nds

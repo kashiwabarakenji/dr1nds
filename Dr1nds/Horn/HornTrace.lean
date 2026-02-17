@@ -4,6 +4,7 @@ import Mathlib.Data.Fintype.Card
 import Mathlib.Data.Finset.Powerset
 import Dr1nds.Horn.Horn
 import Dr1nds.ClosureSystem.Basic
+import Dr1nds.Forbid.Basic
 
 /-
 ============================================================
@@ -13,6 +14,15 @@ namespace Dr1nds
 namespace HornNF
 
 variable {α : Type} [DecidableEq α]
+
+@[ext] lemma ext {H1 H2 : HornNF α}
+  (hU : H1.U = H2.U)
+  (hPrem : H1.prem = H2.prem) : H1 = H2 := by
+  cases H1
+  cases H2
+  cases hU
+  cases hPrem
+  simp
 
 /--- Trace of HornNF at u (rule-level trace). -/
 def trace (H : HornNF α) (u : α) : HornNF α :=
@@ -361,6 +371,163 @@ lemma isClosed_union_singleton_of_noPremContains
     have hhY : h ∈ Y := hY hQtrace hQsubY
     -- conclude h ∈ Y ∪ {v}
     exact Finset.mem_union_left _ (by simpa using hhY)
+
+/--
+Normalization at `v`: delete every rule whose premise contains `v`.
+
+This is the formal version of the `NF-A` normalization used in the `|A|=1` branch:
+when we only care about sets not containing `v` (i.e. the Hole-side for forbid `{v}`),
+any premise containing `v` can never be satisfied, so deleting those rules does not
+change closedness on `v`-free sets.
+-/
+def normalize (H : HornNF α) (v : α) : HornNF α :=
+{ U := H.U
+  prem := fun h => (H.prem h).filter (fun P => v ∉ P)
+  prem_subset_U := by
+    classical
+    intro h P hP
+    have hP' : P ∈ H.prem h := (Finset.mem_filter.mp hP).1
+    exact H.prem_subset_U hP'
+  head_mem_U := by
+    classical
+    intro h hne
+    -- if `(normalize H v).prem h` is nonempty then so is `H.prem h`
+    have hne' : (H.prem h).Nonempty := by
+      rcases hne with ⟨P, hP⟩
+      exact ⟨P, (Finset.mem_filter.mp hP).1⟩
+    exact H.head_mem_U hne'
+  nf := by
+    classical
+    intro h P hP
+    have hP' : P ∈ H.prem h := (Finset.mem_filter.mp hP).1
+    exact H.nf hP' }
+
+/--
+On sets not containing `v`, closedness is preserved by normalization.
+-/
+lemma normalize_isClosed_iff
+  (H : HornNF α)
+  (v : α)
+  {X : Finset α}
+  (hvX : v ∉ X) :
+  HornNF.IsClosed (normalize H v) X ↔ HornNF.IsClosed H X := by
+  classical
+  unfold HornNF.IsClosed
+  constructor
+  · intro hNorm h P hP hsubset
+    -- show `v ∉ P` using `P ⊆ X`
+    have hvP : v ∉ P := by
+      intro hvP
+      have : v ∈ X := hsubset hvP
+      exact hvX this
+    have hPnorm : P ∈ (normalize H v).prem h := by
+      simp [normalize, hP, hvP]
+    exact hNorm hPnorm hsubset
+  · intro hH h P hP hsubset
+    have hP' : P ∈ H.prem h := (Finset.mem_filter.mp hP).1
+    exact hH hP' hsubset
+
+/--
+If `P ∈ (H.trace v).prem h` then necessarily `v ∉ P` (since trace lives on `U.erase v`).
+-/
+lemma trace_prem_not_mem
+  (H : HornNF α)
+  (v : α)
+  {h : α} {P : Finset α}
+  (hP : P ∈ (H.trace v).prem h) :
+  v ∉ P := by
+  classical
+  -- `prem_subset_U` in the trace world gives `P ⊆ H.U.erase v`
+  have hsub : P ⊆ (H.U.erase v) := (H.trace v).prem_subset_U hP
+  intro hvP
+  have : v ∈ H.U.erase v := hsub hvP
+  simpa using this
+
+
+/-- Normalization keeps the universe. -/
+theorem normalize_U
+  (H : HornNF α) (a : α) : (normalize (α := α) H a).U = H.U := rfl
+
+/-- Normalization is exactly “filter premises by `a ∉ ·`”. -/
+theorem normalize_prem
+  (H : HornNF α) (a : α) (h : α) (Q : Finset α) :
+  Q ∈ (normalize (α := α) H a).prem h ↔ (Q ∈ H.prem h ∧ a ∉ Q) := by
+ dsimp [normalize]
+ simp
+
+/-- Immediate corollary: in the normalized system, no premise contains `a`. -/
+lemma normalize_noPremContains
+  (H : HornNF α) (a : α) :
+  ∀ {h : α} {Q : Finset α}, Q ∈ (normalize H a).prem h → a ∉ Q := by
+  intro h Q hQ
+  exact (normalize_prem H a h Q).1 hQ |>.2
+
+/-- Consequence: the Hole family is invariant under normalization. -/
+theorem normalize_hole_fixset_eq
+  (H : HornNF α) (a : α) :
+  Hole (HornNF.FixSet (normalize H a)) ({a} : Finset α)
+    =
+  Hole (HornNF.FixSet H) ({a} : Finset α)
+ := by
+  classical
+  ext X
+  constructor
+  · intro hX
+    have hX' : X ∈ HornNF.FixSet (normalize H a) ∧ a ∉ X := by
+      simpa [Hole_singleton_eq_filter_notmem] using hX
+    rcases hX' with ⟨hFix, haX⟩
+    have hFix' : X ∈ HornNF.FixSet H := by
+      have hData := (mem_FixSet_iff (H := normalize H a) (X := X)).1 hFix
+      have hpow : X ∈ (normalize H a).U.powerset := hData.1
+      have hpow' : X ∈ H.U.powerset := by
+        simpa [normalize_U] using hpow
+      have hClosedH : HornNF.IsClosed H X :=
+        (normalize_isClosed_iff (H := H) (v := a) (X := X) haX).1 hData.2
+      exact (mem_FixSet_iff (H := H) (X := X)).2 ⟨hpow', hClosedH⟩
+    exact (by
+      -- pack back into Hole
+      simpa [Hole_singleton_eq_filter_notmem] using And.intro hFix' haX)
+  · intro hX
+    have hX' : X ∈ HornNF.FixSet H ∧ a ∉ X := by
+      simpa [Hole_singleton_eq_filter_notmem] using hX
+    rcases hX' with ⟨hFix, haX⟩
+    have hFix' : X ∈ HornNF.FixSet (normalize H a) := by
+      have hData := (mem_FixSet_iff (H := H) (X := X)).1 hFix
+      have hpow : X ∈ H.U.powerset := hData.1
+      have hpow' : X ∈ (normalize H a).U.powerset := by
+        simpa [normalize_U] using hpow
+      have hClosedN : HornNF.IsClosed (normalize H a) X :=
+        (normalize_isClosed_iff (H := H) (v := a) (X := X) haX).2 hData.2
+      exact (mem_FixSet_iff (H := normalize H a) (X := X)).2 ⟨hpow', hClosedN⟩
+    exact (by
+      simpa [Hole_singleton_eq_filter_notmem] using And.intro hFix' haX)
+
+
+/--
+Normalizing **after** trace at `v` is a no-op (all trace-premises already avoid `v`).
+-/
+lemma normalize_trace_eq
+  (H : HornNF α)
+  (v : α) :
+  normalize (H.trace v) v = (H.trace v) := by
+  classical
+  have hU : (normalize (H.trace v) v).U = (H.trace v).U := rfl
+  have hPrem : (normalize (H.trace v) v).prem = (H.trace v).prem := by
+    funext h
+    ext P
+    let np := normalize_prem (H := H.trace v)
+    constructor
+    · intro hP
+      have hP' :
+          P ∈ (H.trace v).prem h ∧ v ∉ P := by
+        constructor
+        · simp_all only
+        · simp_all only [not_false_eq_true]
+      exact hP'.1
+    · intro hP
+      have hvP : v ∉ P := trace_prem_not_mem (H := H) (v := v) (hP := hP)
+      simp_all only [not_false_eq_true, and_self]
+  exact HornNF.ext hU hPrem
 
 /--
 In the head-free case, closure for trace coincides with

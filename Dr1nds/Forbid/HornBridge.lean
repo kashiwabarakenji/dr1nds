@@ -741,6 +741,10 @@ lemma qcorr_singleton_hasHead_P_step
     (hNoPremV := hNoPremV) (hQ := hQ_trace)
 
 
+
+
+
+
 #print axioms Dr1nds.NDS_corr_singleton_head_free_eq
 #print axioms Dr1nds.NDS_corr_singleton_hasHead_P_eq
 #print axioms Dr1nds.HornNF.card_up_fixset_eq_card_fixset_trace

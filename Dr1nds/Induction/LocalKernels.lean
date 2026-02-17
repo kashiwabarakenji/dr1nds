@@ -5,6 +5,7 @@ import Dr1nds.Forbid.Basic
 import Dr1nds.S0_CoreDefs
 import Dr1nds.Forbid.HornBridge
 import Dr1nds.Forbid.Singleton
+import LeanCopilot
 
 namespace Dr1nds
 variable {α : Type} [DecidableEq α]
@@ -126,6 +127,100 @@ For now we keep them abstract to freeze the wiring signatures.
 -/
 axiom Pack1.tracePack0 (P : Pack1 α) (a : α) : Pack0 α
 axiom Pack1.tracePack1WithPrem (P : Pack1 α) (a : α) (Pprem : Finset α) : Pack1 α
+
+/- API placeholders: expected semantics of the trace packs. -/
+axiom Pack1.tracePack0_C
+  (P : Pack1 α) (a : α) :
+  Pack0.C (Pack1.tracePack0 (α := α) P a) = HornNF.FixSet (P.S.H.trace a)
+
+axiom Pack1.tracePack0_H
+  (P : Pack1 α) (a : α) :
+  (Pack1.tracePack0 (α := α) P a).H = P.S.H.trace a
+
+axiom Pack1.tracePack1WithPrem_C
+  (P : Pack1 α) (a : α) (Pprem : Finset α) :
+  Pack1.C (Pack1.tracePack1WithPrem (α := α) P a Pprem) = HornNF.FixSet (P.S.H.trace a)
+
+axiom Pack1.tracePack1WithPrem_A
+  (P : Pack1 α) (a : α) (Pprem : Finset α) :
+  Pack1.A (Pack1.tracePack1WithPrem (α := α) P a Pprem) = Pprem
+
+/- API placeholder: normalization assumption (no premise contains a forbidden element). -/
+
+axiom Pack1.noPremContains_forbid
+  (P : Pack1 α) (a : α) :
+  a ∈ Pack1.A (α := α) P →
+  ∀ {h : α} {Q : Finset α}, Q ∈ P.S.H.prem h → a ∉ Q
+
+
+-- =====================================
+-- (A) Phase (2-A) / (2-B) TODO targets (statement skeletons)
+--
+-- These are the *missing mathematical statements* needed to finish the |A|=1 story
+-- without keeping the normalization hypothesis as an explicit axiom.
+--
+-- Rule of thumb:
+-- - (2-A) makes trace packs concrete (defs + rfl lemmas) and deletes the four
+--   `tracePack*_C/H/A` axioms above.
+-- - (2-B) proves that we may normalize away premises containing the forbidden
+--   singleton element `a` (NF-A), and then reuse the existing HornBridge lemmas.
+--
+-- For now we only add the *targets as axioms* so that the end-to-end wiring
+-- can be kept stable while we theorem-ize them one by one.
+-- =====================================
+
+/-
+(2-B) NF-A (normalization) blueprint.
+
+We normalize a HornNF by deleting all premises that contain the distinguished element `a`.
+This produces an equivalent closure behaviour on the singleton-forbid world.
+
+Implementation strategy (later theorem-ization):
+- define `HornNF.normalizePrem` as a `filter (fun Q => a ∉ Q)` on each `prem h`;
+- prove `normalizePrem_noPremContains` by simp;
+- show that on the singleton-forbid branch, normalization preserves the relevant
+  `Hole/Up` families (or at least their cards), hence preserves `NDS_corr`.
+-/
+namespace HornNF
+
+/-- (2-B target) Premise-normalization: remove all premises that contain `a`. -/
+axiom normalizePrem (H : HornNF α) (a : α) : HornNF α
+
+/-- (2-B target) After normalization, no premise contains `a`. -/
+axiom normalizePrem_noPremContains
+  (H : HornNF α) (a : α) :
+  ∀ {h : α} {Q : Finset α}, Q ∈ (normalizePrem (α := α) H a).prem h → a ∉ Q
+
+/--
+(2-B target) On singleton forbid, `Hole` in the FixSet is preserved by normalization.
+
+This is the key lemma that lets us drop the explicit `hNoPremV` assumption from HornBridge:
+we normalize first (gaining `noPremContains`), apply the existing HornBridge lemma there,
+then transport back using this equality.
+-/
+axiom hole_fixset_singleton_normalize_eq
+  (H : HornNF α) (a : α) :
+  Hole (α := α) H.FixSet ({a} : Finset α)
+    = Hole (α := α) (normalizePrem (α := α) H a).FixSet ({a} : Finset α)
+
+/-- (2-B target) On singleton forbid, `Up` in the FixSet is preserved by normalization. -/
+axiom up_fixset_singleton_normalize_eq
+  (H : HornNF α) (a : α) :
+  Up (α := α) H.FixSet ({a} : Finset α)
+    = Up (α := α) (normalizePrem (α := α) H a).FixSet ({a} : Finset α)
+
+/--
+(2-B target) Consequently, `NDS_corr` for singleton forbid is preserved by normalization.
+
+This can be proved by unfolding `NDS_corr` via `Forbid/Singleton.lean` and rewriting with
+`hole_fixset_singleton_normalize_eq` and `up_fixset_singleton_normalize_eq`.
+-/
+axiom NDS_corr_singleton_normalize_eq
+  (n : Nat) (H : HornNF α) (a : α) :
+  NDS_corr (α := α) n H.FixSet ({a} : Finset α)
+    = NDS_corr (α := α) n (normalizePrem (α := α) H a).FixSet ({a} : Finset α)
+
+end HornNF
 
 
 -- =====================================
@@ -421,18 +516,81 @@ by
   by_cases hHead : HasHead1 P a
   · -- has-head branch: shift forbid to a chosen premise
     rcases hHasHeadIH hHead with ⟨Pprem, hmem, hcard, hIH⟩
-    -- use the singleton-step kernel (already declared in the Forbid layer)
-    exact qcorr_singleton_hasHead_P_step
-      (α := α) (n := n) (P := P) (a := a) (Pprem := Pprem)
-      hA hmem hcard hIH
+    -- bridge the pack-level IH to the HornNF kernel
+    have haA : a ∈ P.A := by
+      simpa [hA] using (Finset.mem_singleton.mpr rfl)
+    have hA' : P.S.F = ({a} : Finset α) := by
+      simpa [Pack1.A] using hA
+    have haF : a ∈ P.S.F := by
+      simpa [Pack1.A] using haA
+    have hvU : a ∈ P.S.H.U := by
+      exact P.S.F_subset_U haF
+    have hNoPremV :
+        ∀ {h : α} {Q : Finset α}, Q ∈ P.S.H.prem h → a ∉ Q :=
+      Pack1.noPremContains_forbid (α := α) P a haA
+    have hQ_trace :
+        NDS_corr (α := α) n (HornNF.FixSet (P.S.H.trace a)) Pprem ≤ 0 := by
+      have hQ := Qcorr_implies_NDSCorr_le_zero (α := α) (n := n)
+        (P := Pack1.tracePack1WithPrem (α := α) P a Pprem) hIH
+      simpa [Pack1.tracePack1WithPrem_C, Pack1.tracePack1WithPrem_A] using hQ
+    have hRes :
+        NDS_corr (α := α) n.succ (HornNF.FixSet P.S.H) ({a} : Finset α) ≤ 0 :=
+      qcorr_singleton_hasHead_P_step (α := α)
+        (n := n) (H := P.S.H) (hDR1 := P.S.hDR1)
+        (v := a) (P := Pprem)
+        (hvU := hvU) (hP := hmem) (hUnique := hcard)
+        (hNoPremV := hNoPremV) (hQ_trace := hQ_trace)
+    dsimp [Qcorr, Pack1.C, Pack1.A]
+    rw [hA']
+    exact hRes
   · -- no-head branch: forbid disappears in the trace/deletion world
     have hNoHead : NoHead1 P a := by
       -- `NoHead1` is defined as `¬ HasHead1` in this file
       simpa [NoHead1] using hHead
+    have haA : a ∈ P.A := by
+      simpa [hA] using (Finset.mem_singleton.mpr rfl)
+    have hA' : P.S.F = ({a} : Finset α) := by
+      simpa [Pack1.A] using hA
+    have haF : a ∈ P.S.F := by
+      simpa [Pack1.A] using haA
+    have hvU : a ∈ P.S.H.U := by
+      exact P.S.F_subset_U haF
+    have hNoPremV :
+        ∀ {h : α} {Q : Finset α}, Q ∈ P.S.H.prem h → a ∉ Q :=
+      Pack1.noPremContains_forbid (α := α) P a haA
+    have hfree : P.S.H.prem a = ∅ := by
+      classical
+      by_contra hne
+      have hnonempty : (P.S.H.prem a).Nonempty :=
+        Finset.nonempty_iff_ne_empty.mpr hne
+      exact hNoHead hnonempty
     have hIH : Q n (Pack1.tracePack0 (α := α) P a) := hNoHeadIH hNoHead
-    exact qcorr_singleton_noHead_step
-      (α := α) (n := n) (P := P) (a := a)
-      hA hNoHead hIH
+    have hQ_trace :
+        NDS (α := α) n (HornNF.FixSet (P.S.H.trace a)) ≤ 0 := by
+      have hQ := Q_implies_NDS_le_zero (α := α) (n := n)
+        (P := Pack1.tracePack0 (α := α) P a) hIH
+      dsimp [Pack0.C] at hQ
+      rw [Pack1.tracePack0_H] at hQ
+      exact hQ
+    have hRes :
+        NDS_corr (α := α) n.succ (HornNF.FixSet P.S.H) ({a} : Finset α) ≤ 0 :=
+      qcorr_singleton_noHead_step (α := α)
+        (n := n) (H := P.S.H) (v := a)
+        (hvU := hvU) (hfree := hfree)
+        (hNoPremV := hNoPremV) (hQ_trace := hQ_trace)
+    dsimp [Qcorr, Pack1.C, Pack1.A]
+    rw [hA']
+    exact hRes
+
+/--
+Wrapper kernel for wiring: if `A.card = 1`, step in the singleton case.
+This is kept as an axiom so that `Steps.lean` does not need to supply the
+trace-world IHs explicitly.
+-/
+axiom Qcorr_handle_A_singleton_card
+  (n : Nat) (P : Pack1 α) :
+  (P.A).card = 1 →
+  Qcorr n P → Qcorr (n+1) P
 
 /--
 |A| = 0 branch (temporary).
