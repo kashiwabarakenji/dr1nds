@@ -46,31 +46,6 @@ structure Pack1 (α : Type) [DecidableEq α] where
   ここが最重要の凍結点。
 ------------------------------------------------------------ -/
 
-/-
-Q n P : forbid なし世界（Pack0）での主命題。
-「NDS ≤ 0」そのものにしても良いが、実装上は
-   - IH を con-world に当てる
-   - unary head / parallel 分岐
-などの補助成分が要るなら、ここを強くしてよい。
-
-現時点では “骨格優先” で Prop として凍結する。
--/
--- axiom Q : Nat → Pack0 α → Prop
-
-/-
-Qcorr n P1 : forbid あり世界（Pack1）での主命題。
-目的は NDS_corr ≤ 0（ただし NDS_corr は family + A だけで定義する方針）
--/
--- axiom Qcorr : Nat → Pack1 α → Prop
-
-
-/- ------------------------------------------------------------
-  2. “最終ターゲット” への射影（仕様）
-  - Q から NDS ≤ 0
-  - Qcorr から NDS_corr ≤ 0
-  ここも後で強化・変更してよい。
------------------------------------------------------------- -/
-
 /-- forbid なし世界の「評価対象 family」 -/
 noncomputable def Pack0.C (P : Pack0 α) : Finset (Finset α) :=
   P.H.FixSet

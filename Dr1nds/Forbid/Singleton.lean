@@ -44,6 +44,20 @@ lemma NDS_corr_singleton_rewrite
     Dr1nds.Hole_singleton_eq_filter_notmem (α := α),
     Dr1nds.Up_singleton_eq_filter_mem (α := α)]
 
+omit [DecidableEq α] in
+/-- `NDS` changes by exactly `|C|` when the ambient size increases by 1.
+
+This is the basic accounting identity used when shifting between `n` and `n-1`.
+-/
+lemma NDS_succ_eq_sub_card
+  (n : Nat) (C : Finset (Finset α)) :
+  NDS (α := α) (n + 1) C = NDS (α := α) n C - (C.card : Int) := by
+  classical
+  -- After unfolding `NDS`, this is just the distributivity
+  --   -( |C| * (n+1) ) = -( |C| * n ) - |C|.
+  -- We let `simp` put both sides into the same normal form and finish by `ring`.
+  simp [Dr1nds.NDS, w]
+  ring
 
 
 omit [DecidableEq α] in
@@ -120,5 +134,13 @@ lemma int_ofNat_sub_of_le (a b : Nat) (h : b ≤ a) :
   (↑a : Int) - (↑b : Int) = (↑(a - b) : Int) := by
   -- `Int.ofNat_sub` expects the `≤` proof.
   simp [Int.ofNat_sub h]
+
+#print axioms Dr1nds.NDS_corr_singleton_unfold
+#print axioms Dr1nds.NDS_corr_singleton_rewrite
+#print axioms Dr1nds.card_filter_add_card_filter_not
+#print axioms Dr1nds.card_up_add_card_hole_singleton
+#print axioms Dr1nds.card_up_singleton_eq
+#print axioms Dr1nds.int_card_up_singleton_eq
+#print axioms Dr1nds.int_ofNat_sub_of_le
 
 end Dr1nds

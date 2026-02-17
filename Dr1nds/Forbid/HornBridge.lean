@@ -10,7 +10,9 @@ import LeanCopilot
 namespace Dr1nds
 open scoped BigOperators
 
+
 variable {α : Type} [DecidableEq α]
+
 
 /-- |A|=1（A={v}）かつ head=v の唯一前提が P のとき、
     Hole(Fix(H), {v}) は trace 世界の Hole へ移せる（P 版）。 -/
@@ -602,3 +604,145 @@ lemma NDS_corr_singleton_hasHead_P_eq
           abel
     _ = NDS_corr (α := α) n (HornNF.FixSet (H.trace v)) P := by
           simp [Dr1nds.NDS_corr]
+
+
+/-- has-head singleton: if the trace-world Qcorr holds, then the singleton-forbid world Qcorr holds.
+
+This is the direct corollary of `NDS_corr_singleton_hasHead_P_eq`.
+-/
+lemma Qcorr_singleton_hasHead_of_Qcorr_traceP
+  (n : Nat)
+  (H : HornNF α) (hDR1 : H.IsDR1)
+  (v : α) (P : Finset α)
+  (hvU : v ∈ H.U)
+  (hP : P ∈ H.prem v)
+  (hUnique : (H.prem v).card = 1)
+  (hNoPremV : ∀ {h : α} {Q : Finset α}, Q ∈ H.prem h → v ∉ Q)
+  (hQ : NDS_corr (α := α) n (HornNF.FixSet (H.trace v)) P ≤ 0) :
+  NDS_corr (α := α) n.succ (HornNF.FixSet H) ({v} : Finset α) ≤ 0 := by
+  -- rewrite by the established equality and finish
+  simpa [NDS_corr_singleton_hasHead_P_eq (α := α)
+    (n := n) (H := H) (hDR1 := hDR1) (v := v) (P := P)
+    (hvU := hvU) (hP := hP) (hUnique := hUnique) (hNoPremV := hNoPremV)] using hQ
+
+
+/-- |A|=1 bridge, packaged as a two-case lemma.
+
+If `prem v = ∅` (head-free) we reduce to `NDS ≤ 0` on the trace world.
+If `prem v` is nonempty (has-head) we pick the unique premise `P` (using DR1) and reduce to
+`NDS_corr ≤ 0` on the trace world with forbid `P`.
+
+This lemma is intended as the *only* entry point used by `LocalKernels.lean` for the |A|=1 branch.
+
+NOTE: the proof is provided as a skeleton because the case split and `P` selection policy may vary
+in the project (e.g. you may want an explicit `P` parameter upstream). Replace the `sorry` blocks
+once the upstream API is frozen.
+-/
+lemma Qcorr_singleton_by_trace_cases
+  (n : Nat)
+  (H : HornNF α)
+  (hDR1 : H.IsDR1)
+  (v : α)
+  (hvU : v ∈ H.U)
+  (hNoPremV : ∀ {h : α} {Q : Finset α}, Q ∈ H.prem h → v ∉ Q)
+  (hQ_trace_NDS : NDS (α := α) n (HornNF.FixSet (H.trace v)) ≤ 0)
+  (hQ_trace_Qcorr : ∀ (P : Finset α), P ∈ H.prem v →
+      NDS_corr (α := α) n (HornNF.FixSet (H.trace v)) P ≤ 0) :
+  NDS_corr (α := α) n.succ (HornNF.FixSet H) ({v} : Finset α) ≤ 0 := by
+  classical
+  by_cases hfree : H.prem v = ∅
+  · -- head-free branch
+    exact Qcorr_singleton_head_free_of_Q_trace (α := α)
+      (n := n) (H := H) (v := v) (hvU := hvU)
+      (hfree := hfree) (hNoPremV := hNoPremV) (hQ := hQ_trace_NDS)
+  · -- has-head branch: pick the unique premise P (DR1) and reduce to trace Qcorr(P)
+    have hNonempty : (H.prem v).Nonempty := by
+      -- `prem v ≠ ∅` is the definitional content of “has-head” on the premise-set level
+      simpa [Finset.nonempty_iff_ne_empty] using hfree
+    -- choose a witness `P` from `prem v`
+    rcases hNonempty with ⟨P, hP⟩
+    have hUnique : (H.prem v).card = 1 := by
+      -- DR1 + nonempty
+      exact prem_card_eq_one_of_DR1_of_ne_empty (H := H) (v := v) (hDR1 := hDR1)
+        (by
+          intro hEq
+          exact hfree hEq)
+    -- now discharge using the has-head bridge
+    have hQp : NDS_corr (α := α) n (HornNF.FixSet (H.trace v)) P ≤ 0 :=
+      hQ_trace_Qcorr P hP
+    exact Qcorr_singleton_hasHead_of_Qcorr_traceP (α := α)
+      (n := n) (H := H) (hDR1 := hDR1) (v := v) (P := P)
+      (hvU := hvU) (hP := hP) (hUnique := hUnique) (hNoPremV := hNoPremV) (hQ := hQp)
+
+
+/-- Convenience: the equality form of the has-head bridge rewritten as a `≤ 0` goal.
+
+This is often the exact shape needed in `LocalKernels.lean`.
+-/
+
+lemma Qcorr_singleton_hasHead_P_of_Qcorr_traceP
+  (n : Nat)
+  (H : HornNF α) (hDR1 : H.IsDR1)
+  (v : α) (P : Finset α)
+  (hvU : v ∈ H.U)
+  (hP : P ∈ H.prem v)
+  (hUnique : (H.prem v).card = 1)
+  (hNoPremV : ∀ {h : α} {Q : Finset α}, Q ∈ H.prem h → v ∉ Q)
+  (hQ : NDS_corr (α := α) n (HornNF.FixSet (H.trace v)) P ≤ 0) :
+  NDS_corr (α := α) n.succ (HornNF.FixSet H) ({v} : Finset α) ≤ 0 :=
+by
+  exact Qcorr_singleton_hasHead_of_Qcorr_traceP (α := α)
+    (n := n) (H := H) (hDR1 := hDR1) (v := v) (P := P)
+    (hvU := hvU) (hP := hP) (hUnique := hUnique) (hNoPremV := hNoPremV) (hQ := hQ)
+
+
+/--
+Kernel (singleton forbid, no-head case) in the *step* shape expected by the induction wiring:
+if the trace-world is forbid-free and satisfies `NDS ≤ 0`, then the original singleton-forbid world
+satisfies `NDS_corr ≤ 0`.
+
+This is just a naming wrapper around `Qcorr_singleton_head_free_of_Q_trace`.
+-/
+lemma qcorr_singleton_noHead_step
+  (n : Nat)
+  (H : HornNF α)
+  (v : α)
+  (hvU : v ∈ H.U)
+  (hfree : H.prem v = ∅)
+  (hNoPremV : ∀ {h : α} {Q : Finset α}, Q ∈ H.prem h → v ∉ Q)
+  (hQ_trace : NDS (α := α) n (HornNF.FixSet (H.trace v)) ≤ 0) :
+  NDS_corr (α := α) n.succ (HornNF.FixSet H) ({v} : Finset α) ≤ 0 := by
+  exact Qcorr_singleton_head_free_of_Q_trace (α := α)
+    (n := n) (H := H) (v := v) (hvU := hvU)
+    (hfree := hfree) (hNoPremV := hNoPremV) (hQ := hQ_trace)
+
+
+/--
+Kernel (singleton forbid, has-head case) in the *step* shape expected by the induction wiring:
+if the trace-world with forbid `P` satisfies `NDS_corr ≤ 0`, then the original singleton-forbid world
+satisfies `NDS_corr ≤ 0`.
+
+This is just a naming wrapper around `Qcorr_singleton_hasHead_of_Qcorr_traceP`.
+-/
+lemma qcorr_singleton_hasHead_P_step
+  (n : Nat)
+  (H : HornNF α) (hDR1 : H.IsDR1)
+  (v : α) (P : Finset α)
+  (hvU : v ∈ H.U)
+  (hP : P ∈ H.prem v)
+  (hUnique : (H.prem v).card = 1)
+  (hNoPremV : ∀ {h : α} {Q : Finset α}, Q ∈ H.prem h → v ∉ Q)
+  (hQ_trace : NDS_corr (α := α) n (HornNF.FixSet (H.trace v)) P ≤ 0) :
+  NDS_corr (α := α) n.succ (HornNF.FixSet H) ({v} : Finset α) ≤ 0 := by
+  exact Qcorr_singleton_hasHead_of_Qcorr_traceP (α := α)
+    (n := n) (H := H) (hDR1 := hDR1)
+    (v := v) (P := P)
+    (hvU := hvU) (hP := hP) (hUnique := hUnique)
+    (hNoPremV := hNoPremV) (hQ := hQ_trace)
+
+
+#print axioms Dr1nds.NDS_corr_singleton_head_free_eq
+#print axioms Dr1nds.NDS_corr_singleton_hasHead_P_eq
+#print axioms Dr1nds.HornNF.card_up_fixset_eq_card_fixset_trace
+
+end Dr1nds

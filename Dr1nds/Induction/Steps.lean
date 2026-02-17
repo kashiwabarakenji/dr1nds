@@ -48,14 +48,7 @@ theorem Q_step0
   classical
   by_cases hPar : Parallel0 P
   · -- parallel branch（独立核）
-    /-
-    NOTE (設計メモ)
-    - ここは将来的に `Q_succ_of_parallel : Parallel0 P → Q n P → Q (n+1) P` の形の局所核に置換する想定。
-      いまは `Q_of_parallel` を (n+1) で呼んでいるが、これは「n を進める核」ではなく
-      「Parallel なら Q が成立する」型にしたくなるので、後で必ず整備する。
-    - wiring としては「Parallel なら parallel 核へ投げる」だけ、という点を凍結したい。
-    -/
-    exact Q_of_parallel (α := α) (n := n+1) (P := P) hPar
+    exact Q_succ_of_parallel (α := α) (n := n) (P := P) hPar hQ
   · -- no-parallel branch：SC を取って分岐
     have hNP : NoParallel0 P := by
       -- NOTE (設計メモ): 現在 NoParallel0 は abbrev True なので trivial。
@@ -99,12 +92,7 @@ theorem Qcorr_step1
   classical
   by_cases hPar : Parallel1 P
   · -- parallel branch（独立核）
-    /-
-    NOTE (設計メモ)
-    - forbid あり版も parallel branch は「独立核」に投げるだけ。
-      将来は `Qcorr_succ_of_parallel : Parallel1 P → Qcorr n P → Qcorr (n+1) P` の形が自然。
-    -/
-    exact Qcorr_of_parallel (α := α) (n := n+1) (P := P) hPar
+    exact Qcorr_succ_of_parallel (α := α) (n := n) (P := P) hPar hQ
   · -- no-parallel branch：A の大きさで分岐
     -- NOTE (凍結): この `card_cases` による分岐構造自体を S10(wiring) の仕様として固定する。
     have hNP : NoParallel1 P := by

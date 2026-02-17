@@ -225,6 +225,7 @@ lemma deleteRules_head_free
   2d. DR1 ⇒ premise uniqueness for a fixed head (Q1)
 ------------------------------------------------------------ -/
 
+
 lemma prem_eq_of_mem_of_mem
     (H : HornNF α) (v : α)
     (hDR1 : HornNF.IsDR1 H)
@@ -236,6 +237,60 @@ lemma prem_eq_of_mem_of_mem
   apply Finset.card_le_one.mp hcard
   exact hP
   exact hQ
+
+lemma prem_card_eq_one_of_DR1_of_nonempty
+    (H : HornNF α) (v : α)
+    (hDR1 : HornNF.IsDR1 H)
+    (hne : (H.prem v).Nonempty) :
+    (H.prem v).card = 1 := by
+  classical
+  have hle1 : (H.prem v).card ≤ 1 := hDR1 v
+  have hpos : 0 < (H.prem v).card := Finset.card_pos.mpr hne
+  have hge1 : 1 ≤ (H.prem v).card := Nat.succ_le_of_lt hpos
+  exact Nat.le_antisymm hle1 hge1
+
+
+lemma prem_card_eq_one_of_DR1_of_ne_empty
+    (H : HornNF α) (v : α)
+    (hDR1 : HornNF.IsDR1 H)
+    (hne : (H.prem v) ≠ ∅) :
+    (H.prem v).card = 1 := by
+  classical
+  apply prem_card_eq_one_of_DR1_of_nonempty (H := H) (v := v) (hDR1 := hDR1)
+  exact Finset.nonempty_iff_ne_empty.mpr hne
+
+/-- Under DR1, nonempty `prem v` has a unique premise element. -/
+lemma exists_unique_prem_of_DR1_of_nonempty
+    (H : HornNF α) (v : α)
+    (hDR1 : HornNF.IsDR1 H)
+    (hne : (H.prem v).Nonempty) :
+    ∃! P : Finset α, P ∈ H.prem v
+:= by
+  classical
+  rcases hne with ⟨P, hP⟩
+  refine ⟨P, hP, ?_⟩
+  intro Q hQ
+  exact prem_eq_of_mem_of_mem (H := H) (v := v) (hDR1 := hDR1) (hP := hQ) (hQ := hP)
+
+/-- Under DR1, membership `P ∈ prem v` forces `prem v = {P}`. -/
+lemma prem_eq_singleton_of_DR1_of_mem
+    (H : HornNF α) (v : α)
+    (hDR1 : HornNF.IsDR1 H)
+    {P : Finset α}
+    (hP : P ∈ H.prem v) :
+    H.prem v = {P} := by
+  classical
+  apply Finset.ext
+  intro Q
+  constructor
+  · intro hQ
+    have : Q = P := prem_eq_of_mem_of_mem (H := H) (v := v) (hDR1 := hDR1) (hP := hQ) (hQ := hP)
+    simpa [this]
+  · intro hQ
+    -- Q ∈ {P} implies Q = P
+    simpa using (by
+      rcases Finset.mem_singleton.mp hQ with rfl
+      exact hP)
 
 /- ------------------------------------------------------------
   3. Conversion targets (placeholders only)

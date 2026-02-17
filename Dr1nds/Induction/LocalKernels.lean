@@ -3,6 +3,8 @@ import Mathlib.Tactic
 import Dr1nds.Induction.Statements
 import Dr1nds.Forbid.Basic
 import Dr1nds.S0_CoreDefs
+import Dr1nds.Forbid.HornBridge
+import Dr1nds.Forbid.Singleton
 
 namespace Dr1nds
 variable {α : Type} [DecidableEq α]
@@ -114,6 +116,16 @@ abbrev NonUnaryHead1 (P : Pack1 α) (h : α) : Prop := True
 /-- Convenience: "no head" means the negation of `HasHead*`. -/
 abbrev NoHead0 (P : Pack0 α) (h : α) : Prop := ¬ HasHead0 P h
 abbrev NoHead1 (P : Pack1 α) (h : α) : Prop := ¬ HasHead1 P h
+
+
+/-
+(API placeholders) Trace packs for singleton reduction.
+
+These will be replaced by concrete definitions in the Forbid layer.
+For now we keep them abstract to freeze the wiring signatures.
+-/
+axiom Pack1.tracePack0 (P : Pack1 α) (a : α) : Pack0 α
+axiom Pack1.tracePack1WithPrem (P : Pack1 α) (a : α) (Pprem : Finset α) : Pack1 α
 
 
 -- =====================================
@@ -258,55 +270,169 @@ theorem prem_card_eq_one_of_hasHead1
     Nat.succ_le_of_lt hpos
   exact Nat.le_antisymm hle hone_le
 
+/-- Noncomputably pick a premise for head `h` in a forbid-pack, assuming `HasHead1`. -/
+noncomputable def choose_prem1
+  (P : Pack1 α) (h : α) (hHead : HasHead1 P h) : Finset α :=
+  Classical.choose hHead
+
+@[simp] theorem choose_prem1_mem
+  (P : Pack1 α) (h : α) (hHead : HasHead1 P h) :
+  choose_prem1 (α := α) P h hHead ∈ P.S.H.prem h :=
+  Classical.choose_spec hHead
+
+/-- Under DR1, the chosen premise is the unique premise (cardinality form). -/
+@[simp] theorem prem_card_eq_one_of_choose_prem1
+  (P : Pack1 α) (h : α) (hHead : HasHead1 P h) :
+  (P.S.H.prem h).card = 1 :=
+by
+  exact prem_card_eq_one_of_hasHead1 (α := α) (P := P) (h := h) hHead
+
+/-- Under DR1, any premise membership forces the whole premise family to be a singleton. -/
+lemma prem_eq_singleton_of_DR1_of_mem1
+  (P : Pack1 α) (h : α) (Q : Finset α) :
+  Q ∈ P.S.H.prem h → (P.S.H.prem h).card = 1 →
+  P.S.H.prem h = ({Q} : Finset (Finset α)) :=
+by
+  classical
+  intro hQ hcard
+  -- Use `card = 1` to show all elements equal to `Q`.
+  apply Finset.eq_singleton_iff_unique_mem.2
+  refine ⟨hQ, ?_⟩
+  intro R hR
+  -- If a finset has card 1, all its members are equal.
+  have : R = Q := by
+    -- In a finset of card 1, any two members coincide.
+    -- We can use `Finset.card_eq_one.1` to obtain a singleton representation.
+    rcases Finset.card_eq_one.mp hcard with ⟨Q0, hEq⟩
+    have hQ' : Q = Q0 := by
+      have : Q ∈ ({Q0} : Finset (Finset α)) := by simpa [hEq] using hQ
+      simpa using (Finset.mem_singleton.mp this)
+    have hR' : R = Q0 := by
+      have : R ∈ ({Q0} : Finset (Finset α)) := by simpa [hEq] using hR
+      simpa using (Finset.mem_singleton.mp this)
+    simpa [hQ', hR']
+  simpa [this]
+
+/-- Convenience: the chosen premise witnesses `prem h = {Q}` under DR1. -/
+lemma prem_eq_singleton_of_choose_prem1
+  (P : Pack1 α) (h : α) (hHead : HasHead1 P h) :
+  P.S.H.prem h = ({choose_prem1 (α := α) P h hHead} : Finset (Finset α)) :=
+by
+  classical
+  apply prem_eq_singleton_of_DR1_of_mem1 (α := α) (P := P) (h := h)
+    (Q := choose_prem1 (α := α) P h hHead)
+  · simpa using choose_prem1_mem (α := α) P h hHead
+  · simpa using prem_card_eq_one_of_choose_prem1 (α := α) P h hHead
+
 
 /--
-Singleton-forbid kernel (head-free case).
+Helper lemma (LocalKernels): in the DR1 world, if a head exists then the premise is unique.
 
-This will be implemented in `Dr1nds/Forbid/Singleton.lean` and re-exported here.
-For now we keep it as an axiom so that we can theorem-ize `Qcorr_handle_A_singleton`.
+We use a suffix `_LK` to avoid name clashes with similarly named lemmas living in `Horn.lean` / `HornBridge.lean`.
 -/
-axiom qcorr_singleton_noHead
-  (n : Nat) (P : Pack1 α) (a : α) :
-  P.A = ({a} : Finset α) → NoHead1 P a →
-  Qcorr n P → Qcorr (n+1) P
+theorem prem_card_eq_one_of_hasHead1_LK
+  (P : Pack1 α) (h : α) :
+  HasHead1 P h → (P.S.H.prem h).card = 1 := by
+  intro hHead
+  have hle : (P.S.H.prem h).card ≤ 1 := by
+    simpa using (P.S.hDR1 h)
+  have hpos : 0 < (P.S.H.prem h).card := by
+    exact Finset.card_pos.mpr hHead
+  have hone_le : 1 ≤ (P.S.H.prem h).card :=
+    Nat.succ_le_of_lt hpos
+  exact Nat.le_antisymm hle hone_le
+
+/-- Noncomputably pick a premise for head `h` in a forbid-pack, assuming `HasHead1`. -/
+noncomputable def choose_prem1_LK
+  (P : Pack1 α) (h : α) (hHead : HasHead1 P h) : Finset α :=
+  Classical.choose hHead
+
+@[simp] theorem choose_prem1_LK_mem
+  (P : Pack1 α) (h : α) (hHead : HasHead1 P h) :
+  choose_prem1_LK (α := α) P h hHead ∈ P.S.H.prem h :=
+  Classical.choose_spec hHead
+
+@[simp] theorem prem_card_eq_one_of_choose_prem1_LK
+  (P : Pack1 α) (h : α) (hHead : HasHead1 P h) :
+  (P.S.H.prem h).card = 1 :=
+by
+  exact prem_card_eq_one_of_hasHead1_LK (α := α) (P := P) (h := h) hHead
 
 /--
-Singleton-forbid kernel (has-head case), P-version.
-
-This will be implemented in `Dr1nds/Forbid/Singleton.lean` using `Forbid/HornBridge.lean`.
+Under DR1, any premise membership forces the whole premise family to be a singleton.
+(Kept locally to avoid importing extra lemmas.)
 -/
-axiom qcorr_singleton_hasHead_P
-  (n : Nat) (P : Pack1 α) (a : α)
-  (P0 : Finset α) :
-  P.A = ({a} : Finset α) → P0 ∈ P.S.H.prem a → (P.S.H.prem a).card = 1 →
-  Qcorr n P → Qcorr (n+1) P
+lemma prem_eq_singleton_of_DR1_of_mem1_LK
+  (P : Pack1 α) (h : α) (Q : Finset α) :
+  Q ∈ P.S.H.prem h → (P.S.H.prem h).card = 1 →
+  P.S.H.prem h = ({Q} : Finset (Finset α)) :=
+by
+  classical
+  intro hQ hcard
+  apply Finset.eq_singleton_iff_unique_mem.2
+  refine ⟨hQ, ?_⟩
+  intro R hR
+  rcases Finset.card_eq_one.mp hcard with ⟨Q0, hEq⟩
+  have hQ' : Q = Q0 := by
+    have : Q ∈ ({Q0} : Finset (Finset α)) := by
+      simpa [hEq] using hQ
+    simpa using (Finset.mem_singleton.mp this)
+  have hR' : R = Q0 := by
+    have : R ∈ ({Q0} : Finset (Finset α)) := by
+      simpa [hEq] using hR
+    simpa using (Finset.mem_singleton.mp this)
+  simpa [hQ', hR']
 
-/--
-`|A| = 1` branch (singleton-forbid kernel).
+/-- Convenience: the chosen premise witnesses `prem h = {Q}` under DR1. -/
+lemma prem_eq_singleton_of_choose_prem1_LK
+  (P : Pack1 α) (h : α) (hHead : HasHead1 P h) :
+  P.S.H.prem h = ({choose_prem1_LK (α := α) P h hHead} : Finset (Finset α)) :=
+by
+  classical
+  apply prem_eq_singleton_of_DR1_of_mem1_LK (α := α) (P := P) (h := h)
+    (Q := choose_prem1_LK (α := α) P h hHead)
+  · simpa using choose_prem1_LK_mem (α := α) P h hHead
+  · simpa using prem_card_eq_one_of_choose_prem1_LK (α := α) P h hHead
 
-Implementation (wiring-level):
-- Extract `a` with `A = {a}`.
+
+
+
+
+/-/
+`|A| = 1` branch (singleton-forbid kernel, rewired to the correct IH packs).
+
+Wiring-only lemma:
 - Split by `HasHead1 P a`.
-- Delegate to the corresponding singleton kernel.
+- Route IH to the appropriate trace pack and call the corresponding singleton-step kernel.
 
-All heavy math is kept out of this file and lives in the singleton kernels.
+NOTE: This lemma must NOT take `Qcorr n P` as IH. The IH lives on the trace world.
 -/
 theorem Qcorr_handle_A_singleton
-  (n : Nat) (P : Pack1 α) :
-  (P.A).card = 1 →
-  Qcorr n P → Qcorr (n+1) P := by
+  (n : Nat) (P : Pack1 α) (a : α) :
+  P.A = ({a} : Finset α) →
+  (NoHead1 P a → Q n (Pack1.tracePack0 (α := α) P a)) →
+  (HasHead1 P a →
+    ∃ Pprem, Pprem ∈ P.S.H.prem a ∧ (P.S.H.prem a).card = 1 ∧
+      Qcorr n (Pack1.tracePack1WithPrem (α := α) P a Pprem)) →
+  Qcorr (n+1) P :=
+by
   classical
-  intro hAcard hIH
-  rcases Finset.card_eq_one.mp hAcard with ⟨a, hAeq⟩
+  intro hA hNoHeadIH hHasHeadIH
   by_cases hHead : HasHead1 P a
-  · rcases hHead with ⟨P0, hP0mem⟩
-    have hUnique : (P.S.H.prem a).card = 1 :=
-      prem_card_eq_one_of_hasHead1 (P := P) (h := a) ⟨P0, hP0mem⟩
-    exact qcorr_singleton_hasHead_P (n := n) (P := P) (a := a) (P0 := P0)
-      hAeq hP0mem hUnique hIH
-  · have hNoHead : NoHead1 P a := by
-      exact hHead
-    exact qcorr_singleton_noHead (n := n) (P := P) (a := a) hAeq hNoHead hIH
+  · -- has-head branch: shift forbid to a chosen premise
+    rcases hHasHeadIH hHead with ⟨Pprem, hmem, hcard, hIH⟩
+    -- use the singleton-step kernel (already declared in the Forbid layer)
+    exact qcorr_singleton_hasHead_P_step
+      (α := α) (n := n) (P := P) (a := a) (Pprem := Pprem)
+      hA hmem hcard hIH
+  · -- no-head branch: forbid disappears in the trace/deletion world
+    have hNoHead : NoHead1 P a := by
+      -- `NoHead1` is defined as `¬ HasHead1` in this file
+      simpa [NoHead1] using hHead
+    have hIH : Q n (Pack1.tracePack0 (α := α) P a) := hNoHeadIH hNoHead
+    exact qcorr_singleton_noHead_step
+      (α := α) (n := n) (P := P) (a := a)
+      hA hNoHead hIH
 
 /--
 |A| = 0 branch (temporary).
