@@ -3,6 +3,7 @@ import Mathlib.Data.Finset.Card
 import Mathlib.Data.Fintype.Card
 import Mathlib.Data.Finset.Powerset
 import Dr1nds.Horn.Horn
+import Dr1nds.Horn.HornClosure
 import Dr1nds.ClosureSystem.Basic
 import Dr1nds.Forbid.Basic
 
@@ -431,6 +432,7 @@ lemma normalize_isClosed_iff
 If `P ∈ (H.trace v).prem h` then necessarily `v ∉ P` (since trace lives on `U.erase v`).
 -/
 
+
 lemma trace_prem_not_mem
   (H : HornNF α)
   (v : α)
@@ -443,6 +445,77 @@ lemma trace_prem_not_mem
   intro hvP
   have : v ∈ H.U.erase v := hsub hvP
   simpa using this
+
+/-- In the trace world at `a`, no premise contains `a` (binder name `Q`).
+
+This is a convenience alias of `trace_prem_not_mem` used to eliminate the
+former `Pack1.noPremContains_forbid` axiom.
+-/
+lemma trace_noPremContains
+  (H : HornNF α) (a : α) :
+  ∀ {h : α} {Q : Finset α}, Q ∈ (H.trace a).prem h → a ∉ Q := by
+  intro h Q hQ
+  exact trace_prem_not_mem (H := H) (v := a) (h := h) (P := Q) hQ
+
+/--
+If `Pprem` is a premise of head `a` in `H`, then `Pprem` is contained in the universe
+of the trace system `H.trace a`, i.e. in `H.U.erase a`.
+
+This is the canonical way to produce the `hPsub` argument used when building
+trace-world packs in the singleton-forbid / has-head branch.
+-/
+lemma prem_subset_traceU_of_mem_prem
+  (H : HornNF α) {a : α} {Pprem : Finset α}
+  (hmem : Pprem ∈ H.prem a) :
+  Pprem ⊆ (H.trace a).U := by
+  classical
+  -- `(H.trace a).U` is definitionaly `H.U.erase a`.
+  intro x hx
+  have hxU : x ∈ H.U := H.prem_subset_U hmem hx
+  have hxa : x ≠ a := by
+    -- NF says `a ∉ Pprem` for `Pprem ∈ H.prem a`.
+    have ha_not : a ∉ Pprem := H.nf hmem
+    intro hEq
+    subst hEq
+    exact ha_not hx
+  -- combine `x ∈ H.U` and `x ≠ a`.
+  exact Finset.mem_erase.mpr ⟨hxa, hxU⟩
+
+/--
+If `H` satisfies `IsNEP` (i.e. it has no empty premise), then any specific premise
+`Pprem ∈ H.prem a` must be nonempty.
+
+This is the minimal lemma needed to discharge the `hPne : Pprem.Nonempty` obligation
+from `IsNEP` + membership.
+-/
+lemma prem_nonempty_of_isNEP_of_mem_prem
+  (H : HornNF α) {a : α} {Pprem : Finset α}
+  (hNEP : HornNF.IsNEP (α := α) H)
+  (hmem : Pprem ∈ H.prem a) :
+  Pprem.Nonempty := by
+  classical
+  -- prove `Pprem ≠ ∅`, otherwise it contradicts `IsNEP`.
+  have hne : Pprem ≠ (∅ : Finset α) := by
+    intro hEq
+    have : (∅ : Finset α) ∈ H.prem a := by
+      simpa [hEq] using hmem
+    exact hNEP (h := a) this
+  exact Finset.nonempty_iff_ne_empty.mpr hne
+
+/--
+A small package lemma: from `IsNEP` and `Pprem ∈ H.prem a`, we can produce the
+first two standard arguments used to build a trace-with-prem pack: subset-to-trace-U
+and nonemptiness.
+
+This is intended to replace the ad-hoc `tracePack1WithPrem_obligations` axiom piecewise.
+-/
+theorem tracePack1WithPrem_obligations_core
+  (H : HornNF α) (a : α) (Pprem : Finset α)
+  (hNEP : HornNF.IsNEP (α := α) H)
+  (hmem : Pprem ∈ H.prem a) :
+  (Pprem ⊆ (H.trace a).U) ∧ Pprem.Nonempty := by
+  refine ⟨prem_subset_traceU_of_mem_prem (α := α) (H := H) (a := a) (Pprem := Pprem) hmem, ?_⟩
+  exact prem_nonempty_of_isNEP_of_mem_prem (α := α) (H := H) (a := a) (Pprem := Pprem) hNEP hmem
 
 
 /-- `trace` does not create empty premises: `IsNEP` is preserved by trace. -/
@@ -552,12 +625,55 @@ theorem normalize_prem
  dsimp [normalize]
  simp
 
+
 /-- Immediate corollary: in the normalized system, no premise contains `a`. -/
+
 lemma normalize_noPremContains
   (H : HornNF α) (a : α) :
   ∀ {h : α} {Q : Finset α}, Q ∈ (normalize H a).prem h → a ∉ Q := by
   intro h Q hQ
   exact (normalize_prem H a h Q).1 hQ |>.2
+
+/--
+A named, project-facing alias: after `normalize` at `a`, no premise contains `a`.
+
+This is the theorem-level replacement that downstream code can use instead of the
+former pack-level axiom `Pack1.noPremContains_forbid`.
+-/
+theorem noPremContains_forbid_of_normalize
+  (H : HornNF α) (a : α) :
+  ∀ {h : α} {Q : Finset α}, Q ∈ (normalize H a).prem h → a ∉ Q := by
+  intro h Q hQ
+  exact normalize_noPremContains (H := H) (a := a) hQ
+
+/--
+If `a` is already absent from every premise of `H`, then `normalize H a` is
+definitionally equal to `H` (premises are unchanged).
+
+This lemma is useful for rewriting `normalize` away once a global
+`NoPremContains a` hypothesis has been established.
+-/
+lemma normalize_eq_of_noPremContains
+  (H : HornNF α) (a : α)
+  (hNoPrem : ∀ {h : α} {Q : Finset α}, Q ∈ H.prem h → a ∉ Q) :
+  normalize H a = H := by
+  classical
+  -- use ext on `HornNF`
+  apply HornNF.ext
+  · -- universe is unchanged
+    rfl
+  · -- premises are unchanged because the filter predicate is always true
+    funext h
+    ext Q
+    constructor
+    · intro hQ
+      have hQ' : Q ∈ H.prem h := (Finset.mem_filter.mp hQ).1
+      exact hQ'
+    · intro hQ
+      have haQ : a ∉ Q := hNoPrem (h := h) (Q := Q) hQ
+      exact Finset.mem_filter.mpr ⟨hQ, haQ⟩
+
+
 
 /-- Consequence: the Hole family is invariant under normalization. -/
 theorem normalize_hole_fixset_eq

@@ -1,5 +1,6 @@
 import Dr1nds.Horn.Horn
 import Dr1nds.Horn.HornWithForbid
+import Dr1nds.Horn.HornClosure
 
 set_option autoImplicit false
 
@@ -56,9 +57,20 @@ noncomputable def Pack0.C (P : Pack0 α) : Finset (Finset α) :=
 noncomputable def Pack1.C (P : Pack1 α) : Finset (Finset α) :=
   P.S.H.FixSet
 
-/-- forbid あり世界の forbid 集合（Hole/Up に渡す A） -/
-def Pack1.A (P : Pack1 α) : Finset α :=
+/-- forbid あり世界の forbid 集合（Hole/Up に渡す A）。
+
+設計方針：`HornNF.prem` 由来の forbid（例：trace + prem 分岐）では raw な前提集合が
+closed とは限らない。
+そのため、`Qcorr` の評価に使う forbid 集合は常に `HornNF.closure` を通して閉集合化する。
+
+- `Araw` : pack が保持している raw forbid
+- `A`    : 評価に使う閉集合 forbid (= closure Araw)
+-/
+def Pack1.Araw (P : Pack1 α) : Finset α :=
   P.S.F
+
+noncomputable def Pack1.A (P : Pack1 α) : Finset α :=
+  _root_.Dr1nds.HornNF.closure (α := α) P.S.H (Pack1.Araw (α := α) P)
 
 /- ------------------------------------------------------------
   1'. 帰納法で運ぶ命題 Q / Qcorr（定義固定）
@@ -74,6 +86,7 @@ def Q (n : Nat) (P : Pack0 α) : Prop :=
   _root_.Dr1nds.NDS n (Pack0.C P) ≤ 0
 
 -- forbid あり世界（Pack1）での主命題：`NDS_corr ≤ 0`。
+-- 注意：forbid は常に `Pack1.A = closure(Araw)` を用いる。
 
 def Qcorr (n : Nat) (P : Pack1 α) : Prop :=
   _root_.Dr1nds.NDS_corr n (Pack1.C P) (Pack1.A P) ≤ 0

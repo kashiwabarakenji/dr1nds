@@ -19,6 +19,28 @@ noncomputable def Horn.closure (H : Horn α) (X : Finset α) : Finset α := by
         X ⊆ Y →
         x ∈ Y
 
+namespace Horn
+
+/-- `closure` is closed (fixed) with respect to `Horn.IsClosed`. -/
+theorem closure_isClosed (H : Horn α) (X : Finset α) :
+  Horn.IsClosed H (H.closure X) := by
+  classical
+  constructor
+  · intro y hy
+    exact (Finset.mem_filter.mp hy).1
+  · intro P h hPh hPX
+    apply Finset.mem_filter.mpr
+    constructor
+    · exact (H.valid hPh).2
+    · intro Y hY hXY
+      have hPY : P ⊆ Y := by
+        intro y hyP
+        have : y ∈ H.closure X := hPX hyP
+        exact (Finset.mem_filter.mp this).2 Y hY hXY
+      exact hY.2 hPh hPY
+
+end Horn
+
 /-- Horn induces a closure operator -/
 noncomputable def Horn.toClosureOperator (H : Horn α) : ClosureOperator α :=
 { U := H.U

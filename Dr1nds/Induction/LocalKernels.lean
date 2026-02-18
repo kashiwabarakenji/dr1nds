@@ -4,6 +4,7 @@ import Dr1nds.Induction.Statements
 import Dr1nds.Forbid.Basic
 import Dr1nds.S0_CoreDefs
 import Dr1nds.Horn.HornWithForbid
+import Dr1nds.Horn.HornTrace
 import Dr1nds.Forbid.HornBridge
 import Dr1nds.Forbid.Singleton
 import LeanCopilot
@@ -183,14 +184,29 @@ by
     = Pprem :=
 by
   classical
-  simp [Pack1.tracePack1WithPrem, Pack1.A, traceWithPrem_F]
+  -- `Pack1.A` is defined as `closure(Araw)`.
+  -- For the trace-with-prem pack, `Araw = Pprem`; since `Pprem` is assumed closed in the traced world,
+  -- the closure collapses to `Pprem`.
+  have hcl : _root_.Dr1nds.HornNF.closure (α := α) (P.S.H.trace a) Pprem = Pprem := by
+    apply Finset.Subset.antisymm
+    · intro x hx
+      exact (Finset.mem_filter.mp hx).2 Pprem hPclosed (by intro y hy; exact hy)
+    · exact _root_.Dr1nds.HornNF.subset_closure (H := P.S.H.trace a) (X := Pprem) hPsub
+  -- Unfold `A`/`Araw` and rewrite by closedness.
+  simp [Pack1.tracePack1WithPrem, Pack1.A, Pack1.Araw, traceWithPrem_F, hcl]
 
-/- API placeholder: normalization assumption (no premise contains a forbidden element). -/
 
+/-/
+Normalization hypothesis for the singleton-forbid bridge:
+no premise of the *base* HornNF contains the forbidden singleton `a`.
+
+This is intentionally kept as an axiom at the wiring layer for now.
+Later it should be supplied by a theoremized normalization step (e.g. via `HornNF.normalize`).
+-/
 axiom Pack1.noPremContains_forbid
   (P : Pack1 α) (a : α) :
-  a ∈ Pack1.A (α := α) P →
   ∀ {h : α} {Q : Finset α}, Q ∈ P.S.H.prem h → a ∉ Q
+
 
 
 -- =====================================
@@ -563,15 +579,30 @@ by
     -- bridge the pack-level IH to the HornNF kernel
     have haA : a ∈ P.A := by
       simpa [hA] using (Finset.mem_singleton.mpr rfl)
+    -- Since `P.S.F` is closed in the base world, `closure(P.S.F)=P.S.F`.
+    have hFcl : _root_.Dr1nds.HornNF.closure (α := α) P.S.H P.S.F = P.S.F := by
+      apply Finset.Subset.antisymm
+      · intro x hx
+        exact (Finset.mem_filter.mp hx).2 P.S.F P.S.F_closed (by intro y hy; exact hy)
+      · exact _root_.Dr1nds.HornNF.subset_closure (H := P.S.H) (X := P.S.F) P.S.F_subset_U
+
+    -- `Pack1.A P = closure(P.S.F)`; hence `hA` forces `P.S.F = {a}`.
     have hA' : P.S.F = ({a} : Finset α) := by
-      simpa [Pack1.A] using hA
+      -- `hA : closure(P.S.F) = {a}`
+      have : _root_.Dr1nds.HornNF.closure (α := α) P.S.H P.S.F = ({a} : Finset α) := by
+        simpa [Pack1.A, Pack1.Araw] using hA
+      -- rewrite by `closure(P.S.F)=P.S.F`
+      simpa [hFcl] using this
     have haF : a ∈ P.S.F := by
-      simpa [Pack1.A] using haA
+      -- `a ∈ closure(P.S.F)` (since `a ∈ Pack1.A P`) and `closure(P.S.F)=P.S.F`.
+      have ha_cl : a ∈ _root_.Dr1nds.HornNF.closure (α := α) P.S.H P.S.F := by
+        simpa [Pack1.A, Pack1.Araw] using haA
+      simpa [hFcl] using ha_cl
     have hvU : a ∈ P.S.H.U := by
       exact P.S.F_subset_U haF
     have hNoPremV :
         ∀ {h : α} {Q : Finset α}, Q ∈ P.S.H.prem h → a ∉ Q :=
-      Pack1.noPremContains_forbid (α := α) P a haA
+      Pack1.noPremContains_forbid (α := α) P a
     have hQ_trace :
         NDS_corr (α := α) n (HornNF.FixSet (P.S.H.trace a)) Pprem ≤ 0 := by
       have hQ := Qcorr_implies_NDSCorr_le_zero (α := α) (n := n)
@@ -582,6 +613,7 @@ by
           Pack1.tracePack1WithPrem_A (P := P) (a := a) (Pprem := Pprem)
             (hPsub := hPsub) (hPne := hPne) (hPclosed := hPclosed)] at hQ
       exact hQ
+
     have hRes :
         NDS_corr (α := α) n.succ (HornNF.FixSet P.S.H) ({a} : Finset α) ≤ 0 :=
       qcorr_singleton_hasHead_P_step (α := α)
@@ -589,24 +621,38 @@ by
         (v := a) (P := Pprem)
         (hvU := hvU) (hP := hmem) (hUnique := hcard)
         (hNoPremV := hNoPremV) (hQ_trace := hQ_trace)
-    dsimp [Qcorr, Pack1.C, Pack1.A]
-    rw [hA']
-    exact hRes
+    dsimp [Qcorr, Pack1.C]
+    -- rewrite the forbid set in `Qcorr` using the branch hypothesis
+    simpa [hA] using hRes
   · -- no-head branch: forbid disappears in the trace/deletion world
     have hNoHead : NoHead1 P a := by
       -- `NoHead1` is defined as `¬ HasHead1` in this file
       simpa [NoHead1] using hHead
     have haA : a ∈ P.A := by
       simpa [hA] using (Finset.mem_singleton.mpr rfl)
+    -- Since `P.S.F` is closed in the base world, `closure(P.S.F)=P.S.F`.
+    have hFcl : _root_.Dr1nds.HornNF.closure (α := α) P.S.H P.S.F = P.S.F := by
+      apply Finset.Subset.antisymm
+      · intro x hx
+        exact (Finset.mem_filter.mp hx).2 P.S.F P.S.F_closed (by intro y hy; exact hy)
+      · exact _root_.Dr1nds.HornNF.subset_closure (H := P.S.H) (X := P.S.F) P.S.F_subset_U
+    -- `Pack1.A P = closure(P.S.F)`; hence `hA` forces `P.S.F = {a}`.
     have hA' : P.S.F = ({a} : Finset α) := by
-      simpa [Pack1.A] using hA
+      -- `hA : closure(P.S.F) = {a}`
+      have : _root_.Dr1nds.HornNF.closure (α := α) P.S.H P.S.F = ({a} : Finset α) := by
+        simpa [Pack1.A, Pack1.Araw] using hA
+      -- rewrite by `closure(P.S.F)=P.S.F`
+      simpa [hFcl] using this
     have haF : a ∈ P.S.F := by
-      simpa [Pack1.A] using haA
+      -- `a ∈ closure(P.S.F)` (since `a ∈ Pack1.A P`) and `closure(P.S.F)=P.S.F`.
+      have ha_cl : a ∈ _root_.Dr1nds.HornNF.closure (α := α) P.S.H P.S.F := by
+        simpa [Pack1.A, Pack1.Araw] using haA
+      simpa [hFcl] using ha_cl
     have hvU : a ∈ P.S.H.U := by
       exact P.S.F_subset_U haF
     have hNoPremV :
         ∀ {h : α} {Q : Finset α}, Q ∈ P.S.H.prem h → a ∉ Q :=
-      Pack1.noPremContains_forbid (α := α) P a haA
+      Pack1.noPremContains_forbid (α := α) P a
     have hfree : P.S.H.prem a = ∅ := by
       classical
       by_contra hne
@@ -626,9 +672,9 @@ by
         (n := n) (H := P.S.H) (v := a)
         (hvU := hvU) (hfree := hfree)
         (hNoPremV := hNoPremV) (hQ_trace := hQ_trace)
-    dsimp [Qcorr, Pack1.C, Pack1.A]
-    rw [hA']
-    exact hRes
+    dsimp [Qcorr, Pack1.C]
+    -- rewrite the forbid set in `Qcorr` using the branch hypothesis
+    simpa [hA] using hRes
 
 
 /--

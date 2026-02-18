@@ -4,6 +4,7 @@ import Dr1nds.S0_CoreDefs
 import Dr1nds.S1_Families
 import Dr1nds.Horn.Horn   -- HornNF
 import Dr1nds.Horn.HornTrace
+import Dr1nds.Horn.HornClosure
 
 namespace Dr1nds
 
@@ -77,7 +78,66 @@ noncomputable def traceWithPrem
   (traceWithPrem (α := α) S a Pprem hPsub hPne hPclosed).F = Pprem := by
   rfl
 
-attribute [simp] traceWithPrem_H traceWithPrem_F
+
+/-!
+`HornWithForbid` requires the forbid set to be closed.
+
+In the singleton-forbid has-head branch, the natural new forbid set is not the raw
+premise `Praw` but its closure in the traced Horn system:
+
+  `Pprem := closure_{S.H.trace a}(Praw)`.
+
+This wrapper constructs the obligations internally.
+
+NOTE: Replacing `Praw` by `closure(Praw)` does **not** change the resulting
+forbid-family *when we filter a closed family* (e.g. `HornNF.FixSet`), because for
+closed `X` we have `Praw ⊆ X ↔ closure(Praw) ⊆ X`. A lemma for this equivalence is
+added below.
+-/
+noncomputable def traceWithPremClosure
+  (S : HornWithForbid α) (a : α) (Praw : Finset α)
+  (hPsub : Praw ⊆ (S.H.trace a).U)
+  (hPne : Praw.Nonempty) : HornWithForbid α := by
+  classical
+  let Pprem : Finset α := HornNF.closure (S.H.trace a) Praw
+
+  -- closure is always inside the universe because it is defined by `U.filter _`
+  have hPsub' : Pprem ⊆ (S.H.trace a).U := by
+    intro x hx
+    exact (Finset.mem_filter.mp hx).1
+
+  -- nonempty is preserved because `Praw ⊆ closure(Praw)` when `Praw ⊆ U`
+  have hPne' : Pprem.Nonempty := by
+    rcases hPne with ⟨x, hx⟩
+    refine ⟨x, ?_⟩
+    exact (HornNF.subset_closure (H := (S.H.trace a)) (X := Praw) hPsub) hx
+
+  -- closure is closed
+  have hPclosed' : HornNF.IsClosed (S.H.trace a) Pprem := by
+    let hc := HornNF.closure_isClosed (H := (S.H.trace a))
+    simp [Pprem]
+    simp_all only [Pprem]
+
+  exact traceWithPrem (α := α) S a Pprem hPsub' hPne' hPclosed'
+
+@[simp] theorem traceWithPremClosure_H
+  (S : HornWithForbid α) (a : α) (Praw : Finset α)
+  (hPsub : Praw ⊆ (S.H.trace a).U)
+  (hPne : Praw.Nonempty) :
+  (traceWithPremClosure (α := α) S a Praw hPsub hPne).H = S.H.trace a := by
+  classical
+  simp [traceWithPremClosure]
+
+@[simp] theorem traceWithPremClosure_F
+  (S : HornWithForbid α) (a : α) (Praw : Finset α)
+  (hPsub : Praw ⊆ (S.H.trace a).U)
+  (hPne : Praw.Nonempty) :
+  (traceWithPremClosure (α := α) S a Praw hPsub hPne).F
+    = HornNF.closure (S.H.trace a) Praw := by
+  classical
+  simp [traceWithPremClosure]
+
+attribute [simp] traceWithPremClosure_H traceWithPremClosure_F
 
 
 /- ------------------------------------------------------------
@@ -194,6 +254,60 @@ lemma mem_Hole_FixSet_iff
   classical
   simp [Hole]
 
+/-- For closed `X`, testing `A ⊆ X` is equivalent to testing `closure(A) ⊆ X`.
+
+This requires `A ⊆ U` so that `A ⊆ closure(A)` holds. -/
+lemma closure_subset_iff_subset_of_isClosed
+  (H : HornNF α) (A X : Finset α)
+  (hA : A ⊆ H.U)
+  (hXclosed : HornNF.IsClosed H X) :
+  HornNF.closure H A ⊆ X ↔ A ⊆ X := by
+  classical
+  constructor
+  · intro hcl
+    -- A ⊆ closure(A) ⊆ X
+    intro a ha
+    have : a ∈ HornNF.closure H A :=
+      (HornNF.subset_closure (H := H) (X := A) hA) ha
+    exact hcl this
+  · intro hAX
+    -- minimality of closure: any closed superset contains the closure
+    intro x hx
+    -- unfold membership in `closure`
+    have hx_prop : ∀ Y : Finset α, HornNF.IsClosed H Y → A ⊆ Y → x ∈ Y :=
+      (Finset.mem_filter.mp hx).2
+    exact hx_prop X hXclosed hAX
+
+/-- On a closed family (in particular `FixSet`), forbidding `A` is the same as forbidding `closure(A)`.
+
+We assume `A ⊆ U` so that `A ⊆ closure(A)` is available. -/
+lemma Hole_FixSet_eq_Hole_FixSet_closure
+  (H : HornNF α) (A : Finset α)
+  (hA : A ⊆ H.U) :
+  Hole (α := α) (HornNF.FixSet H) (HornNF.closure H A)
+    = Hole (α := α) (HornNF.FixSet H) A := by
+  classical
+  ext X
+  constructor <;> intro hX
+  · -- →
+    have hmem := (mem_Hole_FixSet_iff (α := α) H (HornNF.closure H A) X).1 hX
+    refine (mem_Hole_FixSet_iff (α := α) H A X).2 ?_
+    refine ⟨hmem.1, ?_⟩
+    intro hAX
+    have hXclosed : HornNF.IsClosed H X := (mem_FixSet_iff H X).1 hmem.1 |>.2
+    have hcl : HornNF.closure H A ⊆ X :=
+      (closure_subset_iff_subset_of_isClosed (α := α) H A X hA hXclosed).2 hAX
+    exact hmem.2 hcl
+  · -- ←
+    have hmem := (mem_Hole_FixSet_iff (α := α) H A X).1 hX
+    refine (mem_Hole_FixSet_iff (α := α) H (HornNF.closure H A) X).2 ?_
+    refine ⟨hmem.1, ?_⟩
+    intro hcl
+    have hXclosed : HornNF.IsClosed H X := (mem_FixSet_iff H X).1 hmem.1 |>.2
+    have hAX : A ⊆ X :=
+      (closure_subset_iff_subset_of_isClosed (α := α) H A X hA hXclosed).1 hcl
+    exact hmem.2 hAX
+
 /-- `Up` and `Hole` form a partition of a family (cardinality version). -/
 lemma card_up_add_card_hole_eq_card
   (C : Finset (Finset α)) (A : Finset α) :
@@ -301,11 +415,31 @@ lemma nep_FixSet_iff_empty_mem_base
   have h2 : (∅ : Finset α) ∈ S.FixSet ↔ (∅ : Finset α) ∈ HornNF.FixSet S.H :=
     empty_mem_FixSet_iff_empty_mem_base (α := α) S
   simpa [h1] using h2
+
 /-
 ============================================================
   NDS (for future use)
 ============================================================
 -/
+
+/-- Base closed family (without forbidding), extracted from `HornWithForbid`. -/
+noncomputable def HornWithForbid.BaseC
+  (S : HornWithForbid α) : Finset (Finset α) :=
+  HornNF.FixSet S.H
+
+/-- Up-set used in corrected NDS, computed in the base family. -/
+noncomputable def HornWithForbid.UpBase
+  (S : HornWithForbid α) : Finset (Finset α) :=
+  Up (α := α) (HornWithForbid.BaseC (α := α) S) S.F
+
+/-- Corrected NDS computed directly from `HornWithForbid` data.
+
+This is just the core `Dr1nds.NDS_corr` applied to
+`C := HornWithForbid.BaseC S` and `A := S.F`.
+-/
+noncomputable def HornWithForbid.NDS_corr
+  (n : Nat) (S : HornWithForbid α) : Int :=
+  Dr1nds.NDS_corr (α := α) n (HornWithForbid.BaseC (α := α) S) S.F
 
 noncomputable def HornWithForbid.NDS
   (S : HornWithForbid α) : Int :=
