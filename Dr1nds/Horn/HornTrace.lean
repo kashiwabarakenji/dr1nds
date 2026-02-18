@@ -224,8 +224,7 @@ by
   ----------------------------------------------------------------
   -- → direction
   ----------------------------------------------------------------
-  · intro htrace
-    intro h P hP hsubset
+  · intro htrace h P hP hsubset
 
     by_cases h_eq_v : h = v
     · subst h_eq_v
@@ -253,8 +252,7 @@ by
   ----------------------------------------------------------------
   -- ← direction
   ----------------------------------------------------------------
-  · intro hH
-    intro h P hP hsubset
+  · intro hH h P hP hsubset
 
     by_cases h_eq_v : h = v
     · subst h_eq_v
@@ -444,7 +442,7 @@ lemma trace_prem_not_mem
   have hsub : P ⊆ (H.U.erase v) := (H.trace v).prem_subset_U hP
   intro hvP
   have : v ∈ H.U.erase v := hsub hvP
-  simpa using this
+  simp_all only [Finset.mem_erase, ne_eq, not_true_eq_false, false_and]
 
 /-- In the trace world at `a`, no premise contains `a` (binder name `Q`).
 
@@ -714,6 +712,106 @@ theorem normalize_hole_fixset_eq
       exact (mem_FixSet_iff (H := normalize H a) (X := X)).2 ⟨hpow', hClosedN⟩
     exact (by
       simpa [Hole_singleton_eq_filter_notmem] using And.intro hFix' haX)
+
+/--
+If normalization at `a` does not increase the *Up-card* for the singleton forbid `{a}`,
+then it does not increase the singleton-corrected accounting objective `NDS_corr`.
+
+This is the inequality-form “rewrite bridge”: it is often enough for `≤ 0` goals.
+-/
+theorem normalize_NDS_corr_singleton_le_of_up_card_le
+  (H : HornNF α) (a : α) (n : Nat)
+  (hUpCard :
+    (Up (α := α) (HornNF.FixSet (normalize H a)) ({a} : Finset α)).card
+      ≤
+    (Up (α := α) (HornNF.FixSet H) ({a} : Finset α)).card) :
+  NDS_corr (α := α) n (HornNF.FixSet (normalize H a)) ({a} : Finset α)
+    ≤
+  NDS_corr (α := α) n (HornNF.FixSet H) ({a} : Finset α) := by
+  classical
+  -- Hole-side is invariant under normalization
+  have hHole :
+      Hole (HornNF.FixSet (normalize H a)) ({a} : Finset α)
+        =
+      Hole (HornNF.FixSet H) ({a} : Finset α) :=
+    normalize_hole_fixset_eq (H := H) (a := a)
+
+  -- cast the Nat inequality on cards into Int
+  have hUpInt :
+      (↑(Up (α := α) (HornNF.FixSet (normalize H a)) ({a} : Finset α)).card : Int)
+        ≤
+      (↑(Up (α := α) (HornNF.FixSet H) ({a} : Finset α)).card : Int) :=
+    Int.ofNat_le.mpr hUpCard
+
+  -- unfold `NDS_corr` as Hole + Up(card), rewrite Hole, and use monotonicity of addition
+  calc
+    NDS_corr (α := α) n (HornNF.FixSet (normalize H a)) ({a} : Finset α)
+        =
+      NDS (α := α) n (Hole (HornNF.FixSet H) ({a} : Finset α))
+        + (↑(Up (α := α) (HornNF.FixSet (normalize H a)) ({a} : Finset α)).card : Int) := by
+          simp [Dr1nds.NDS_corr, hHole]
+    _ ≤
+      NDS (α := α) n (Hole (HornNF.FixSet H) ({a} : Finset α))
+        + (↑(Up (α := α) (HornNF.FixSet H) ({a} : Finset α)).card : Int) := by
+          simp_all only [Up_singleton_eq_filter_mem, Hole_singleton_eq_filter_notmem, Nat.cast_le, add_le_add_iff_left]
+    _ =
+      NDS_corr (α := α) n (HornNF.FixSet H) ({a} : Finset α) := by
+          simp [Dr1nds.NDS_corr]
+
+/--
+Public-facing alias (short name): normalization does not increase `NDS_corr` for singleton forbid,
+provided the Up-card does not increase.
+
+This name is used by `LocalKernels.lean`.
+-/
+theorem normalize_ndscorr_singleton_le
+  (H : HornNF α) (a : α) (n : Nat)
+  (hUpCard :
+    (Up (α := α) (HornNF.FixSet (normalize H a)) ({a} : Finset α)).card
+      ≤
+    (Up (α := α) (HornNF.FixSet H) ({a} : Finset α)).card) :
+  NDS_corr (α := α) n (HornNF.FixSet (normalize H a)) ({a} : Finset α)
+    ≤
+  NDS_corr (α := α) n (HornNF.FixSet H) ({a} : Finset α) :=
+by
+  exact
+    normalize_NDS_corr_singleton_le_of_up_card_le (α := α)
+      (H := H) (a := a) (n := n) (hUpCard := hUpCard)
+
+
+/--
+Corollary for the `≤ 0` goal shape: if `NDS_corr` holds for `H` and normalization does not
+increase the Up-card, then `NDS_corr` holds for `normalize H a`.
+-/
+theorem normalize_Qcorr_singleton_of_up_card_le
+  (H : HornNF α) (a : α) (n : Nat)
+  (hUpCard :
+    (Up (α := α) (HornNF.FixSet (normalize H a)) ({a} : Finset α)).card
+      ≤
+    (Up (α := α) (HornNF.FixSet H) ({a} : Finset α)).card)
+  (hQ : NDS_corr (α := α) n (HornNF.FixSet H) ({a} : Finset α) ≤ 0) :
+  NDS_corr (α := α) n (HornNF.FixSet (normalize H a)) ({a} : Finset α) ≤ 0 := by
+  have hle :=
+    normalize_NDS_corr_singleton_le_of_up_card_le (H := H) (a := a) (n := n) (hUpCard := hUpCard)
+  exact le_trans hle hQ
+
+/--
+Public-facing alias (goal-shape): if `NDS_corr` holds for `H` and normalization does not increase
+Up-card, then `NDS_corr` holds for `normalize H a`.
+
+This name is used by `LocalKernels.lean`.
+-/
+theorem normalize_ndscorr_singleton_of_up_card_le
+  (H : HornNF α) (a : α) (n : Nat)
+  (hUpCard :
+    (Up (α := α) (HornNF.FixSet (normalize H a)) ({a} : Finset α)).card
+      ≤
+    (Up (α := α) (HornNF.FixSet H) ({a} : Finset α)).card)
+  (hQ : NDS_corr (α := α) n (HornNF.FixSet H) ({a} : Finset α) ≤ 0) :
+  NDS_corr (α := α) n (HornNF.FixSet (normalize H a)) ({a} : Finset α) ≤ 0 := by
+  simpa using
+    (normalize_Qcorr_singleton_of_up_card_le (α := α) (H := H) (a := a) (n := n)
+      (hUpCard := hUpCard) (hQ := hQ))
 
 
 /--

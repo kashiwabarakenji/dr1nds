@@ -196,16 +196,6 @@ by
   simp [Pack1.tracePack1WithPrem, Pack1.A, Pack1.Araw, traceWithPrem_F, hcl]
 
 
-/-/
-Normalization hypothesis for the singleton-forbid bridge:
-no premise of the *base* HornNF contains the forbidden singleton `a`.
-
-This is intentionally kept as an axiom at the wiring layer for now.
-Later it should be supplied by a theoremized normalization step (e.g. via `HornNF.normalize`).
--/
-axiom Pack1.noPremContains_forbid
-  (P : Pack1 α) (a : α) :
-  ∀ {h : α} {Q : Finset α}, Q ∈ P.S.H.prem h → a ∉ Q
 
 
 
@@ -274,6 +264,22 @@ theorem hole_fixset_singleton_normalize_eq
   Hole (α := α) (HornNF.FixSet (normalizePrem (α := α) H a)) ({a} : Finset α) := by
   -- This is exactly `normalize_hole_fixset_eq` from `HornTrace.lean`.
   simpa [normalizePrem] using (normalize_hole_fixset_eq (H := H) (a := a)).symm
+
+theorem normalizePreservesDR1
+  (H : HornNF α) (a : α) (hDR1 : HornNF.DR1 H) :
+  HornNF.DR1 (HornNF.normalizePrem (α := α) H a) := by
+  simp [HornNF.normalizePrem]
+  sorry
+  --  (HornNF.normalize_preserves_DR1 (α := α) (H := H) (a := a) hDR1)
+
+theorem normalizeNDSCorrSingleton_le
+  (n : Nat) (H : HornNF α) (a : α) :
+  NDS_corr (α := α) n (HornNF.FixSet H) ({a} : Finset α)
+    ≤ NDS_corr (α := α) n (HornNF.FixSet (HornNF.normalizePrem (α := α) H a)) ({a} : Finset α) := by
+  simp [HornNF.normalizePrem]
+  sorry
+  --let hn := (HornNF.normalize_ndscorr_singleton_le (α := α) (H := H) (a := a) (n := n))
+
 
 end HornNF
 
@@ -600,9 +606,11 @@ by
       simpa [hFcl] using ha_cl
     have hvU : a ∈ P.S.H.U := by
       exact P.S.F_subset_U haF
-    have hNoPremV :
-        ∀ {h : α} {Q : Finset α}, Q ∈ P.S.H.prem h → a ∉ Q :=
-      Pack1.noPremContains_forbid (α := α) P a
+    -- normalize at `a` to obtain NF-A
+    let Hn : HornNF α := HornNF.normalizePrem (α := α) P.S.H a
+    have hNoPremVn :
+        ∀ {h : α} {Q : Finset α}, Q ∈ Hn.prem h → a ∉ Q :=
+      HornNF.normalizePrem_noPremContains (α := α) (H := P.S.H) (a := a)
     have hQ_trace :
         NDS_corr (α := α) n (HornNF.FixSet (P.S.H.trace a)) Pprem ≤ 0 := by
       have hQ := Qcorr_implies_NDSCorr_le_zero (α := α) (n := n)
@@ -613,14 +621,48 @@ by
           Pack1.tracePack1WithPrem_A (P := P) (a := a) (Pprem := Pprem)
             (hPsub := hPsub) (hPne := hPne) (hPclosed := hPclosed)] at hQ
       exact hQ
+    have hResN :
+        NDS_corr (α := α) n.succ (HornNF.FixSet Hn) ({a} : Finset α) ≤ 0 :=
+      qcorr_singleton_hasHead_P_step (α := α)
+        (n := n) (H := Hn) (hDR1 := by
+          -- DR1 preserved by normalization
+          have hDR1' : HornNF.DR1 P.S.H := by
+            simpa [HornNF.IsDR1, HornNF.DR1] using P.S.hDR1
+          have : HornNF.DR1 (HornNF.normalizePrem (α := α) P.S.H a) :=
+            HornNF.normalizePreservesDR1 (α := α) (H := P.S.H) (a := a) hDR1'
+          simpa [HornNF.IsDR1, HornNF.DR1, Hn] using this
+        )
+        (v := a) (P := Pprem)
+        (hvU := hvU)
+        (hP := by
+          -- membership survives normalization since NF gives `a ∉ Pprem`
+          have ha_not : a ∉ Pprem := P.S.H.nf hmem
+          simp [Hn, HornNF.normalize, ha_not]
+          simp_all only [isEmpty_Prop, Decidable.not_not, IsEmpty.forall_iff, true_and, forall_const,
+            prem_card_eq_one_of_choose_prem1, Finset.mem_singleton, Hn]
+        )
+        (hUnique := by
+          classical
+          -- In the base world, DR1 + `hmem`/`hcard` implies `prem a = {Pprem}`.
+          have hEq : P.S.H.prem a = ({Pprem} : Finset (Finset α)) :=
+            prem_eq_singleton_of_DR1_of_mem1_LK (α := α) (P := P) (h := a) (Q := Pprem) hmem hcard
+          -- NF gives `a ∉ Pprem`, hence the filter keeps `Pprem`.
+          have ha_not : a ∉ Pprem := P.S.H.nf hmem
+          -- Compute the normalized premise set at `a`.
+          have hEqN : (Hn.prem a) = ({Pprem} : Finset (Finset α)) := by
+            -- `Hn` is `normalizePrem` of `P.S.H` at `a`.
+            -- Unfold and rewrite by the singleton form.
+            simp [Hn, HornNF.normalize, hEq, ha_not]
+          -- Therefore the normalized premise family still has cardinality 1.
+          simpa [hEqN]
+        )
+        (hNoPremV := hNoPremVn)
+        (hQ_trace := sorry)--hQ_trace)
 
     have hRes :
-        NDS_corr (α := α) n.succ (HornNF.FixSet P.S.H) ({a} : Finset α) ≤ 0 :=
-      qcorr_singleton_hasHead_P_step (α := α)
-        (n := n) (H := P.S.H) (hDR1 := P.S.hDR1)
-        (v := a) (P := Pprem)
-        (hvU := hvU) (hP := hmem) (hUnique := hcard)
-        (hNoPremV := hNoPremV) (hQ_trace := hQ_trace)
+        NDS_corr (α := α) n.succ (HornNF.FixSet P.S.H) ({a} : Finset α) ≤ 0 := by
+      have hmono := HornNF.normalizeNDSCorrSingleton_le (α := α) (n := n.succ) (H := P.S.H) (a := a)
+      exact le_trans hmono hResN
     dsimp [Qcorr, Pack1.C]
     -- rewrite the forbid set in `Qcorr` using the branch hypothesis
     simpa [hA] using hRes
@@ -650,15 +692,20 @@ by
       simpa [hFcl] using ha_cl
     have hvU : a ∈ P.S.H.U := by
       exact P.S.F_subset_U haF
-    have hNoPremV :
-        ∀ {h : α} {Q : Finset α}, Q ∈ P.S.H.prem h → a ∉ Q :=
-      Pack1.noPremContains_forbid (α := α) P a
-    have hfree : P.S.H.prem a = ∅ := by
+    let Hn : HornNF α := HornNF.normalizePrem (α := α) P.S.H a
+    have hNoPremVn :
+        ∀ {h : α} {Q : Finset α}, Q ∈ Hn.prem h → a ∉ Q :=
+      HornNF.normalizePrem_noPremContains (α := α) (H := P.S.H) (a := a)
+    have hfree : Hn.prem a = ∅ := by
       classical
-      by_contra hne
-      have hnonempty : (P.S.H.prem a).Nonempty :=
-        Finset.nonempty_iff_ne_empty.mpr hne
-      exact hNoHead hnonempty
+      -- `¬ HasHead1 P a` means `(P.S.H.prem a)` is empty.
+      have h0 : P.S.H.prem a = ∅ := by
+        classical
+        by_contra hne
+        have : HasHead1 P a := Finset.nonempty_iff_ne_empty.mpr hne
+        exact hHead this
+      -- Normalization is `filter (fun Q => a ∉ Q)`, so filtering `∅` stays `∅`.
+      simp [Hn, HornNF.normalize, h0]
     have hIH : Q n (Pack1.tracePack0 (α := α) P a) := hNoHeadIH hNoHead
     have hQ_trace :
         NDS (α := α) n (HornNF.FixSet (P.S.H.trace a)) ≤ 0 := by
@@ -666,12 +713,19 @@ by
         (P := Pack1.tracePack0 (α := α) P a) hIH
       dsimp [Pack0.C] at hQ
       simpa using hQ
-    have hRes :
-        NDS_corr (α := α) n.succ (HornNF.FixSet P.S.H) ({a} : Finset α) ≤ 0 :=
+    have hResN :
+        NDS_corr (α := α) n.succ (HornNF.FixSet Hn) ({a} : Finset α) ≤ 0 :=
       qcorr_singleton_noHead_step (α := α)
-        (n := n) (H := P.S.H) (v := a)
-        (hvU := hvU) (hfree := hfree)
-        (hNoPremV := hNoPremV) (hQ_trace := hQ_trace)
+        (n := n) (H := Hn) (v := a)
+        (hvU := hvU)
+        (hfree := hfree)
+        (hNoPremV := hNoPremVn)
+        (hQ_trace := sorry)--hQ_trace)
+
+    have hRes :
+        NDS_corr (α := α) n.succ (HornNF.FixSet P.S.H) ({a} : Finset α) ≤ 0 := by
+      have hmono := HornNF.normalizeNDSCorrSingleton_le (α := α) (n := n.succ) (H := P.S.H) (a := a)
+      exact le_trans hmono hResN
     dsimp [Qcorr, Pack1.C]
     -- rewrite the forbid set in `Qcorr` using the branch hypothesis
     simpa [hA] using hRes
