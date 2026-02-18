@@ -83,6 +83,33 @@ def HornNF.IsClosed (H : HornNF α) (X : Finset α) : Prop :=
     h ∈ X
 
 
+/-
+------------------------------------------------------------
+  2a. NEP ⇒ ∅ is closed (and hence belongs to FixSet)
+
+  This block is intentionally trace-free.
+------------------------------------------------------------ -/
+
+/-- If `H` is NEP (no empty premise), then the empty set is closed w.r.t. `H`. -/
+lemma HornNF.isClosed_empty_of_isNEP
+  (H : HornNF α)
+  (hNEP : H.IsNEP) :
+  HornNF.IsClosed H (∅ : Finset α) := by
+  classical
+  intro h P hP hPsub
+  have hPempty : P = (∅ : Finset α) := by
+    -- any element of `P` would have to lie in `∅`
+    apply Finset.eq_empty_iff_forall_not_mem.2
+    intro x hx
+    have : x ∈ (∅ : Finset α) := hPsub hx
+    simpa using this
+  -- contradict NEP (since `P = ∅` would mean an empty premise appears)
+  have : (∅ : Finset α) ∈ H.prem h := by
+    simpa [hPempty] using hP
+  exact False.elim (hNEP (h := h) this)
+
+
+
 noncomputable def HornNF.FixSet (H : HornNF α) : Finset (Finset α) :=
 by
   classical
@@ -109,6 +136,105 @@ lemma mem_FixSet_subset_U (H : HornNF α) {X : Finset α}
   have hXpow : X ∈ H.U.powerset := (mem_FixSet_iff (H := H) (X := X)).1 hX |>.1
   exact (Finset.mem_powerset.mp hXpow)
 
+
+
+/-- If `H` is NEP, then `∅ ∈ FixSet H` (so the family-level NEP holds for `FixSet H`). -/
+lemma HornNF.empty_mem_FixSet_of_isNEP
+  (H : HornNF α)
+  (hNEP : H.IsNEP) :
+  (∅ : Finset α) ∈ HornNF.FixSet H := by
+  classical
+  -- Use the `mem_FixSet_iff` bridge to avoid unfolding `FixSet`.
+  apply (mem_FixSet_iff (H := H) (X := (∅ : Finset α))).2
+  refine And.intro ?_ (HornNF.isClosed_empty_of_isNEP (H := H) hNEP)
+  -- `∅ ∈ U.powerset`
+  have : (∅ : Finset α) ⊆ H.U := by
+    intro x hx
+    simpa using hx
+  exact Finset.mem_powerset.2 this
+
+
+/-- If the empty set is closed w.r.t. `H`, then `H` is NEP (no empty premise). -/
+lemma HornNF.isNEP_of_isClosed_empty
+  (H : HornNF α)
+  (hClosed : HornNF.IsClosed H (∅ : Finset α)) :
+  H.IsNEP := by
+  classical
+  intro h hempty
+  have : h ∈ (∅ : Finset α) := hClosed (h := h) (P := (∅ : Finset α)) hempty (by
+    intro x hx
+    simpa using hx)
+  simpa using this
+
+/-- `H` is NEP iff the empty set is closed w.r.t. `H`. -/
+lemma HornNF.isNEP_iff_isClosed_empty
+  (H : HornNF α) :
+  H.IsNEP ↔ HornNF.IsClosed H (∅ : Finset α) := by
+  constructor
+  · intro hNEP
+    exact HornNF.isClosed_empty_of_isNEP (H := H) hNEP
+  · intro hClosed
+    exact HornNF.isNEP_of_isClosed_empty (H := H) hClosed
+
+/- `H` is NEP iff `FixSet H` contains the empty set (family-level NEP for `FixSet`). -/
+/- `H` is NEP iff `FixSet H` contains the empty set (family-level NEP for `FixSet`). -/
+lemma HornNF.isNEP_iff_empty_mem_FixSet
+  (H : HornNF α) :
+  H.IsNEP ↔ (∅ : Finset α) ∈ HornNF.FixSet H := by
+  constructor
+  · intro hNEP
+    exact HornNF.empty_mem_FixSet_of_isNEP (H := H) hNEP
+  · intro hempty
+    have hClosed : HornNF.IsClosed H (∅ : Finset α) := by
+      -- unpack `∅ ∈ FixSet H` using the bridge lemma
+      exact (mem_FixSet_iff (H := H) (X := (∅ : Finset α))).1 hempty |>.2
+    let hi := HornNF.isNEP_of_isClosed_empty (H := H)
+    simp_all only [mem_FixSet_iff, Finset.mem_powerset, Finset.empty_subset, and_self]
+
+/-
+  ------------------------------------------------------------
+  2b-alt. Safe alias layer (do not touch existing proofs)
+
+  Some environments are sensitive to minor proof edits here.
+  To avoid breaking already-compiling code, we provide
+  “alias lemmas” under fresh names and keep the originals frozen.
+  ------------------------------------------------------------
+-/
+
+/-- Alias of `HornNF.isClosed_empty_of_isNEP` (kept for stable downstream rewrites). -/
+lemma HornNF.isClosed_empty_of_isNEP_alt
+  (H : HornNF α)
+  (hNEP : H.IsNEP) :
+  HornNF.IsClosed H (∅ : Finset α) := by
+  let hi := HornNF.isClosed_empty_of_isNEP (H := H)
+  simp_all only
+
+/-- Alias of `HornNF.empty_mem_FixSet_of_isNEP` (kept for stable downstream rewrites). -/
+lemma HornNF.empty_mem_FixSet_of_isNEP_alt
+  (H : HornNF α)
+  (hNEP : H.IsNEP) :
+  (∅ : Finset α) ∈ HornNF.FixSet H := by
+  simpa using HornNF.empty_mem_FixSet_of_isNEP (H := H) hNEP
+
+/-- Alias of `HornNF.isNEP_of_isClosed_empty` (kept for stable downstream rewrites). -/
+lemma HornNF.isNEP_of_isClosed_empty_alt
+  (H : HornNF α)
+  (hClosed : HornNF.IsClosed H (∅ : Finset α)) :
+  H.IsNEP := by
+    let hi := HornNF.isNEP_of_isClosed_empty (H := H)
+    simp_all only
+
+/-- Alias of `HornNF.isNEP_iff_isClosed_empty` (kept for stable downstream rewrites). -/
+lemma HornNF.isNEP_iff_isClosed_empty_alt
+  (H : HornNF α) :
+  H.IsNEP ↔ HornNF.IsClosed H (∅ : Finset α) := by
+  simpa using HornNF.isNEP_iff_isClosed_empty (H := H)
+
+/-- Alias of `HornNF.isNEP_iff_empty_mem_FixSet` (preferred stable entry point). -/
+lemma HornNF.isNEP_iff_empty_mem_FixSet_alt
+  (H : HornNF α) :
+  H.IsNEP ↔ (∅ : Finset α) ∈ HornNF.FixSet H := by
+  simpa using HornNF.isNEP_iff_empty_mem_FixSet (H := H)
 
 /-
 ------------------------------------------------------------

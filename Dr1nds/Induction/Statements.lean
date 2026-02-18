@@ -74,8 +74,20 @@ def Q (n : Nat) (P : Pack0 α) : Prop :=
   _root_.Dr1nds.NDS n (Pack0.C P) ≤ 0
 
 -- forbid あり世界（Pack1）での主命題：`NDS_corr ≤ 0`。
+
 def Qcorr (n : Nat) (P : Pack1 α) : Prop :=
   _root_.Dr1nds.NDS_corr n (Pack1.C P) (Pack1.A P) ≤ 0
+
+
+/--
+Set-family level NEP: the family contains the empty set.
+
+We keep NEP at the *family* level so it can be shared across the Horn/ClosureSystem/WithForbid worlds.
+In this project we will apply it primarily to the *base* family `Pack*.C` (not Hole-filtered families),
+so it does not conflict with the “no double Hole” convention for `NDS_corr`.
+-/
+def NEP (C : Finset (Finset α)) : Prop :=
+  (∅ : Finset α) ∈ C
 
 
 /--
@@ -91,8 +103,27 @@ def T (n : Nat) : Prop :=
 
 This is intended as the induction hypothesis shape carried by `Steps.lean`.
 -/
+
 def Tcorr (n : Nat) : Prop :=
   ∀ P : Pack1 α, Qcorr n P
+
+
+/--
+`TNEP n` is the forall-pack induction hypothesis shape that *also* transports NEP.
+
+We intentionally keep `Q/Qcorr` as pure evaluation predicates, and only enrich the forall-pack
+forms used by `Steps.lean`.
+-/
+def TNEP (n : Nat) : Prop :=
+  ∀ P : Pack0 α, NEP (Pack0.C P) → Q n P
+
+/--
+`TcorrNEP n` is the forall-pack induction hypothesis shape (with forbid) that transports NEP.
+
+As with `TNEP`, NEP is stated on the *base* family `Pack1.C P`.
+-/
+def TcorrNEP (n : Nat) : Prop :=
+  ∀ P : Pack1 α, NEP (Pack1.C P) → Qcorr n P
 
 /-- Extract `Q n P` from `T n`. -/
 theorem T_elim (n : Nat) (P : Pack0 α) :
@@ -101,10 +132,24 @@ theorem T_elim (n : Nat) (P : Pack0 α) :
   exact hT P
 
 /-- Extract `Qcorr n P` from `Tcorr n`. -/
+
 theorem Tcorr_elim (n : Nat) (P : Pack1 α) :
   Tcorr (α := α) n → Qcorr (α := α) n P := by
   intro hT
   exact hT P
+
+
+/-- Extract `Q n P` from `TNEP n`, given `NEP (Pack0.C P)`. -/
+theorem TNEP_elim (n : Nat) (P : Pack0 α) :
+  TNEP (α := α) n → NEP (Pack0.C P) → Q (α := α) n P := by
+  intro hT hNEP
+  exact hT P hNEP
+
+/-- Extract `Qcorr n P` from `TcorrNEP n`, given `NEP (Pack1.C P)`. -/
+theorem TcorrNEP_elim (n : Nat) (P : Pack1 α) :
+  TcorrNEP (α := α) n → NEP (Pack1.C P) → Qcorr (α := α) n P := by
+  intro hT hNEP
+  exact hT P hNEP
 
 
 /- ------------------------------------------------------------

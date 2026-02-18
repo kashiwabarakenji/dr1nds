@@ -430,6 +430,7 @@ lemma normalize_isClosed_iff
 /--
 If `P ∈ (H.trace v).prem h` then necessarily `v ∉ P` (since trace lives on `U.erase v`).
 -/
+
 lemma trace_prem_not_mem
   (H : HornNF α)
   (v : α)
@@ -443,6 +444,102 @@ lemma trace_prem_not_mem
   have : v ∈ H.U.erase v := hsub hvP
   simpa using this
 
+
+/-- `trace` does not create empty premises: `IsNEP` is preserved by trace. -/
+lemma isNEP_trace_of_isNEP
+  (H : HornNF α) (u : α)
+  (hNEP : HornNF.IsNEP (α := α) H) :
+  HornNF.IsNEP (α := α) (H.trace u) := by
+  classical
+  intro h
+  by_cases hh : h = u
+  · subst hh
+    -- by definition, trace has no premises at the traced head
+    simp [HornNF.trace]
+  ·
+    -- show `∅` is not in the filtered `biUnion`
+    intro hempty
+    -- unfold membership in `(H.trace u).prem h`
+    simp [HornNF.trace, hh] at hempty
+    cases hempty with
+    | intro P0 hP0 =>
+      -- hP0 : P0 ∈ H.prem h ∧ ∅ ∈ if u ∈ P0 then ... else {P0}
+      have hP0mem : P0 ∈ H.prem h := hP0.1
+      have hcase : (∅ : Finset α) ∈
+          (if u ∈ P0 then
+            Finset.image (fun Pu => P0.erase u ∪ Pu) (H.prem u)
+           else ({P0} : Finset (Finset α))) := hP0.2
+      by_cases hu : u ∈ P0
+      · -- image branch
+        have hcase' :
+            (∅ : Finset α) ∈
+              Finset.image (fun Pu => P0.erase u ∪ Pu) (H.prem u) := by
+          simpa [hu] using hcase
+        rcases Finset.mem_image.mp hcase' with ⟨Pu, hPu, hEq⟩
+        have hPu0 : Pu = (∅ : Finset α) := by
+          have hboth : P0.erase u = (∅ : Finset α) ∧ Pu = (∅ : Finset α) := by
+            exact (Finset.union_eq_empty.mp hEq)
+          exact hboth.2
+        exact (hNEP (h := u)) (by simpa [hPu0] using hPu)
+      · -- singleton branch
+        have hcase' : (∅ : Finset α) ∈ ({P0} : Finset (Finset α)) := by
+          simpa [hu] using hcase
+        have hP0eq : P0 = (∅ : Finset α) := by
+          let fm := Finset.mem_singleton.mp hcase'
+          simp_all only [↓reduceIte, Finset.mem_singleton, and_self]
+        exact (hNEP (h := h)) (by simpa [hP0eq] using hP0mem)
+
+
+/-- If `∅` is a closed set of `H` (equivalently, `∅ ∈ FixSet H`), then it remains so after trace. -/
+theorem empty_mem_fixset_trace_of_empty_mem_fixset
+  (H : HornNF α) (u : α)
+  (h0 : (∅ : Finset α) ∈ HornNF.FixSet (α := α) H) :
+  (∅ : Finset α) ∈ HornNF.FixSet (α := α) (H.trace u) := by
+  classical
+  -- convert `∅ ∈ FixSet` to `IsNEP`, transport across trace, then convert back
+  have hNEP : HornNF.IsNEP (α := α) H :=
+    (isNEP_iff_empty_mem_FixSet (α := α) (H := H)).2 h0
+  have hNEP' : HornNF.IsNEP (α := α) (H.trace u) :=
+    isNEP_trace_of_isNEP (α := α) (H := H) (u := u) hNEP
+  exact (isNEP_iff_empty_mem_FixSet (α := α) (H := H.trace u)).1 hNEP'
+
+
+/-- The empty set always belongs to the Hole side for a singleton forbid `{a}`.
+
+This is the basic NEP-transport fact used in singleton-forbid wiring:
+adding a nonempty forbid set does not affect whether `∅` is present.
+-/
+lemma empty_mem_Hole_singleton_iff
+  (C : Finset (Finset α)) (a : α) :
+  ((∅ : Finset α) ∈ Hole (α := α) C ({a} : Finset α)) ↔ (∅ : Finset α) ∈ C := by
+  classical
+  -- unfold `Hole` and evaluate the predicate at `∅`
+  -- Hole C {a} = C.filter (fun X => ¬({a} ⊆ X))
+  -- and `{a} ⊆ ∅` is false, so membership reduces to `∅ ∈ C`.
+  simp [Dr1nds.Hole]
+
+/-- If `∅ ∈ C`, then also `∅ ∈ Hole C {a}` (the forward direction packaged).
+
+This is often the exact shape needed by `have`-steps in `Steps.lean`.
+-/
+lemma empty_mem_Hole_singleton_of_empty_mem
+  (C : Finset (Finset α)) (a : α)
+  (h0 : (∅ : Finset α) ∈ C) :
+  (∅ : Finset α) ∈ Hole (α := α) C ({a} : Finset α) := by
+  have h :
+      ((∅ : Finset α) ∈ Hole (α := α) C ({a} : Finset α)) ↔ (∅ : Finset α) ∈ C :=
+    empty_mem_Hole_singleton_iff (α := α) (C := C) (a := a)
+  exact h.mpr h0
+
+/-- The empty set is never in `Up C {a}` for a singleton forbid `{a}`. -/
+lemma empty_not_mem_Up_singleton
+  (C : Finset (Finset α)) (a : α) :
+  (∅ : Finset α) ∉ Up (α := α) C ({a} : Finset α) := by
+  classical
+  simp [Dr1nds.Up]
+
+
+-----------------------------------------------
 
 /-- Normalization keeps the universe. -/
 theorem normalize_U

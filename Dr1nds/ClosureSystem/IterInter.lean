@@ -88,7 +88,7 @@ lemma iterInter_mem
       simp [hY]
     -- insert case reduces to intersection
     let csm := CS.mem_inter hXmem hSmem
-    simp [iterInter_insert]
+    simp
     dsimp [iterInter] at csm
     dsimp [iterInter] at hSmem
     convert csm using 1

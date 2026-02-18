@@ -1,6 +1,7 @@
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Dr1nds.S0_CoreDefs
+import Dr1nds.S1_Families
 import Dr1nds.Horn.Horn   -- HornNF
 import Dr1nds.Horn.HornTrace
 
@@ -120,6 +121,71 @@ lemma FixSet_eq_Hole_FixSet
   classical
   simp [HornWithForbid.FixSet, Hole]
 
+/-- `SetFamily.NEP` for the forbid-family `S.FixSet` is definitionally `∅ ∈ S.FixSet`. -/
+lemma nep_iff_empty_mem_FixSet
+  (S : HornWithForbid α) :
+  SetFamily.NEP (
+   { U := S.H.U, C := S.FixSet, subset_univ := by
+      intro X hX
+      -- FixSet members are subsets of U
+      simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+   }
+     : SetFamily α
+    )
+    ↔ (∅ : Finset α) ∈ S.FixSet := by
+  rfl
+
+/-- If the forbid-family `S.FixSet` is `NEP`, then `∅ ∈ S.FixSet`. -/
+lemma empty_mem_of_nep_FixSet
+  (S : HornWithForbid α)
+  (h : SetFamily.NEP (
+   { U := S.H.U, C := S.FixSet, subset_univ := by
+      intro X hX
+      -- FixSet members are subsets of U
+      simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+   }
+     : SetFamily α
+    )) :
+  (∅ : Finset α) ∈ S.FixSet := by
+  simpa [SetFamily.NEP] using h
+
+/-- `SetFamily.NEP` for the base family `HornNF.FixSet S.H` is definitionally `∅ ∈ HornNF.FixSet S.H`. -/
+lemma nep_iff_empty_mem_base
+  (S : HornWithForbid α) :
+  SetFamily.NEP (
+   { U := S.H.U, C := HornNF.FixSet S.H, subset_univ := by
+      intro X hX
+      -- FixSet members are subsets of U
+      simpa using (mem_FixSet_subset_U (H := S.H) (X := X) hX)
+   }
+     : SetFamily α
+    )
+    ↔ (∅ : Finset α) ∈ HornNF.FixSet S.H := by
+  rfl
+
+/-- If `A` is nonempty, then adding the forbid via `Hole` does not change whether `∅` is present. -/
+lemma empty_mem_Hole_iff
+  (C : Finset (Finset α)) (A : Finset α) (hA : A.Nonempty) :
+  (∅ : Finset α) ∈ Hole (α := α) C A ↔ (∅ : Finset α) ∈ C := by
+  classical
+  have hnot : ¬ A ⊆ (∅ : Finset α) := by
+    rcases hA with ⟨a, haA⟩
+    intro hsub
+    have : a ∈ (∅ : Finset α) := hsub haA
+    simpa using this
+  simp [Hole, hnot]
+
+
+
+/-- In particular, for `HornWithForbid`, `F.Nonempty` implies `∅ ∈ S.FixSet ↔ ∅ ∈ HornNF.FixSet S.H`. -/
+lemma empty_mem_FixSet_iff_empty_mem_base
+  (S : HornWithForbid α) :
+  (∅ : Finset α) ∈ S.FixSet ↔ (∅ : Finset α) ∈ HornNF.FixSet S.H := by
+  classical
+  -- `S.FixSet = Hole (FixSet) S.F` and `S.F` is nonempty.
+  simpa [FixSet_eq_Hole_FixSet (α := α) S] using
+    (empty_mem_Hole_iff (α := α) (C := HornNF.FixSet S.H) (A := S.F) S.F_nonempty).symm
+
 /-- A convenient rewriting lemma for membership in `Hole (FixSet ...)`. -/
 lemma mem_Hole_FixSet_iff
   (H : HornNF α) (A X : Finset α) :
@@ -166,6 +232,75 @@ lemma subset_U_of_subset_traceU
   exact (Finset.mem_erase.mp hx').2
 
 
+/-- NEP is preserved when passing between the base family `HornNF.FixSet S.H`
+    and the forbid family `S.FixSet` (since `S.F` is nonempty). -/
+lemma nep_FixSet_iff_nep_base
+  (S : HornWithForbid α) :
+  SetFamily.NEP (
+    { U := S.H.U
+      C := S.FixSet
+      subset_univ := by
+        intro X hX
+        -- FixSet members are subsets of U
+        simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+    } : SetFamily α)
+  ↔
+  SetFamily.NEP (
+    { U := S.H.U
+      C := HornNF.FixSet S.H
+      subset_univ := by
+        intro X hX
+        -- FixSet members are subsets of U
+        simpa using (mem_FixSet_subset_U (H := S.H) (X := X) hX)
+    } : SetFamily α) := by
+  classical
+  constructor
+  · intro hNEP_forbid
+    have hempty_forbid : (∅ : Finset α) ∈ S.FixSet :=
+      empty_mem_of_nep_FixSet (α := α) S hNEP_forbid
+    have hempty_base : (∅ : Finset α) ∈ HornNF.FixSet S.H :=
+      (empty_mem_FixSet_iff_empty_mem_base (α := α) S).1 hempty_forbid
+    -- base NEP is definitional `∅ ∈ base`
+    simp [SetFamily.NEP]
+    simp_all only [mem_FixSet_withForbid_iff, Finset.subset_empty, true_and, mem_FixSet_iff, Finset.mem_powerset,
+      Finset.empty_subset]
+  · intro hNEP_base
+    -- base NEP is definitional `∅ ∈ base`
+    have hempty_base : (∅ : Finset α) ∈ HornNF.FixSet S.H := by
+      simpa [SetFamily.NEP] using hNEP_base
+    have hempty_forbid : (∅ : Finset α) ∈ S.FixSet :=
+      (empty_mem_FixSet_iff_empty_mem_base (α := α) S).2 hempty_base
+    -- forbid NEP is definitional `∅ ∈ forbid`
+    simpa [SetFamily.NEP] using hempty_forbid
+
+
+/-- A convenient corollary: `S.FixSet` is NEP iff `∅` is in the base `FixSet`. -/
+lemma nep_FixSet_iff_empty_mem_base
+  (S : HornWithForbid α) :
+  SetFamily.NEP (
+    { U := S.H.U
+      C := S.FixSet
+      subset_univ := by
+        intro X hX
+        -- FixSet members are subsets of U
+        simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+    } : SetFamily α)
+  ↔ (∅ : Finset α) ∈ HornNF.FixSet S.H := by
+  classical
+  -- unfold NEP on the forbid side, then rewrite emptiness via the Hole characterization
+  have h1 :
+      SetFamily.NEP (
+        { U := S.H.U
+          C := S.FixSet
+          subset_univ := by
+            intro X hX
+            simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+        } : SetFamily α)
+      ↔ (∅ : Finset α) ∈ S.FixSet := by
+    rfl
+  have h2 : (∅ : Finset α) ∈ S.FixSet ↔ (∅ : Finset α) ∈ HornNF.FixSet S.H :=
+    empty_mem_FixSet_iff_empty_mem_base (α := α) S
+  simpa [h1] using h2
 /-
 ============================================================
   NDS (for future use)
