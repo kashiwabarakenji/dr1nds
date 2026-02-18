@@ -17,10 +17,26 @@ SetFamily を継承し、
 
 ※ Set ではなく Finset (Finset α) で統一する。
 -/
+
 structure ClosureSystem (α : Type) [Fintype α] [DecidableEq α]
   extends SetFamily α :=
   (mem_inter :
      ∀ {X Y : Finset α}, X ∈ C → Y ∈ C → X ∩ Y ∈ C)
   (top_mem : U ∈ C)
+
+
+namespace ClosureSystem
+
+variable (S : ClosureSystem α)
+
+/-- A closure system is `NEP` iff it contains the empty set.  (This is the SetFamily-level `NEP`.) -/
+lemma nep_iff_empty_mem : SetFamily.NEP  (S.toSetFamily) ↔ (∅ : Finset α) ∈ S.C := by
+  rfl
+
+/-- If a closure system is `NEP`, then the empty set is a closed set. -/
+lemma empty_mem_of_nep (h : SetFamily.NEP (S.toSetFamily)) : (∅ : Finset α) ∈ S.C := by
+  simpa [SetFamily.NEP] using h
+
+end ClosureSystem
 
 end Dr1nds

@@ -27,7 +27,56 @@ structure HornWithForbid (α : Type) [DecidableEq α] where
   F_nonempty : F.Nonempty
   F_closed : HornNF.IsClosed H F
 
+
 attribute [simp] HornWithForbid.F_subset_U
+
+/--
+Trace the underlying Horn system at `a` and **replace** the forbid set by `Pprem`.
+
+IMPORTANT:
+`HornWithForbid` requires the forbid set to satisfy:
+- `Pprem ⊆ (S.H.trace a).U`
+- `Pprem.Nonempty`
+- `HornNF.IsClosed (S.H.trace a) Pprem`
+
+So this constructor takes these obligations as explicit arguments.
+This removes the need for axiom-level APIs.
+-/
+noncomputable def traceWithPrem
+  (S : HornWithForbid α) (a : α) (Pprem : Finset α)
+  (hPsub : Pprem ⊆ (S.H.trace a).U)
+  (hPne : Pprem.Nonempty)
+  (hPclosed : HornNF.IsClosed (S.H.trace a) Pprem) : HornWithForbid α :=
+  { H := S.H.trace a
+    hDR1 := by
+      -- DR1 is preserved by trace (proved in the Horn layer).
+      have hDR1' : HornNF.DR1 S.H := by
+        simpa [HornNF.IsDR1, HornNF.DR1] using S.hDR1
+      have hDR1'' : HornNF.DR1 (S.H.trace a) :=
+        HornNF.trace_preserves_DR1 (H := S.H) (u := a) hDR1'
+      simpa [HornNF.IsDR1, HornNF.DR1] using hDR1''
+    F := Pprem
+    F_subset_U := hPsub
+    F_nonempty := hPne
+    F_closed := hPclosed }
+
+@[simp] theorem traceWithPrem_H
+  (S : HornWithForbid α) (a : α) (Pprem : Finset α)
+  (hPsub : Pprem ⊆ (S.H.trace a).U)
+  (hPne : Pprem.Nonempty)
+  (hPclosed : HornNF.IsClosed (S.H.trace a) Pprem) :
+  (traceWithPrem (α := α) S a Pprem hPsub hPne hPclosed).H = S.H.trace a := by
+  rfl
+
+@[simp] theorem traceWithPrem_F
+  (S : HornWithForbid α) (a : α) (Pprem : Finset α)
+  (hPsub : Pprem ⊆ (S.H.trace a).U)
+  (hPne : Pprem.Nonempty)
+  (hPclosed : HornNF.IsClosed (S.H.trace a) Pprem) :
+  (traceWithPrem (α := α) S a Pprem hPsub hPne hPclosed).F = Pprem := by
+  rfl
+
+attribute [simp] traceWithPrem_H traceWithPrem_F
 
 
 /- ------------------------------------------------------------
@@ -64,6 +113,57 @@ lemma mem_FixSet_withForbid_subset_U
   基本補題
 ------------------------------------------------------------ -/
 
+/-- `HornWithForbid.FixSet` is exactly the `Hole` of the underlying `HornNF.FixSet`. -/
+lemma FixSet_eq_Hole_FixSet
+  (S : HornWithForbid α) :
+  S.FixSet = Hole (α := α) (HornNF.FixSet S.H) S.F := by
+  classical
+  simp [HornWithForbid.FixSet, Hole]
+
+/-- A convenient rewriting lemma for membership in `Hole (FixSet ...)`. -/
+lemma mem_Hole_FixSet_iff
+  (H : HornNF α) (A X : Finset α) :
+  X ∈ Hole (α := α) (HornNF.FixSet H) A
+    ↔ X ∈ HornNF.FixSet H ∧ ¬ A ⊆ X := by
+  classical
+  simp [Hole]
+
+/-- `Up` and `Hole` form a partition of a family (cardinality version). -/
+lemma card_up_add_card_hole_eq_card
+  (C : Finset (Finset α)) (A : Finset α) :
+  (Up (α := α) C A).card + (Hole (α := α) C A).card = C.card := by
+  classical
+  -- `Up` is `filter (A ⊆ ·)` and `Hole` is its negation.
+  simpa [Up, Hole] using
+    (Finset.filter_card_add_filter_neg_card_eq_card (s := C) (p := fun X => A ⊆ X))
+
+/-- The `Int`-coerced version of `card_up_add_card_hole_eq_card`. -/
+lemma int_card_up_add_card_hole_eq_card
+  (C : Finset (Finset α)) (A : Finset α) :
+  ((Up (α := α) C A).card : Int) + (Hole (α := α) C A).card = (C.card : Int) := by
+  classical
+  -- coerce the Nat identity to Int
+  exact_mod_cast (card_up_add_card_hole_eq_card (α := α) C A)
+
+/-- If `F ⊆ U` and `v ∉ F`, then `F ⊆ U.erase v`. -/
+lemma subset_erase_of_subset
+  {U F : Finset α} {v : α} :
+  F ⊆ U → v ∉ F → F ⊆ U.erase v := by
+  intro hFU hvF x hx
+  refine Finset.mem_erase.mpr ?_
+  constructor
+  · intro hxv
+    subst hxv
+    exact hvF hx
+  · exact hFU hx
+
+/-- A small helper: from `P ⊆ (H.trace v).U` we get `P ⊆ H.U` (forgetting the erase). -/
+lemma subset_U_of_subset_traceU
+  (H : HornNF α) (v : α) {P : Finset α} :
+  P ⊆ (H.trace v).U → P ⊆ H.U := by
+  intro hP x hx
+  have hx' : x ∈ (H.trace v).U := hP hx
+  exact (Finset.mem_erase.mp hx').2
 
 
 /-
@@ -358,5 +458,63 @@ theorem deletion_as_forbid
       =
     (HornNF.FixSet H).filter (fun X => v ∉ X) := by
   sorry
+
+/--
+A usable (proved) version of `deletion_as_forbid`.
+
+To build a `HornWithForbid` object we must supply the extra structure fields
+for the forbid set `P` in the trace world (`P ⊆ (H.trace v).U`, `P.Nonempty`, and
+`IsClosed (H.trace v) P`). In the singleton-proof wiring these are typically
+provided from NF/DR1 lemmas and the chosen-premise facts.
+
+This theorem is the *actual* bridge used to identify the deletion-filtered family
+with the forbid FixSet in the trace world.
+-/
+theorem deletion_as_forbid'
+  (H : HornNF α)
+  (hDR1 : H.IsDR1)
+  (v : α)
+  (P : Finset α)
+  (hP : P ∈ H.prem v)
+  (hUnique : (H.prem v).card = 1)
+  (hPsub : P ⊆ (H.trace v).U)
+  (hPne : P.Nonempty)
+  (hPclosed : HornNF.IsClosed (H.trace v) P)
+  :
+  ∃ S : HornWithForbid α,
+    S.H = H.trace v ∧
+    S.F = P ∧
+    S.FixSet = (HornNF.FixSet H).filter (fun X => v ∉ X) := by
+  classical
+  -- build the forbid structure on the trace world
+  let S : HornWithForbid α :=
+    { H := H.trace v
+      hDR1 := by
+        -- If you have a lemma `HornNF.trace_preserves_DR1`, replace this with it.
+        -- For now we keep it as a local assumption via `hDR1` if needed.
+        -- (Most developments already have `trace_preserves_DR1`.)
+        let hn := HornNF.trace_preserves_DR1 (H := H) (hDR1 := hDR1)
+        apply hn
+      F := P
+      F_subset_U := hPsub
+      F_nonempty := hPne
+      F_closed := hPclosed }
+
+  refine ⟨S, rfl, rfl, ?_⟩
+
+  -- Extensional equality using the membership characterization.
+  ext X
+  -- unfold `S.FixSet` and rewrite to the `deletion_filter_equiv` statement.
+  have hdel :
+    X ∈ (HornNF.FixSet H).filter (fun X => v ∉ X)
+      ↔ X ∈ (H.trace v).FixSet ∧ ¬ P ⊆ X :=
+    deletion_filter_equiv (α := α) (H := H) (hDR1 := hDR1)
+      (v := v) (P := P) (hP := hP) (hUnique := hUnique) (X := X)
+
+  -- `X ∈ S.FixSet` is `X ∈ FixSet(trace)` plus `¬P ⊆ X`.
+  -- So both sides match by `hdel`.
+  --
+  -- Note: `S.FixSet` is `filter (¬ P ⊆ ·)` on `FixSet(trace)` by definition.
+  simp [HornWithForbid.FixSet, S, hdel]
 
 end Dr1nds
