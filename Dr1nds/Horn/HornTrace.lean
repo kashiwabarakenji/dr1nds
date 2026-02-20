@@ -98,7 +98,7 @@ def trace (H : HornNF α) (u : α) : HornNF α :=
 def DR1 (H : HornNF α) : Prop :=
   ∀ h, (H.prem h).card ≤ 1
 
-/-- Trace preserves DR1. -/
+/-- Trace preserves DR1. 使われている -/
 lemma trace_preserves_DR1
   (H : HornNF α) (u : α)
   (hDR1 : DR1 H) :
@@ -134,7 +134,7 @@ by
       · -- u ∉ P₀: result is {P₀}, card = 1 ≤ 1
         simp [huP]
 
-/-- Trace preserves NEP (no empty premise created). -/
+/-- Trace preserves NEP (no empty premise created). まだ使われてない -/
 lemma trace_preserves_NEP
   (H : HornNF α) (u : α)
   (hnep : ∀ h P, P ∈ H.prem h → P.Nonempty) :
@@ -161,7 +161,7 @@ Head-free simplification of trace premises.
 If `H.prem v = ∅` and `h ≠ v`, then trace just filters
 out premises containing `v`.
 -/
-lemma trace_prem_head_free
+private lemma trace_prem_head_free
   (H : HornNF α)
   (v : α)
   (hfree : H.prem v = ∅)
@@ -207,6 +207,7 @@ lemma trace_prem_head_free
       · simp_all only [ne_eq, ↓reduceIte, Finset.mem_singleton]
     · exact H.nf hX.1
 
+-- 使われている HornBridgeから。
 lemma trace_isClosed_iff_head_free
   (H : HornNF α)
   (v : α)
@@ -271,6 +272,7 @@ If no premise in `H` contains `v`, then in the trace world the premises for any 
 are unchanged (the `biUnion` branch never fires).
 
 This lemma is the key simplification used in the `|A|=1` has-head Up-card bijection.
+-- HornBridgeから使われている。
 -/
 lemma trace_prem_eq_of_noPremContains
   (H : HornNF α)
@@ -324,6 +326,7 @@ preserves closedness in the original world.
 
 This is the forward direction needed for the `|A|=1` has-head Up-card bijection:
 `Y ∈ FixSet (trace v)` implies `Y ∪ {v} ∈ FixSet H` (after handling the subset-to-U part).
+Horn Bridgeから使われている。
 -/
 lemma isClosed_union_singleton_of_noPremContains
   (H : HornNF α)
@@ -371,60 +374,6 @@ lemma isClosed_union_singleton_of_noPremContains
     -- conclude h ∈ Y ∪ {v}
     exact Finset.mem_union_left _ (by simpa using hhY)
 
-/--
-Normalization at `v`: delete every rule whose premise contains `v`.
-
-This is the formal version of the `NF-A` normalization used in the `|A|=1` branch:
-when we only care about sets not containing `v` (i.e. the Hole-side for forbid `{v}`),
-any premise containing `v` can never be satisfied, so deleting those rules does not
-change closedness on `v`-free sets.
--/
-def normalize (H : HornNF α) (v : α) : HornNF α :=
-{ U := H.U
-  prem := fun h => (H.prem h).filter (fun P => v ∉ P)
-  prem_subset_U := by
-    classical
-    intro h P hP
-    have hP' : P ∈ H.prem h := (Finset.mem_filter.mp hP).1
-    exact H.prem_subset_U hP'
-  head_mem_U := by
-    classical
-    intro h hne
-    -- if `(normalize H v).prem h` is nonempty then so is `H.prem h`
-    have hne' : (H.prem h).Nonempty := by
-      rcases hne with ⟨P, hP⟩
-      exact ⟨P, (Finset.mem_filter.mp hP).1⟩
-    exact H.head_mem_U hne'
-  nf := by
-    classical
-    intro h P hP
-    have hP' : P ∈ H.prem h := (Finset.mem_filter.mp hP).1
-    exact H.nf hP' }
-
-/--
-On sets not containing `v`, closedness is preserved by normalization.
--/
-lemma normalize_isClosed_iff
-  (H : HornNF α)
-  (v : α)
-  {X : Finset α}
-  (hvX : v ∉ X) :
-  HornNF.IsClosed (normalize H v) X ↔ HornNF.IsClosed H X := by
-  classical
-  unfold HornNF.IsClosed
-  constructor
-  · intro hNorm h P hP hsubset
-    -- show `v ∉ P` using `P ⊆ X`
-    have hvP : v ∉ P := by
-      intro hvP
-      have : v ∈ X := hsubset hvP
-      exact hvX this
-    have hPnorm : P ∈ (normalize H v).prem h := by
-      simp [normalize, hP, hvP]
-    exact hNorm hPnorm hsubset
-  · intro hH h P hP hsubset
-    have hP' : P ∈ H.prem h := (Finset.mem_filter.mp hP).1
-    exact hH hP' hsubset
 
 /--
 If `P ∈ (H.trace v).prem h` then necessarily `v ∉ P` (since trace lives on `U.erase v`).
@@ -478,6 +427,7 @@ lemma prem_subset_traceU_of_mem_prem
     exact ha_not hx
   -- combine `x ∈ H.U` and `x ≠ a`.
   exact Finset.mem_erase.mpr ⟨hxa, hxU⟩
+
 
 /--
 If `H` satisfies `IsNEP` (i.e. it has no empty premise), then any specific premise
@@ -608,375 +558,6 @@ lemma empty_not_mem_Up_singleton
   (∅ : Finset α) ∉ Up (α := α) C ({a} : Finset α) := by
   classical
   simp [Dr1nds.Up]
-
-
------------------------------------------------
-
-/-- Normalization keeps the universe. -/
-theorem normalize_U
-  (H : HornNF α) (a : α) : (normalize (α := α) H a).U = H.U := rfl
-
-/-- Normalization is exactly “filter premises by `a ∉ ·`”. -/
-theorem normalize_prem
-  (H : HornNF α) (a : α) (h : α) (Q : Finset α) :
-  Q ∈ (normalize (α := α) H a).prem h ↔ (Q ∈ H.prem h ∧ a ∉ Q) := by
- dsimp [normalize]
- simp
-
-
-/-- Immediate corollary: in the normalized system, no premise contains `a`. -/
-
-lemma normalize_noPremContains
-  (H : HornNF α) (a : α) :
-  ∀ {h : α} {Q : Finset α}, Q ∈ (normalize H a).prem h → a ∉ Q := by
-  intro h Q hQ
-  exact (normalize_prem H a h Q).1 hQ |>.2
-
-/--
-A named, project-facing alias: after `normalize` at `a`, no premise contains `a`.
-
-This is the theorem-level replacement that downstream code can use instead of the
-former pack-level axiom `Pack1.noPremContains_forbid`.
--/
-theorem noPremContains_forbid_of_normalize
-  (H : HornNF α) (a : α) :
-  ∀ {h : α} {Q : Finset α}, Q ∈ (normalize H a).prem h → a ∉ Q := by
-  intro h Q hQ
-  exact normalize_noPremContains (H := H) (a := a) hQ
-
-/--
-If `a` is already absent from every premise of `H`, then `normalize H a` is
-definitionally equal to `H` (premises are unchanged).
-
-This lemma is useful for rewriting `normalize` away once a global
-`NoPremContains a` hypothesis has been established.
--/
-lemma normalize_eq_of_noPremContains
-  (H : HornNF α) (a : α)
-  (hNoPrem : ∀ {h : α} {Q : Finset α}, Q ∈ H.prem h → a ∉ Q) :
-  normalize H a = H := by
-  classical
-  -- use ext on `HornNF`
-  apply HornNF.ext
-  · -- universe is unchanged
-    rfl
-  · -- premises are unchanged because the filter predicate is always true
-    funext h
-    ext Q
-    constructor
-    · intro hQ
-      have hQ' : Q ∈ H.prem h := (Finset.mem_filter.mp hQ).1
-      exact hQ'
-    · intro hQ
-      have haQ : a ∉ Q := hNoPrem (h := h) (Q := Q) hQ
-      exact Finset.mem_filter.mpr ⟨hQ, haQ⟩
-
-
-
-/-- Consequence: the Hole family is invariant under normalization. -/
-theorem normalize_hole_fixset_eq
-  (H : HornNF α) (a : α) :
-  Hole (HornNF.FixSet (normalize H a)) ({a} : Finset α)
-    =
-  Hole (HornNF.FixSet H) ({a} : Finset α)
- := by
-  classical
-  ext X
-  constructor
-  · intro hX
-    have hX' : X ∈ HornNF.FixSet (normalize H a) ∧ a ∉ X := by
-      simpa [Hole_singleton_eq_filter_notmem] using hX
-    rcases hX' with ⟨hFix, haX⟩
-    have hFix' : X ∈ HornNF.FixSet H := by
-      have hData := (mem_FixSet_iff (H := normalize H a) (X := X)).1 hFix
-      have hpow : X ∈ (normalize H a).U.powerset := hData.1
-      have hpow' : X ∈ H.U.powerset := by
-        simpa [normalize_U] using hpow
-      have hClosedH : HornNF.IsClosed H X :=
-        (normalize_isClosed_iff (H := H) (v := a) (X := X) haX).1 hData.2
-      exact (mem_FixSet_iff (H := H) (X := X)).2 ⟨hpow', hClosedH⟩
-    exact (by
-      -- pack back into Hole
-      simpa [Hole_singleton_eq_filter_notmem] using And.intro hFix' haX)
-  · intro hX
-    have hX' : X ∈ HornNF.FixSet H ∧ a ∉ X := by
-      simpa [Hole_singleton_eq_filter_notmem] using hX
-    rcases hX' with ⟨hFix, haX⟩
-    have hFix' : X ∈ HornNF.FixSet (normalize H a) := by
-      have hData := (mem_FixSet_iff (H := H) (X := X)).1 hFix
-      have hpow : X ∈ H.U.powerset := hData.1
-      have hpow' : X ∈ (normalize H a).U.powerset := by
-        simpa [normalize_U] using hpow
-      have hClosedN : HornNF.IsClosed (normalize H a) X :=
-        (normalize_isClosed_iff (H := H) (v := a) (X := X) haX).2 hData.2
-      exact (mem_FixSet_iff (H := normalize H a) (X := X)).2 ⟨hpow', hClosedN⟩
-    exact (by
-      simpa [Hole_singleton_eq_filter_notmem] using And.intro hFix' haX)
-
-/--
-If normalization at `a` does not increase the *Up-card* for the singleton forbid `{a}`,
-then it does not increase the singleton-corrected accounting objective `NDS_corr`.
-
-This is the inequality-form “rewrite bridge”: it is often enough for `≤ 0` goals.
--/
-theorem normalize_NDS_corr_singleton_le_of_up_card_le
-  (H : HornNF α) (a : α) (n : Nat)
-  (hUpCard :
-    (Up (α := α) (HornNF.FixSet (normalize H a)) ({a} : Finset α)).card
-      ≤
-    (Up (α := α) (HornNF.FixSet H) ({a} : Finset α)).card) :
-  NDS_corr (α := α) n (HornNF.FixSet (normalize H a)) ({a} : Finset α)
-    ≤
-  NDS_corr (α := α) n (HornNF.FixSet H) ({a} : Finset α) := by
-  classical
-  -- Hole-side is invariant under normalization
-  have hHole :
-      Hole (HornNF.FixSet (normalize H a)) ({a} : Finset α)
-        =
-      Hole (HornNF.FixSet H) ({a} : Finset α) :=
-    normalize_hole_fixset_eq (H := H) (a := a)
-
-  -- cast the Nat inequality on cards into Int
-  have hUpInt :
-      (↑(Up (α := α) (HornNF.FixSet (normalize H a)) ({a} : Finset α)).card : Int)
-        ≤
-      (↑(Up (α := α) (HornNF.FixSet H) ({a} : Finset α)).card : Int) :=
-    Int.ofNat_le.mpr hUpCard
-
-  -- unfold `NDS_corr` as Hole + Up(card), rewrite Hole, and use monotonicity of addition
-  calc
-    NDS_corr (α := α) n (HornNF.FixSet (normalize H a)) ({a} : Finset α)
-        =
-      NDS (α := α) n (Hole (HornNF.FixSet H) ({a} : Finset α))
-        + (↑(Up (α := α) (HornNF.FixSet (normalize H a)) ({a} : Finset α)).card : Int) := by
-          simp [Dr1nds.NDS_corr, hHole]
-    _ ≤
-      NDS (α := α) n (Hole (HornNF.FixSet H) ({a} : Finset α))
-        + (↑(Up (α := α) (HornNF.FixSet H) ({a} : Finset α)).card : Int) := by
-          simp_all only [Up_singleton_eq_filter_mem, Hole_singleton_eq_filter_notmem, Nat.cast_le, add_le_add_iff_left]
-    _ =
-      NDS_corr (α := α) n (HornNF.FixSet H) ({a} : Finset α) := by
-          simp [Dr1nds.NDS_corr]
-
-/--
-Public-facing alias (short name): normalization does not increase `NDS_corr` for singleton forbid,
-provided the Up-card does not increase.
-
-This name is used by `LocalKernels.lean`.
--/
-theorem normalize_ndscorr_singleton_le
-  (H : HornNF α) (a : α) (n : Nat)
-  (hUpCard :
-    (Up (α := α) (HornNF.FixSet (normalize H a)) ({a} : Finset α)).card
-      ≤
-    (Up (α := α) (HornNF.FixSet H) ({a} : Finset α)).card) :
-  NDS_corr (α := α) n (HornNF.FixSet (normalize H a)) ({a} : Finset α)
-    ≤
-  NDS_corr (α := α) n (HornNF.FixSet H) ({a} : Finset α) :=
-by
-  exact
-    normalize_NDS_corr_singleton_le_of_up_card_le (α := α)
-      (H := H) (a := a) (n := n) (hUpCard := hUpCard)
-
-
-/--
-Corollary for the `≤ 0` goal shape: if `NDS_corr` holds for `H` and normalization does not
-increase the Up-card, then `NDS_corr` holds for `normalize H a`.
--/
-theorem normalize_Qcorr_singleton_of_up_card_le
-  (H : HornNF α) (a : α) (n : Nat)
-  (hUpCard :
-    (Up (α := α) (HornNF.FixSet (normalize H a)) ({a} : Finset α)).card
-      ≤
-    (Up (α := α) (HornNF.FixSet H) ({a} : Finset α)).card)
-  (hQ : NDS_corr (α := α) n (HornNF.FixSet H) ({a} : Finset α) ≤ 0) :
-  NDS_corr (α := α) n (HornNF.FixSet (normalize H a)) ({a} : Finset α) ≤ 0 := by
-  have hle :=
-    normalize_NDS_corr_singleton_le_of_up_card_le (H := H) (a := a) (n := n) (hUpCard := hUpCard)
-  exact le_trans hle hQ
-
-/--
-Public-facing alias (goal-shape): if `NDS_corr` holds for `H` and normalization does not increase
-Up-card, then `NDS_corr` holds for `normalize H a`.
-
-This name is used by `LocalKernels.lean`.
--/
-theorem normalize_ndscorr_singleton_of_up_card_le
-  (H : HornNF α) (a : α) (n : Nat)
-  (hUpCard :
-    (Up (α := α) (HornNF.FixSet (normalize H a)) ({a} : Finset α)).card
-      ≤
-    (Up (α := α) (HornNF.FixSet H) ({a} : Finset α)).card)
-  (hQ : NDS_corr (α := α) n (HornNF.FixSet H) ({a} : Finset α) ≤ 0) :
-  NDS_corr (α := α) n (HornNF.FixSet (normalize H a)) ({a} : Finset α) ≤ 0 := by
-  simpa using
-    (normalize_Qcorr_singleton_of_up_card_le (α := α) (H := H) (a := a) (n := n)
-      (hUpCard := hUpCard) (hQ := hQ))
-
-
-/--
-Normalizing **after** trace at `v` is a no-op (all trace-premises already avoid `v`).
--/
-lemma normalize_trace_eq
-  (H : HornNF α)
-  (v : α) :
-  normalize (H.trace v) v = (H.trace v) := by
-  classical
-  have hU : (normalize (H.trace v) v).U = (H.trace v).U := rfl
-  have hPrem : (normalize (H.trace v) v).prem = (H.trace v).prem := by
-    funext h
-    ext P
-    let np := normalize_prem (H := H.trace v)
-    constructor
-    · intro hP
-      have hP' :
-          P ∈ (H.trace v).prem h ∧ v ∉ P := by
-        constructor
-        · simp_all only
-        · simp_all only [not_false_eq_true]
-      exact hP'.1
-    · intro hP
-      have hvP : v ∉ P := trace_prem_not_mem (H := H) (v := v) (hP := hP)
-      simp_all only [not_false_eq_true, and_self]
-  exact HornNF.ext hU hPrem
-
-/--
-In the head-free case, closure for trace coincides with
-closure for H on sets not containing v.
--/
-theorem trace_fixset_head_free
-  (H : HornNF α)
-  (v : α)
-  (hvU : v ∈ H.U)
-  (hfree : H.prem v = ∅)
-  :
-  HornNF.FixSet (H.trace v)
-    =
-  (HornNF.FixSet H).image (fun X => X.erase v) :=
-by
-  classical
-  ext X
-  constructor
-
-  ----------------------------------------------------------------
-  -- → direction
-  ----------------------------------------------------------------
-  · intro hX
-
-    -- unpack Fix(trace)
-    have hx := (mem_FixSet_iff (H.trace v) X).1 hX
-    rcases hx with ⟨hpow, hclosed_trace⟩
-
-    -- from powerset obtain subset
-    have hsub : X ⊆ H.U.erase v := by
-      simpa using hpow
-
-    -- v ∉ X
-    have hvX : v ∉ X := by
-      intro hv
-      have := hsub hv
-      simp_all only [mem_FixSet_iff, and_self, Finset.mem_powerset, Finset.mem_erase, ne_eq, not_true_eq_false,
-        and_true]
-
-    -- lift subset to U
-    have hsubU : X ⊆ H.U := by
-      intro x hxmem
-      have hx' := hsub hxmem
-      exact (Finset.mem_of_mem_erase hx')
-
-    -- closure equivalence
-    have hclosed_H :
-      HornNF.IsClosed H X :=
-      (trace_isClosed_iff_head_free H v hfree hvX).1
-        hclosed_trace
-
-    -- X ∈ Fix(H)
-    have hXfix :
-      X ∈ HornNF.FixSet H :=
-      (mem_FixSet_iff H X).2
-        ⟨
-          by simpa using hsubU,
-          hclosed_H
-        ⟩
-
-    -- X = X.erase v
-    have h_eq : X = X.erase v :=
-      (Finset.erase_eq_of_notMem hvX).symm
-
-    -- conclude
-    refine Finset.mem_image.mpr ?_
-    refine ⟨X, hXfix, ?_⟩
-    exact h_eq.symm
-
-
-  ----------------------------------------------------------------
-  -- ← direction
-  ----------------------------------------------------------------
-  · intro hX
-    rcases Finset.mem_image.mp hX with ⟨Y, hYfix, h_eq⟩
-
-    -- unpack Y ∈ Fix(H)
-    have hy := (mem_FixSet_iff H Y).1 hYfix
-    rcases hy with ⟨hYpow, hYclosed⟩
-
-    -- rewrite X
-    subst h_eq
-
-    ------------------------------------------------------------
-    -- subset part
-    ------------------------------------------------------------
-    have hsub :
-      Y.erase v ⊆ H.U.erase v :=
-    by
-      intro x hx
-      have hxY := Finset.mem_of_mem_erase hx
-      have hxU : x ∈ H.U := by
-        have hsubY : Y ⊆ H.U := by simpa using hYpow
-        exact hsubY hxY
-      apply Finset.mem_erase.mpr
-      simp_all only [mem_FixSet_iff, and_self, Finset.mem_powerset, Finset.mem_image, Finset.mem_erase, ne_eq, and_true,
-        not_false_eq_true]
-
-    have hpow :
-      Y.erase v ∈ (H.trace v).U.powerset := by
-      simpa using hsub
-
-    ------------------------------------------------------------
-    -- closure part
-    ------------------------------------------------------------
-    have hvX : v ∉ Y.erase v := by simp
-
-    have hclosed_trace :
-      HornNF.IsClosed (H.trace v) (Y.erase v) :=
-      (trace_isClosed_iff_head_free H v hfree hvX).2
-        (
-          by
-            intro h P hP hsubset
-
-            -- lift subset to Y
-            have hsubsetY : P ⊆ Y :=
-            by
-              intro x hxP
-              have hxX := hsubset hxP
-              exact Finset.mem_of_mem_erase hxX
-
-            have h_in_Y : h ∈ Y :=
-              hYclosed hP hsubsetY
-
-            -- need h ∈ Y.erase v
-            by_cases h_eq_v : h = v
-            · subst h_eq_v
-              -- but v ∉ Y.erase v
-              simp at hvX
-              simp_all only [mem_FixSet_iff, and_self, Finset.mem_powerset, Finset.notMem_empty]
-            · exact Finset.mem_erase.mpr
-                ⟨h_eq_v, h_in_Y⟩
-        )
-
-    -- conclude
-    exact
-      (mem_FixSet_iff (H.trace v) _).2
-        ⟨hpow, hclosed_trace⟩
 
 
 end HornNF

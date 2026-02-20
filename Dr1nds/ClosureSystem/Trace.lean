@@ -4,7 +4,6 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Powerset
 import Dr1nds.S0_CoreDefs
 import Dr1nds.S1_Families
-import Dr1nds.S2_HornNF
 import Dr1nds.ClosureSystem.Basic
 import LeanCopilot
 

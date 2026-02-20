@@ -1,6 +1,6 @@
 import Dr1nds.Horn.Horn
-import Dr1nds.Horn.HornWithForbid
 import Dr1nds.Horn.HornClosure
+import Dr1nds.Forbid.HornWithForbid
 
 set_option autoImplicit false
 

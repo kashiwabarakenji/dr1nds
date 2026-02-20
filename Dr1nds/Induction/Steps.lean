@@ -80,10 +80,9 @@ by
 theorem nep_tracePack1WithPrem_of_nep
   (P : Pack1 α) (a : α) (Pprem : Finset α)
   (hPsub : Pprem ⊆ (P.S.H.trace a).U)
-  (hPne : Pprem.Nonempty)
-  (hPclosed : (P.S.H.trace a).IsClosed Pprem) :
+  (hPne : Pprem.Nonempty) :
   NEP (Pack1.C (α := α) P) →
-    NEP (Pack1.C (Pack1.tracePack1WithPrem (α := α) P a Pprem hPsub hPne hPclosed)) := by
+    NEP (Pack1.C (Pack1.tracePack1WithPrem (α := α) P a Pprem hPsub hPne)) := by
   intro hNEP
   classical
 
@@ -169,8 +168,7 @@ theorem tracePack1WithPrem_args
   let Pcl : Finset α := HornNF.closure (P.S.H.trace a) Praw
   ∃ (hPsub : Pcl ⊆ (P.S.H.trace a).U),
     ∃ (hPne : Pcl.Nonempty),
-      ∃ (hPclosed : (P.S.H.trace a).IsClosed Pcl),
-        True := by
+      True := by
   classical
   let Pcl : Finset α := HornNF.closure (P.S.H.trace a) Praw
   have hObs :=
@@ -180,9 +178,7 @@ theorem tracePack1WithPrem_args
     simpa [Pcl] using hObs.1
   have hPne : Pcl.Nonempty := by
     simpa [Pcl] using hObs.2.1
-  have hPclosed : (P.S.H.trace a).IsClosed Pcl := by
-    simp_all only [Pcl]
-  exact ⟨hPsub, ⟨hPne, ⟨hPclosed, trivial⟩⟩⟩
+  exact ⟨hPsub, ⟨hPne, trivial⟩⟩
 
 
 /- ============================================================
@@ -258,7 +254,7 @@ theorem Qcorr_step1
     have hCardCases := card_cases (α := α) P.A
     rcases hCardCases with h0 | h1 | hge2
     · -- A.card=0（暫定：専用核）
-      exact Qcorr_handle_A_empty (α := α) (n := n) (P := P) h0 (hTcorr P)
+      exact Qcorr_handle_A_empty (α := α) (n := n) (P := P) h0 (hT (Pack1.toPack0 P))
     · -- A.card=1（専用核：台落ち）
       -- `A.card = 1` から代表元 `a` を取り、`A = {a}` を得る
       obtain ⟨a, hAeq⟩ := Finset.card_eq_one.mp h1
@@ -279,7 +275,7 @@ theorem Qcorr_step1
       let h := choose_SC_in_forbid (α := α) P hNP
       have hmem : h ∈ P.A := choose_SC_in_forbid_mem (α := α) P hNP
       have hSC : IsSC1 P h := choose_SC_in_forbid_spec (α := α) P hNP
-      exact Qcorr_branch_A_ge2 (α := α) (n := n) (P := P) (h := h) hSC hmem (hTcorr P)
+      exact Qcorr_branch_A_ge2 (α := α) (n := n) (P := P) (h := h) hSC hmem (hTcorr (Pack1.contract P h))
 
 
 /- ============================================================
@@ -305,7 +301,7 @@ theorem Qcorr_step1_NEP
     have hCardCases := card_cases (α := α) P.A
     rcases hCardCases with h0 | h1 | hge2
     · -- A.card=0（暫定：専用核）
-      exact Qcorr_handle_A_empty (α := α) (n := n) (P := P) h0 (hTcorrNEP P hNEP)
+      exact Qcorr_handle_A_empty (α := α) (n := n) (P := P) h0 (hTNEP (Pack1.toPack0 P) sorry) -- TODO: transport NEP to Pack0
     · -- A.card=1（専用核：台落ち）
       obtain ⟨a, hAeq⟩ := Finset.card_eq_one.mp h1
       refine Qcorr_handle_A_singleton (α := α) (n := n) (P := P) (a := a) ?_ ?_ ?_
@@ -326,7 +322,7 @@ theorem Qcorr_step1_NEP
       let h := choose_SC_in_forbid (α := α) P hNP
       have hmem : h ∈ P.A := choose_SC_in_forbid_mem (α := α) P hNP
       have hSC : IsSC1 P h := choose_SC_in_forbid_spec (α := α) P hNP
-      exact Qcorr_branch_A_ge2 (α := α) (n := n) (P := P) (h := h) hSC hmem (hTcorrNEP P hNEP)
+      exact Qcorr_branch_A_ge2 (α := α) (n := n) (P := P) (h := h) hSC hmem (hTcorrNEP (Pack1.contract P h) sorry) -- TODO: transport NEP to contracted pack
 
 /- ============================================================
   (S10-global) Lift local steps to global (∀-quantified) steps.

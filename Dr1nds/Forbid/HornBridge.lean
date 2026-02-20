@@ -2,9 +2,10 @@ import Mathlib.Data.Fintype.Card
 import Mathlib.Data.Finset.Card
 import Mathlib.Tactic
 import Dr1nds.Forbid.Basic
-import Dr1nds.Horn.HornWithForbid
+import Dr1nds.Forbid.HornWithForbid
 import Dr1nds.S6_ConDelNdegId
 import Dr1nds.Horn.HornTrace
+import Dr1nds.Horn.HornNormalize
 import LeanCopilot
 
 

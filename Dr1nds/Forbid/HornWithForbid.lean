@@ -27,7 +27,6 @@ structure HornWithForbid (α : Type) [DecidableEq α] where
 
   F_subset_U : F ⊆ H.U
   F_nonempty : F.Nonempty
-  F_closed : HornNF.IsClosed H F
 
 
 attribute [simp] HornWithForbid.F_subset_U
@@ -39,7 +38,6 @@ IMPORTANT:
 `HornWithForbid` requires the forbid set to satisfy:
 - `Pprem ⊆ (S.H.trace a).U`
 - `Pprem.Nonempty`
-- `HornNF.IsClosed (S.H.trace a) Pprem`
 
 So this constructor takes these obligations as explicit arguments.
 This removes the need for axiom-level APIs.
@@ -47,8 +45,7 @@ This removes the need for axiom-level APIs.
 noncomputable def traceWithPrem
   (S : HornWithForbid α) (a : α) (Pprem : Finset α)
   (hPsub : Pprem ⊆ (S.H.trace a).U)
-  (hPne : Pprem.Nonempty)
-  (hPclosed : HornNF.IsClosed (S.H.trace a) Pprem) : HornWithForbid α :=
+  (hPne : Pprem.Nonempty) : HornWithForbid α :=
   { H := S.H.trace a
     hDR1 := by
       -- DR1 is preserved by trace (proved in the Horn layer).
@@ -59,23 +56,20 @@ noncomputable def traceWithPrem
       simpa [HornNF.IsDR1, HornNF.DR1] using hDR1''
     F := Pprem
     F_subset_U := hPsub
-    F_nonempty := hPne
-    F_closed := hPclosed }
+    F_nonempty := hPne }
 
 @[simp] theorem traceWithPrem_H
   (S : HornWithForbid α) (a : α) (Pprem : Finset α)
   (hPsub : Pprem ⊆ (S.H.trace a).U)
-  (hPne : Pprem.Nonempty)
-  (hPclosed : HornNF.IsClosed (S.H.trace a) Pprem) :
-  (traceWithPrem (α := α) S a Pprem hPsub hPne hPclosed).H = S.H.trace a := by
+  (hPne : Pprem.Nonempty) :
+  (traceWithPrem (α := α) S a Pprem hPsub hPne).H = S.H.trace a := by
   rfl
 
 @[simp] theorem traceWithPrem_F
   (S : HornWithForbid α) (a : α) (Pprem : Finset α)
   (hPsub : Pprem ⊆ (S.H.trace a).U)
-  (hPne : Pprem.Nonempty)
-  (hPclosed : HornNF.IsClosed (S.H.trace a) Pprem) :
-  (traceWithPrem (α := α) S a Pprem hPsub hPne hPclosed).F = Pprem := by
+  (hPne : Pprem.Nonempty) :
+  (traceWithPrem (α := α) S a Pprem hPsub hPne).F = Pprem := by
   rfl
 
 
@@ -112,13 +106,7 @@ noncomputable def traceWithPremClosure
     refine ⟨x, ?_⟩
     exact (HornNF.subset_closure (H := (S.H.trace a)) (X := Praw) hPsub) hx
 
-  -- closure is closed
-  have hPclosed' : HornNF.IsClosed (S.H.trace a) Pprem := by
-    let hc := HornNF.closure_isClosed (H := (S.H.trace a))
-    simp [Pprem]
-    simp_all only [Pprem]
-
-  exact traceWithPrem (α := α) S a Pprem hPsub' hPne' hPclosed'
+  exact traceWithPrem (α := α) S a Pprem hPsub' hPne'
 
 @[simp] theorem traceWithPremClosure_H
   (S : HornWithForbid α) (a : α) (Praw : Finset α)
@@ -702,33 +690,6 @@ lemma deletion_filter_equiv
 
 
 /--
-Unique-head deletion can be represented as
-trace + a single forbid set.
-
-If `v` has exactly one premise `P`, then
-the deletion of `v` from the closure system
-of `H` is equivalent to the FixSet of the
-trace system together with forbid `P`.
-
-This is the core Del = Hole bridge in the DR1 world.
--/
-theorem deletion_as_forbid
-  (H : HornNF α)
-  (hDR1 : H.IsDR1)
-  (v : α)
-  (P : Finset α)
-  (hP : P ∈ H.prem v)
-  (hUnique : (H.prem v).card = 1)
-  :
-  ∃ S : HornWithForbid α,
-    S.H = H.trace v ∧
-    S.F = P ∧
-    S.FixSet
-      =
-    (HornNF.FixSet H).filter (fun X => v ∉ X) := by
-  sorry
-
-/--
 A usable (proved) version of `deletion_as_forbid`.
 
 To build a `HornWithForbid` object we must supply the extra structure fields
@@ -748,7 +709,6 @@ theorem deletion_as_forbid'
   (hUnique : (H.prem v).card = 1)
   (hPsub : P ⊆ (H.trace v).U)
   (hPne : P.Nonempty)
-  (hPclosed : HornNF.IsClosed (H.trace v) P)
   :
   ∃ S : HornWithForbid α,
     S.H = H.trace v ∧
@@ -766,8 +726,7 @@ theorem deletion_as_forbid'
         apply hn
       F := P
       F_subset_U := hPsub
-      F_nonempty := hPne
-      F_closed := hPclosed }
+      F_nonempty := hPne }
 
   refine ⟨S, rfl, rfl, ?_⟩
 
