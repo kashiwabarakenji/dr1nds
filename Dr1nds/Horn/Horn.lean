@@ -99,7 +99,7 @@ lemma HornNF.isClosed_empty_of_isNEP
   intro h P hP hPsub
   have hPempty : P = (∅ : Finset α) := by
     -- any element of `P` would have to lie in `∅`
-    apply Finset.eq_empty_iff_forall_not_mem.2
+    apply Finset.eq_empty_iff_forall_notMem.2
     intro x hx
     have : x ∈ (∅ : Finset α) := hPsub hx
     simpa using this

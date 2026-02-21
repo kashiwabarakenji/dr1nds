@@ -31,16 +31,17 @@ variable {α : Type} [DecidableEq α]
 structure Pack0 (α : Type) [DecidableEq α] where
   H : _root_.Dr1nds.HornNF α
   hDR1 : H.IsDR1
-  -- 追加で必要なら：
-  -- hNEP : H.IsNEP
+  hNEP : H.IsNEP
   -- hNF  : H.IsNF
 
 -- forbid あり世界：DR1 HornNF + forbid 閉集合 F（あなたの HornWithForbid と同型）
 structure Pack1 (α : Type) [DecidableEq α] where
   S : _root_.Dr1nds.HornWithForbid α
+  hNEP : S.IsNEP
+  hDR1 : S.IsDR1
+
   -- HornWithForbid に DR1/closed などを含めている想定なので、ここは薄くする。
   -- 必要ならここに追加条件を持たせてもよい。
-
 
 /- ------------------------------------------------------------
   1. 帰納法で運ぶ命題 Q / Qcorr
