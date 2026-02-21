@@ -5,6 +5,7 @@ import Dr1nds.S1_Families
 import Dr1nds.Horn.Horn   -- HornNF
 import Dr1nds.Horn.HornTrace
 import Dr1nds.Horn.HornClosure
+import LeanCopilot
 
 namespace Dr1nds
 
@@ -22,9 +23,9 @@ variable {α : Type} [DecidableEq α]
 structure HornWithForbid (α : Type) [DecidableEq α] where
   H : HornNF α
   hDR1 : H.IsDR1
+  hNEP : H.IsNEP
 
   F : Finset α                    -- forbid set
-
   F_subset_U : F ⊆ H.U
   F_nonempty : F.Nonempty
 
@@ -54,9 +55,17 @@ noncomputable def traceWithPrem
       have hDR1'' : HornNF.DR1 (S.H.trace a) :=
         HornNF.trace_preserves_DR1 (H := S.H) (u := a) hDR1'
       simpa [HornNF.IsDR1, HornNF.DR1] using hDR1''
+    hNEP := by
+      -- NEP is preserved by trace (proved in the Horn layer).
+      let tp := HornNF.trace_preserves_NEP' S.H a
+      have :S.H.IsNEP := by
+        dsimp [HornNF.IsNEP]
+        simp [S.hNEP ]
+      simp_all only
     F := Pprem
     F_subset_U := hPsub
-    F_nonempty := hPne }
+    F_nonempty := hPne
+  }
 
 @[simp] theorem traceWithPrem_H
   (S : HornWithForbid α) (a : α) (Pprem : Finset α)
@@ -722,6 +731,7 @@ with the forbid FixSet in the trace world.
 theorem deletion_as_forbid'
   (H : HornNF α)
   (hDR1 : H.IsDR1)
+  (hNEP: H.IsNEP)
   (v : α)
   (P : Finset α)
   (hP : P ∈ H.prem v)
@@ -743,6 +753,8 @@ theorem deletion_as_forbid'
         -- (Most developments already have `trace_preserves_DR1`.)
         let hn := HornNF.trace_preserves_DR1 (H := H) (hDR1 := hDR1)
         apply hn
+      hNEP := by
+        (expose_names; exact @HornNF.isNEP_trace_of_isNEP α inst H v hNEP)
       F := P
       F_subset_U := hPsub
       F_nonempty := hPne }
