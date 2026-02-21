@@ -776,4 +776,6 @@ theorem deletion_as_forbid'
   -- Note: `S.FixSet` is `filter (¬ P ⊆ ·)` on `FixSet(trace)` by definition.
   simp [HornWithForbid.FixSet, S, hdel]
 
+
+
 end Dr1nds

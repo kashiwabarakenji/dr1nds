@@ -6,6 +6,7 @@ import Dr1nds.Horn.Horn
 import Dr1nds.Horn.HornClosure
 import Dr1nds.ClosureSystem.Basic
 import Dr1nds.Forbid.Basic
+import LeanCopilot
 
 /-
 ============================================================
@@ -155,6 +156,33 @@ by
       simp_all
       exact hnep h P₀ hP₀
 
+lemma trace_preserves_NEP'
+  (H : HornNF α) (u : α)
+  (hnep : H.IsNEP):
+(trace H u).IsNEP := by
+  classical
+  intro x
+  dsimp [HornNF.IsNEP] at hnep
+  have : ∀ (h : α), ∀ P ∈ H.prem h, P.Nonempty := by
+    intro h P hP
+    dsimp [Finset.Nonempty]
+    have :∅ ∉ H.prem h := by
+      simp_all only [not_false_eq_true]
+    have : P ≠ ∅ := by
+      simp_all only [not_false_eq_true, ne_eq]
+      apply Aesop.BuiltinRules.not_intro
+      intro a
+      subst a
+      simp_all only
+    let ni :=Finset.nonempty_iff_ne_empty (s := P)
+    simp_all only [not_false_eq_true, ne_eq]
+    simpa using ni.2 this
+
+  let tp := trace_preserves_NEP H u this
+  intro h
+  specialize tp x
+  specialize tp ∅ h
+  simp_all only [Finset.not_nonempty_empty]
 
 /--
 Head-free simplification of trace premises.

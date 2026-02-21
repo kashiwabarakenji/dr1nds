@@ -2,6 +2,8 @@ import Mathlib.Data.Finset.Basic
 import Dr1nds.Horn.Horn
 import Dr1nds.Horn.HornTrace
 import Dr1nds.Forbid.Basic
+import Dr1nds.Forbid.HornBridge
+import Dr1nds.Forbid.HornWithForbid
 
 namespace Dr1nds
 namespace HornNF
@@ -128,6 +130,69 @@ lemma ndscorr_singleton_normalize_le
     exact hX.1.2 hP.1 hsub
   simp only [NDS_corr, hHole]
   linarith [Int.ofNat_le.mpr hCard]
+
+/-!
+## Inductive NDS Correlation
+
+This section introduces theorems related to the inductive `NDS_corr` metric defined in
+`S8_Statements`. These are essential for the main induction proof which proceeds on
+the size of the universe. The logic is adapted from proofs in `Induction/LocalKernels.lean`.
+-/
+section InductiveNDSCorr
+
+variable {α : Type} [DecidableEq α]
+
+/--
+This theorem formalizes the core inductive step for a singleton forbid set `{a}`
+where `a` has a unique premise `Pprem` in the normalized system. It states that
+the `NDS_corr` for `(U, {a})` can be bounded by the `NDS_corr` of a smaller
+system on `U - α` with `Pprem` as the new forbid set.
+-/
+theorem nds_corr_singleton_hasHead_normalized_step
+  (n : Nat) (F : HornWithForbid α) (a : α)
+  (hA : F.F = {a})
+  (Pprem : Finset α)
+  (h_prem_normalized : (F.H.normalize a).prem a = {Pprem})
+  (h_IH : Dr1nds.NDS_corr n (HornNF.FixSet ((F.H.normalize a).trace a)) Pprem ≤ 0) :
+  Dr1nds.NDS_corr (n + 1) (HornNF.FixSet (F.H.normalize a)) {a} ≤ 0 := by
+  let H_norm := F.H.normalize a
+  -- This theorem is a wrapper around a more fundamental identity.
+  -- The proof from the reference code applies `Qcorr_singleton_hasHead_of_Qcorr_traceP`.
+  -- We apply it here with the necessary arguments.
+  apply Qcorr_singleton_hasHead_of_Qcorr_traceP
+  -- H_norm has DR1
+  · exact normalizePreservesDR1 F.H a F.hDR1
+  -- a ∈ H_norm.U
+  · simp [normalize]
+    apply F.F_subset_U
+    simp_all only [Finset.mem_singleton]
+  -- Pprem ∈ H_norm.prem a
+  · rw [h_prem_normalized]
+    exact Finset.mem_singleton.mpr rfl
+  -- (H_norm.prem a).card = 1
+  · rw [h_prem_normalized]
+    exact Finset.card_singleton Pprem
+  -- H_norm is a-normalized
+  · exact normalizePrem_noPremContains F.H a
+  -- The inductive hypothesis
+  · exact h_IH
+
+/--
+A convenience wrapper combining the monotonicity of normalization and a hypothesis
+on the normalized system to prove the goal for the original system. This corresponds
+to `NDS_corr_le_of_normalized_le` in the original snippets.
+-/
+lemma nds_corr_le_of_normalized_le
+  (n : Nat) (F : HornWithForbid α) (a : α) (hA : F.F = {a})
+  (h_norm_goal_le_0 : Dr1nds.NDS_corr (n + 1) (HornNF.FixSet (F.H.normalize a)) {a} ≤ 0) :
+  Dr1nds.NDS_corr (n + 1) (HornNF.FixSet F.H) F.F ≤ 0 := by
+  rw [hA]
+  -- Use the monotonicity of NDS_corr wrt normalization, which is proved in this file.
+  have h_mono := ndscorr_singleton_normalize_le (n + 1) F.H a
+  -- Chain the inequalities: NDS_corr(H) ≤ NDS_corr(normalize H) ≤ 0
+  exact le_trans h_mono h_norm_goal_le_0
+
+end InductiveNDSCorr
 
 end HornNF
 end Dr1nds

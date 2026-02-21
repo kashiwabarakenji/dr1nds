@@ -5,7 +5,7 @@ import Dr1nds.Forbid.Basic
 import Dr1nds.Forbid.HornWithForbid
 import Dr1nds.S6_ConDelNdegId
 import Dr1nds.Horn.HornTrace
-import Dr1nds.Horn.HornNormalize
+--import Dr1nds.Horn.HornNormalize
 --import LeanCopilot
 
 
