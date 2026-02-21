@@ -3,7 +3,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Data.Int.Basic
 import Mathlib.Algebra.BigOperators.Group.Finset.Basic
-import LeanCopilot
+--import LeanCopilot
 
 import Dr1nds.S0_CoreDefs
 import Dr1nds.S6_ConDelNdegId  -- CON_ID（通常会計）を参照する前提

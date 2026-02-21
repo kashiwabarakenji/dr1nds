@@ -3,7 +3,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Data.Int.Basic
 import Mathlib.Tactic
-import LeanCopilot
+--import LeanCopilot
 
 import Dr1nds.S0_CoreDefs  -- Up / Hole / NDS / NDS_corr がここにある想定
 

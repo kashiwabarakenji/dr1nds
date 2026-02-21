@@ -58,19 +58,19 @@ noncomputable def Pack1.C (P : Pack1 α) : Finset (Finset α) :=
   P.S.H.FixSet
 
 /-- forbid あり世界の forbid 集合（Hole/Up に渡す A）。
-
-設計方針：`HornNF.prem` 由来の forbid（例：trace + prem 分岐）では raw な前提集合が
-closed とは限らない。
-そのため、`Qcorr` の評価に使う forbid 集合は常に `HornNF.closure` を通して閉集合化する。
-
-- `Araw` : pack が保持している raw forbid
-- `A`    : 評価に使う閉集合 forbid (= closure Araw)
 -/
-def Pack1.Araw (P : Pack1 α) : Finset α :=
+def Pack1.A (P : Pack1 α) : Finset α :=
   P.S.F
 
-noncomputable def Pack1.A (P : Pack1 α) : Finset α :=
-  _root_.Dr1nds.HornNF.closure (α := α) P.S.H (Pack1.Araw (α := α) P)
+@[simp] theorem Pack1_A_eq_S_F (P : Pack1 α) : P.A = P.S.F := rfl
+
+-- Araw は不要になったので削除
+-- def Pack1.Araw (P : Pack1 α) : Finset α :=
+--   P.S.F
+
+-- noncomputable def Pack1.A (P : Pack1 α) : Finset α :=
+--   _root_.Dr1nds.HornNF.closure (α := α) P.S.H (Pack1.Araw (α := α) P)
+
 
 /- ------------------------------------------------------------
   1'. 帰納法で運ぶ命題 Q / Qcorr（定義固定）

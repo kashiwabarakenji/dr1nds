@@ -1,7 +1,7 @@
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Algebra.BigOperators.Group.Finset.Basic
-import LeanCopilot
+--import LeanCopilot
 
 namespace Dr1nds
 

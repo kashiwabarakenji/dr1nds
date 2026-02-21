@@ -5,7 +5,7 @@ import Mathlib.Data.Finset.Powerset
 import Dr1nds.S0_CoreDefs
 import Dr1nds.S1_Families
 import Dr1nds.ClosureSystem.Basic
-import LeanCopilot
+--import LeanCopilot
 
 namespace Dr1nds
 

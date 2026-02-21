@@ -33,7 +33,7 @@ theorem normalizePreservesDR1
   (H : HornNF α) (a : α) (hDR1 : DR1 H) :
   DR1 (normalizePrem H a) := by
   intro h
-  simp [normalizePrem, normalize, DR1]
+  simp [normalizePrem, normalize]
   calc
     ((H.prem h).filter (fun P => a ∉ P)).card ≤ (H.prem h).card := Finset.card_filter_le _ _
     _ ≤ 1 := hDR1 h
@@ -95,24 +95,19 @@ theorem hole_fixset_singleton_normalize_eq
     =
   Hole (α := α) (FixSet H) ({a} : Finset α) := by
   ext X
-  simp [Hole, mem_FixSet_iff, IsClosed]
-  intro h
+  simp only [mem_Hole_iff, mem_FixSet_iff, Finset.mem_powerset, singleton_subset_iff]
   constructor
-  · intro ⟨⟨hU, hCl_norm⟩, haX⟩
+  · rintro ⟨⟨hU, hCl_norm⟩, haX⟩
     refine ⟨⟨hU, ?_⟩, haX⟩
     intro h P hP hsub
     by_cases haP : a ∈ P
-    · have : a ∈ X := hsub haP
-      contradiction
-    · apply hCl_norm h
-      simp [normalizePrem, normalize]
-      exact ⟨hP, haP⟩
-      exact hsub
-  · intro ⟨⟨hU, hCl⟩, haX⟩
+    · exact absurd (hsub haP) haX
+    · exact hCl_norm (Finset.mem_filter.mpr ⟨hP, haP⟩) hsub
+  · rintro ⟨⟨hU, hCl⟩, haX⟩
     refine ⟨⟨hU, ?_⟩, haX⟩
     intro h P hP hsub
     simp [normalizePrem, normalize] at hP
-    apply hCl h hP.1 hsub
+    exact hCl hP.1 hsub
 
 /--
 On singleton forbid, the `NDS_corr` of the original system is bounded by the normalized one.
@@ -122,19 +117,17 @@ lemma ndscorr_singleton_normalize_le
   NDS_corr k (FixSet H) {a} ≤ NDS_corr k (FixSet (normalizePrem H a)) {a} := by
   have hHole : Hole (FixSet H) {a} = Hole (FixSet (normalizePrem H a)) {a} :=
     (hole_fixset_singleton_normalize_eq H a).symm
-  unfold NDS_corr
-  rw [hHole]
-  apply add_le_add_left
-  apply Int.ofNat_le.mpr
-  apply Finset.card_le_card
-  intro X hX
-  simp [Up] at hX ⊢
-  refine ⟨?_, hX.2⟩
-  rw [mem_FixSet_iff] at hX ⊢
-  refine ⟨hX.1.1, ?_⟩
-  intro h P hP hsub
-  simp [normalizePrem, normalize] at hP
-  exact hX.1.2 h hP.1 hsub
+  have hCard : (Up (FixSet H) {a}).card ≤ (Up (FixSet (normalizePrem H a)) {a}).card := by
+    apply Finset.card_le_card
+    intro X hX
+    simp [Up] at hX ⊢
+    refine ⟨?_, hX.2⟩
+    refine ⟨hX.1.1, ?_⟩
+    intro h P hP hsub
+    simp [normalizePrem, normalize] at hP
+    exact hX.1.2 hP.1 hsub
+  simp only [NDS_corr, hHole]
+  linarith [Int.ofNat_le.mpr hCard]
 
 end HornNF
 end Dr1nds

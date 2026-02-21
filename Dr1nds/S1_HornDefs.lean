@@ -1,7 +1,7 @@
 -- Dr1nds/S1_HornDefs.lean
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Image
-import LeanCopilot
+--import LeanCopilot
 
 namespace Dr1nds
 

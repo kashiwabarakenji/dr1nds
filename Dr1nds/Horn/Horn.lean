@@ -4,7 +4,7 @@ import Mathlib.Data.Finset.Card
 import Mathlib.Data.Fintype.Card
 import Mathlib.Data.Finset.Powerset
 --import Dr1nds.S1_HornDefs
-import LeanCopilot
+--import LeanCopilot
 
 namespace Dr1nds
 

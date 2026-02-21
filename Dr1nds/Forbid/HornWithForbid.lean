@@ -296,6 +296,25 @@ lemma Hole_FixSet_eq_Hole_FixSet_closure
       (closure_subset_iff_subset_of_isClosed (α := α) H A X hA hXclosed).1 hcl
     exact hmem.2 hAX
 
+/-
+lemma NDS_corr_eq_of_closure (n : Nat) (H : HornNF α) (A : Finset α) (hA : A ⊆ H.U) :
+  NDS_corr n (FixSet H) (closure H A) = NDS_corr n (FixSet H) A := by
+  have h_hole_eq : Hole (FixSet H) (closure H A) = Hole (FixSet H) A :=
+    Hole_FixSet_eq_Hole_FixSet_closure H A hA
+  have h_up_eq : Up (FixSet H) (closure H A) = Up (FixSet H) A := by
+    ext X
+    constructor <;> intro hX
+    · cases' Finset.mem_filter.mp hX with hX_in_FixSet h_cls_sub_X
+      have hX_closed := (mem_FixSet_iff H X).mp hX_in_FixSet |>.2
+      have hA_sub_X := (closure_subset_iff_subset_of_isClosed H A X hA hX_closed).mp h_cls_sub_X
+      exact Finset.mem_filter.mpr ⟨hX_in_FixSet, hA_sub_X⟩
+    · cases' Finset.mem_filter.mp hX with hX_in_FixSet hA_sub_X
+      have hX_closed := (mem_FixSet_iff H X).mp hX_in_FixSet |>.2
+      have h_cls_sub_X := (closure_subset_iff_subset_of_isClosed H A X hA hX_closed).mpr hA_sub_X
+      exact Finset.mem_filter.mpr ⟨hX_in_FixSet, h_cls_sub_X⟩
+  simp [NDS_corr, h_hole_eq, h_up_eq]
+  -/
+
 /-- `Up` and `Hole` form a partition of a family (cardinality version). -/
 lemma card_up_add_card_hole_eq_card
   (C : Finset (Finset α)) (A : Finset α) :
