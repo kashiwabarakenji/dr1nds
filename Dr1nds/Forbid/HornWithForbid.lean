@@ -31,6 +31,40 @@ structure HornWithForbid (α : Type) [DecidableEq α] where
 
 
 attribute [simp] HornWithForbid.F_subset_U
+namespace HornWithForbid
+
+noncomputable def FixSet
+  (S : HornWithForbid α) :
+  Finset (Finset α) :=
+  (HornNF.FixSet S.H).filter
+    (fun X => ¬ S.F ⊆ X)
+
+/--
+Trace a `HornWithForbid` system at a point `v`.
+
+The new Horn system is `S.H.trace v`, and the new forbid set is `S.F.erase v`.
+This operation is only defined when the resulting forbid set is non-empty,
+which is equivalent to `S.F ≠ {v}`. The point `v` does not need to be in `F`
+or be an SC point.
+-/
+def trace (S : HornWithForbid α) (v : α) (h_nonempty : (S.F.erase v).Nonempty) : HornWithForbid α :=
+  { H := S.H.trace v
+    hDR1 := HornNF.trace_preserves_DR1 S.H v S.hDR1
+    hNEP := HornNF.trace_preserves_NEP' S.H v S.hNEP
+    F := S.F.erase v
+    F_subset_U := by
+      dsimp [HornNF.trace]
+      have : S.F ⊆ S.H.U := by simp_all only [F_subset_U]
+      exact Finset.erase_subset_erase v this
+
+    F_nonempty := h_nonempty
+  }
+
+@[simp] theorem trace_H (S : HornWithForbid α) (v : α) (h : (S.F.erase v).Nonempty) :
+  (S.trace v h).H = S.H.trace v := rfl
+
+@[simp] theorem trace_F (S : HornWithForbid α) (v : α) (h : (S.F.erase v).Nonempty) :
+  (S.trace v h).F = S.F.erase v := rfl
 
 /--
 Trace the underlying Horn system at `a` and **replace** the forbid set by `Pprem`.
@@ -136,16 +170,11 @@ noncomputable def traceWithPremClosure
 
 attribute [simp] traceWithPremClosure_H traceWithPremClosure_F
 
-
 /- ------------------------------------------------------------
   FixSet
 ------------------------------------------------------------ -/
 
-noncomputable def HornWithForbid.FixSet
-  (S : HornWithForbid α) :
-  Finset (Finset α) :=
-  (HornNF.FixSet S.H).filter
-    (fun X => ¬ S.F ⊆ X)
+
 
 @[simp] lemma mem_FixSet_withForbid_iff
   (S : HornWithForbid α)
@@ -167,6 +196,7 @@ lemma mem_FixSet_withForbid_subset_U
   exact mem_FixSet_subset_U S.H h.1
 
 
+end HornWithForbid
 /- ------------------------------------------------------------
   基本補題
 ------------------------------------------------------------ -/
@@ -185,7 +215,7 @@ lemma nep_iff_empty_mem_FixSet
    { U := S.H.U, C := S.FixSet, subset_univ := by
       intro X hX
       -- FixSet members are subsets of U
-      simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+      simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
    }
      : SetFamily α
     )
@@ -199,7 +229,7 @@ lemma empty_mem_of_nep_FixSet
    { U := S.H.U, C := S.FixSet, subset_univ := by
       intro X hX
       -- FixSet members are subsets of U
-      simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+      simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
    }
      : SetFamily α
     )) :
@@ -372,7 +402,7 @@ lemma nep_FixSet_iff_nep_base
       subset_univ := by
         intro X hX
         -- FixSet members are subsets of U
-        simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+        simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
     } : SetFamily α)
   ↔
   SetFamily.NEP (
@@ -392,8 +422,8 @@ lemma nep_FixSet_iff_nep_base
       (empty_mem_FixSet_iff_empty_mem_base (α := α) S).1 hempty_forbid
     -- base NEP is definitional `∅ ∈ base`
     simp [SetFamily.NEP]
-    simp_all only [mem_FixSet_withForbid_iff, Finset.subset_empty, true_and, mem_FixSet_iff, Finset.mem_powerset,
-      Finset.empty_subset]
+    simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, Finset.subset_empty, true_and, mem_FixSet_iff,
+      Finset.mem_powerset, Finset.empty_subset]
   · intro hNEP_base
     -- base NEP is definitional `∅ ∈ base`
     have hempty_base : (∅ : Finset α) ∈ HornNF.FixSet S.H := by
@@ -413,7 +443,7 @@ lemma nep_FixSet_iff_empty_mem_base
       subset_univ := by
         intro X hX
         -- FixSet members are subsets of U
-        simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+        simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
     } : SetFamily α)
   ↔ (∅ : Finset α) ∈ HornNF.FixSet S.H := by
   classical
@@ -424,7 +454,7 @@ lemma nep_FixSet_iff_empty_mem_base
           C := S.FixSet
           subset_univ := by
             intro X hX
-            simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+            simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
         } : SetFamily α)
       ↔ (∅ : Finset α) ∈ S.FixSet := by
     rfl
