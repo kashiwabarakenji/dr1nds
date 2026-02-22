@@ -62,8 +62,6 @@ noncomputable def tracePack0 (P : Pack0 α) (a : α) : Pack0 α :=
     hNEP := by exact P.H.trace_preserves_NEP' a P.hNEP
   }
 
-
-
 -- =====================================
 -- (0) parallel / no-parallel 分岐（独立核）
 -- =====================================
@@ -81,7 +79,7 @@ axiom Q_of_parallel
 /-- Wiring helper: advance one step under the parallel-branch (forbid-free). -/
 axiom Q_succ_of_parallel
   (n : Nat) (P : Pack0 α) (hn : P.H.U.card = n):
-  Parallel0 P → ∃ P':Pack0 α , P'.H.U.card = n - 1
+  Parallel0 P → ∃ P':Pack0 α , (P'.H.U.card = n - 1 ∧ NDS n (P.H.FixSet) ≤ NDS (n-1) (P'.H.FixSet))
 
 --これはおかしいのではないか。きのうほうは、Fについて成り立つのではなくて、任意のFについて成り立つはず。
 /-- Wiring helper: advance one step under the parallel-branch (with forbid). -/
@@ -173,45 +171,5 @@ lemma card_cases
     omega
   exact h
 
--- TODO: once `Pack1` enforces `A.Nonempty`, the `card = 0` branch becomes unreachable.
--- Then we can delete `Qcorr_handle_A_empty` and simplify wiring.
-
-
-/--
-Helper lemma: in the DR1 world, if a head exists then the premise is unique.
-
-This is used only at the wiring layer: once we know `HasHead1 P h`, DR1 forces
-`(prem h).card = 1`.
--/
-theorem prem_card_eq_one_of_hasHead1
-  (F : HornWithForbid α) (h : α) :
-  HasHead1 F h → (F.H.prem h).card = 1 := by
-  intro hHead
-  have hle : (F.H.prem h).card ≤ 1 := by
-    simpa using (F.hDR1 h)
-  have hpos : 0 < (F.H.prem h).card := by
-    exact Finset.card_pos.mpr hHead
-  have hone_le : 1 ≤ (F.H.prem h).card :=
-    Nat.succ_le_of_lt hpos
-  exact Nat.le_antisymm hle hone_le
-
-/-- Noncomputably pick a premise for head `h` in a forbid-pack, assuming `HasHead1`. -/
-noncomputable def choose_prem1
-  (F : HornWithForbid α) (h : α) (hHead : HasHead1 P h) : Finset α :=
-  Classical.choose hHead
-
-@[simp] theorem choose_prem1_mem
-  (F : HornWithForbid α)  (h : α) (hHead : HasHead1 F h) :
-  choose_prem1 (α := α) F h hHead ∈ F.H.prem h :=
-  Classical.choose_spec hHead
-
-/-- Under DR1, the chosen premise is the unique premise (cardinality form). -/
-@[simp] theorem prem_card_eq_one_of_choose_prem1
-  (F : HornWithForbid α) (h : α) (hHead : HasHead1 F h) :
-  (F.H.prem h).card = 1 :=
-by
-  exact prem_card_eq_one_of_hasHead1 (α := α) (F := F) (h := h) hHead
-
---theorem Qcorr_handle_A_singleton (F : HornWithForbid α) (n : Nat) (P : Pack0 α) (h : α) :
 
 end Dr1nds

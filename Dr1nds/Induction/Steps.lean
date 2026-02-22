@@ -44,12 +44,28 @@ Parallel なら独立核へ、NoParallel なら SC を取り 3-way split。
 -/
 theorem Q_step0
   (n : Nat):
-   (∀ P : Pack0 α,Q n P) → (∀ P : Pack0 α,Q (n+1) P) := by
-  intro hQ P
+   (∀ P : Pack0 α,(P.H.U.card = n → Q n P)) → (∀ P : Pack0 α,P.H.U.card = n+1 → Q (n+1) P) := by
+  intro hQ P hn
   classical
   by_cases hPar : Parallel0 P
   · -- parallel branch（独立核）
-    exact Q_succ_of_parallel (α := α) (n := n) (P := P) hPar (hQ P)
+    obtain ⟨P',hP⟩ := Q_succ_of_parallel (α := α) (n := n + 1) (P := P) hn hPar
+    simp at hP
+    dsimp [Q]
+    intro h
+    specialize hQ P'
+    specialize hQ hP.1
+    dsimp [Q] at hQ
+    simp_all only [forall_const]
+    obtain ⟨w, h_1⟩ := hPar
+    obtain ⟨left, right⟩ := hP
+    obtain ⟨w_1, h_1⟩ := h_1
+    obtain ⟨left_1, right_1⟩ := h_1
+    obtain ⟨left_2, right_1⟩ := right_1
+    subst left
+    simp_all only [ne_eq]
+    exact right.trans hQ
+
   · -- no-parallel branch：SC を取って分岐
     have hNP : NoParallel0 P := by
       -- NOTE (設計メモ): 現在 NoParallel0 は abbrev True なので trivial。
@@ -79,7 +95,7 @@ Parallel なら独立核へ、NoParallel なら
 |A|=1 を専用核、|A|≥2 を “A 内 SC” で進める。
 -/
 noncomputable def Qcorr_Singleton_HasHead {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:HasHead1 F a):
-    ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr (F.H.U.card - 1)) ≤ (F'.NDS_corr F.H.U.card)
+    ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (F'.NDS_corr (F.H.U.card - 1))
 := sorry
 
 noncomputable def Qcorr_Singleton_NoHead {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:¬HasHead1 F a):
@@ -129,11 +145,7 @@ theorem Qcorr_step1
         --片方が集合族のNDSで、片方が表示のNDSなので変換する必要がある。変換は定義を展開すればいい。
         dsimp [HornWithForbid.NDS_corr] at hF
         dsimp [HornWithForbid.BaseC] at hF
-        search_proof
-
-
-
-
+        exact Int.le_trans hF hQcorr
 
       · --  aがheadのルールがないとき。
         --ここで閉包をとりたい。
@@ -142,8 +154,9 @@ theorem Qcorr_step1
     · -- A.card≥2（A 内 SC を取って進める）
       ---禁止集合を閉集合に変えたものを作る必要がある。
       let h := choose_SC_in_forbid (α := α) F hNP
-      have hmem : h ∈ F.F := choose_SC_in_forbid_mem (α := α) F
-      have hSC : IsSC1 F h := choose_SC_in_forbid_spec (α := α) F
+      have hmem : h ∈ F.F := choose_SC_in_forbid_mem (α := α) F hNP
+      have hSC : IsSC1 F h := choose_SC_in_forbid_spec (α := α) F hNP
+
       by_cases hs:HasHead1 F h
       · exact Qcorr_ge2_HasHead (α := α) (n := n) (P := P) (h := h) hSC hmem hSC
       · exact Qcorr_ge2_NoHead (α := α) (n := n) (P := P) (h := h) hSC hmem hSC

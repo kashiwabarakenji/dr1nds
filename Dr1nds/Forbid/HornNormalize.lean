@@ -194,5 +194,43 @@ lemma nds_corr_le_of_normalized_le
 
 end InductiveNDSCorr
 
+---------------------------------
+
+noncomputable def ClosureForbid (F: HornWithForbid α) : HornWithForbid α where
+  H := F.H
+  hDR1 := F.hDR1
+  hNEP := F.hNEP
+  F := F.H.closure F.F
+  F_subset_U := by
+    unfold closure
+    simp_all only [Finset.filter_subset]
+  F_nonempty := by
+    have :F.F ⊆ F.H.closure F.F := by
+      apply subset_closure
+      simp_all only [HornWithForbid.F_subset_U]
+    have ne: F.F.Nonempty := by
+      exact F.F_nonempty
+    exact ne.mono this
+
+theorem closureForbid_NDS_corr_spec (F: HornWithForbid α) :
+  NDS_corr n (F.FixSet) ≤ NDS_corr n (ClosureForbid F).FixSet := by
+  let F' := ClosureForbid F
+  have eq : Hole F.H.FixSet F.F = Hole F'.H.FixSet F'.F := by
+    dsimp [Hole]
+    ext X
+    constructor
+    · intro hX
+      simp
+      simp at hX
+      dsimp [F']
+      sorry
+  dsimp [HornWithForbid.FixSet]
+  simp
+  exact ge_of_eq (congrArg (NDS_corr n) (id (Eq.symm eq)))
+
+
+
+
+
 end HornNF
 end Dr1nds
