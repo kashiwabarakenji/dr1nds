@@ -2,15 +2,14 @@
 
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Powerset
-import Dr1nds.S0_CoreDefs
-import Dr1nds.S1_Families
+import Dr1nds.SetFamily.CoreDefs
+import Dr1nds.SetFamily.SetFamily
 import Dr1nds.ClosureSystem.Basic
 --import LeanCopilot
 
 namespace Dr1nds
 
 variable {α : Type} [DecidableEq α]
-
 
 @[simp]
 lemma mem_Tr {u : α} {C : Finset (Finset α)} {Y : Finset α} :
@@ -24,11 +23,10 @@ lemma mem_Tr {u : α} {C : Finset (Finset α)} {Y : Finset α} :
   1. SetFamily structure
 ============================================================ -/
 
-
-
 namespace SetFamily
 
 variable {F : SetFamily α}
+
 
 /-- Trace of a SetFamily at u. -/
 def trace (F : SetFamily α) (u : α) : SetFamily α :=

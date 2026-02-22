@@ -1,51 +1,16 @@
 -- Dr1nds/Induction/LocalKernels.lean
 import Mathlib.Tactic
-import Dr1nds.S0_CoreDefs
 import Dr1nds.Horn.HornTrace
-import Dr1nds.Horn.HornNormalize
+import Dr1nds.Forbid.HornNormalize
 import Dr1nds.Forbid.Basic
 import Dr1nds.Forbid.HornWithForbid
 import Dr1nds.Forbid.HornBridge
 import Dr1nds.Forbid.Singleton
 import Dr1nds.Induction.Statements
-import LeanCopilot
 set_option maxHeartbeats 10000000
 
 namespace Dr1nds
 variable {α : Type} [DecidableEq α]
-
-/-!
-# Induction/LocalKernels.lean (S11 aggregator)
-
-This file is the **single entry point** for the induction wiring (`Induction/Steps.lean`).
-
-## Policy & Design (Reflecting User Requirements)
-1. **SetFamily with Universe**: We assume `HornNF` and `FixSet` carry the universe information `U`.
-   `NDS` and `NDS_corr` calculations depend on this universe.
-2. **NEP**: We distinguish between NEP of the family and NEP of the rules.
-3. **Horn Rules**: We do *not* assume DR1 or Head-Full initially for the general `HornNF` structure.
-   - **Head-free**: No rule has head `v`. In this case, deletion = trace.
-   - **DR1**: Each head has at most one premise.
-   - **Parallel**: Defined via closure (`u ∈ cl v` and `v ∈ cl u`).
-   However, `Pack1` enforces `DR1` via hypothesis `hDR1`.
-4. **Hole Family**: A family with forbid set `A` is `Hole(D, A)`. `D` is a closed family (written by Horn rules).
-   `Pack1` represents this.
-5. **Closure of A**: `Pack1.A` is the closure of the raw forbid set. Taking closure does not change the hole family.
-6. **Normalization**: Removing rules that contain `A` (subset of premise) does not change the hole family (normalization).
-   `NDS_corr` does not decrease under this normalization (`ndscorr_singleton_normalize_le`).
-   We prove non-positivity for the normalized system, which implies it for the original.
-7. **Induction Strategy**:
-   - Branch on `|A|=1` vs `|A| >= 2`.
-   - `|A|=1`: Use normalization and deletion (trace).
-   - `|A|>=2`: Use SC contraction (monotone).
-
-## Contract (frozen)
-- `Steps.lean` performs only case splits and calls kernels from this file.
-- All heavy mathematics lives in *kernels* here (currently frozen as `axiom`).
-- Kernels must never mix the two worlds:
-  * `Pack0` (forbid-free)
-  * `Pack1` (with one forbid set `A`)
--/
 
 -- =====================================
 -- (S) Predicate placeholders (to be refined)
@@ -86,14 +51,10 @@ abbrev IsSC1 (P : Pack1 α) (h : α) : Prop := True
 /- With-forbid version of head-existence. -/
 def HasHead1 (P : Pack1 α) (h : α) : Prop :=
   (P.S.H.prem h).Nonempty
-abbrev UnaryHead1 (P : Pack1 α) (h v : α) : Prop := True
-abbrev NonUnaryHead1 (P : Pack1 α) (h : α) : Prop := True
 
 /-- Convenience: "no head" means the negation of `HasHead*`. -/
 abbrev NoHead0 (P : Pack0 α) (h : α) : Prop := ¬ HasHead0 P h
 abbrev NoHead1 (P : Pack1 α) (h : α) : Prop := ¬ HasHead1 P h
-
-
 /-
 (API) Trace packs for singleton reduction.
 
@@ -636,7 +597,7 @@ axiom Qcorr_branch_A_ge2_hasHead
   (n : Nat) (P : Pack1 α) (h : α) :
   IsSC1 P h → h ∈ P.A → HasHead1 P h → Qcorr n P → Qcorr (n+1) P
 
-#print axioms Dr1nds.Qcorr_handle_A_singleton
+
 
 
 end Dr1nds

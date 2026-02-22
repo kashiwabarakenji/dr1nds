@@ -1,12 +1,10 @@
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
-import Dr1nds.S0_CoreDefs
-import Dr1nds.S1_Families
 import Dr1nds.Horn.Horn   -- HornNF
 import Dr1nds.Horn.HornTrace
 import Dr1nds.Horn.HornContraction
 import Dr1nds.Horn.HornClosure
-import LeanCopilot
+import Dr1nds.Forbid.Basic
 
 namespace Dr1nds
 
@@ -89,8 +87,9 @@ def HornWithForbid.contraction (S : HornWithForbid α) (v : α)
         simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset,
           Finset.singleton_subset_iff, Finset.subset_singleton_iff, not_or, ↓reduceIte, Finset.notMem_empty]
       ·
-        simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset, Finset.singleton_subset_iff,
-          Finset.subset_singleton_iff, not_or, ↓reduceIte, Finset.mem_image, subset_refl, Finset.notMem_empty]
+        simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset,
+          Finset.singleton_subset_iff, Finset.subset_singleton_iff, not_or, ↓reduceIte,
+          Finset.mem_image]
         obtain ⟨a,ha⟩ := P
         have : a ≠ ∅ := by
           intro hcon
@@ -141,10 +140,66 @@ The `FixSet` of a contracted `HornWithForbid` system is the contraction of its o
 theorem contract_FixSet_eq (S : HornWithForbid α) (v : α)
   (h_nonempty : (S.F.erase v).Nonempty)
   (h_sc : {v} ∈ S.FixSet) :
-  (S.contraction v h_nonempty h_sc).FixSet = con v S.FixSet := by
-  -- This proof requires showing that `Hole` and `contract` commute,
-  -- and that `FixSet (H.contract v)` is related to `(FixSet H).contract v`.
-  sorry
+  (S.contraction v h_nonempty h_sc).FixSet = Con v S.FixSet := by
+  classical
+  have hvU : v ∈ S.H.U := by
+    have hsingleton : ({v} : Finset α) ∈ HornNF.FixSet S.H :=
+      (HornWithForbid.mem_FixSet_withForbid_iff S {v}).1 h_sc |>.1
+    have hpow : ({v} : Finset α) ∈ S.H.U.powerset := (mem_FixSet_iff S.H {v}).1 hsingleton |>.1
+    have hsubset : ({v} : Finset α) ⊆ S.H.U := by
+      simpa [Finset.mem_powerset] using hpow
+    exact hsubset (by simp)
+  ext X
+  constructor
+  · intro hX
+    have hXmem : X ∈ HornNF.FixSet (S.H.contraction v) :=
+      (HornWithForbid.mem_FixSet_withForbid_iff (S.contraction v h_nonempty h_sc) X).1 hX |>.1
+    have hXnot : ¬ S.F.erase v ⊆ X :=
+      (HornWithForbid.mem_FixSet_withForbid_iff (S.contraction v h_nonempty h_sc) X).1 hX |>.2
+    have hXcon : X ∈ Con v (HornNF.FixSet S.H) := by
+      have hEq := contraction_fix_equiv (H := S.H) (x := v) hvU
+      simpa [HornWithForbid.contraction, hEq] using hXmem
+    rcases Finset.mem_image.mp hXcon with ⟨Y, hYfilt, hYX⟩
+    rcases Finset.mem_filter.mp hYfilt with ⟨hYfix, hvY⟩
+    have hYnotF : ¬ S.F ⊆ Y := by
+      intro hFsubY
+      apply hXnot
+      intro z hz
+      have hz' := Finset.mem_erase.mp hz
+      have hzYerase : z ∈ Y.erase v := Finset.mem_erase.mpr ⟨hz'.1, hFsubY hz'.2⟩
+      simpa [hYX] using hzYerase
+    have hYmem : Y ∈ S.FixSet :=
+      (HornWithForbid.mem_FixSet_withForbid_iff S Y).2 ⟨hYfix, hYnotF⟩
+    apply Finset.mem_image.mpr
+    refine ⟨Y, ?_, hYX⟩
+    exact Finset.mem_filter.mpr ⟨hYmem, hvY⟩
+  · intro hX
+    rcases Finset.mem_image.mp hX with ⟨Y, hYfilt, hYX⟩
+    rcases Finset.mem_filter.mp hYfilt with ⟨hYmem, hvY⟩
+    have hYbase : Y ∈ HornNF.FixSet S.H :=
+      (HornWithForbid.mem_FixSet_withForbid_iff S Y).1 hYmem |>.1
+    have hYnotF : ¬ S.F ⊆ Y :=
+      (HornWithForbid.mem_FixSet_withForbid_iff S Y).1 hYmem |>.2
+    have hXconBase : X ∈ Con v (HornNF.FixSet S.H) := by
+      apply Finset.mem_image.mpr
+      refine ⟨Y, Finset.mem_filter.mpr ⟨hYbase, hvY⟩, hYX⟩
+    have hXmem : X ∈ HornNF.FixSet (S.H.contraction v) := by
+      have hEq := contraction_fix_equiv (H := S.H) (x := v) hvU
+      simpa [HornWithForbid.contraction, hEq] using hXconBase
+    have hXnot : ¬ S.F.erase v ⊆ X := by
+      intro hEraseSub
+      apply hYnotF
+      intro s hs
+      by_cases hsv : s = v
+      · simpa [hsv] using hvY
+      · have hsErase : s ∈ S.F.erase v := Finset.mem_erase.mpr ⟨hsv, hs⟩
+        have hsX : s ∈ X := hEraseSub hsErase
+        have hsYerase : s ∈ Y.erase v := by simpa [hYX] using hsX
+        exact (Finset.mem_erase.mp hsYerase).2
+    exact (HornWithForbid.mem_FixSet_withForbid_iff (S.contraction v h_nonempty h_sc) X).2
+      ⟨hXmem, hXnot⟩
+
+
 
 /- ------------------------------------------------------------
   基本補題
@@ -208,7 +263,7 @@ lemma empty_mem_Hole_iff
     rcases hA with ⟨a, haA⟩
     intro hsub
     have : a ∈ (∅ : Finset α) := hsub haA
-    simpa using this
+    exact (List.mem_nil_iff a).mp (hsub haA)
   simp [Hole, hnot]
 
 
@@ -240,15 +295,12 @@ lemma closure_subset_iff_subset_of_isClosed
   HornNF.closure H A ⊆ X ↔ A ⊆ X := by
   classical
   constructor
-  · intro hcl
+  · intro hcl a ha
     -- A ⊆ closure(A) ⊆ X
-    intro a ha
     have : a ∈ HornNF.closure H A :=
       (HornNF.subset_closure (H := H) (X := A) hA) ha
     exact hcl this
-  · intro hAX
-    -- minimality of closure: any closed superset contains the closure
-    intro x hx
+  · intro hAX x hx
     -- unfold membership in `closure`
     have hx_prop : ∀ Y : Finset α, HornNF.IsClosed H Y → A ⊆ Y → x ∈ Y :=
       (Finset.mem_filter.mp hx).2

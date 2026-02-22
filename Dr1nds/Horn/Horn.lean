@@ -3,8 +3,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Data.Fintype.Card
 import Mathlib.Data.Finset.Powerset
---import Dr1nds.S1_HornDefs
---import LeanCopilot
+import LeanCopilot
 
 namespace Dr1nds
 
@@ -102,7 +101,7 @@ lemma HornNF.isClosed_empty_of_isNEP
     apply Finset.eq_empty_iff_forall_notMem.2
     intro x hx
     have : x ∈ (∅ : Finset α) := hPsub hx
-    simpa using this
+    exact (List.mem_nil_iff x).mp (hPsub hx)
   -- contradict NEP (since `P = ∅` would mean an empty premise appears)
   have : (∅ : Finset α) ∈ H.prem h := by
     simpa [hPempty] using hP
@@ -150,7 +149,8 @@ lemma HornNF.empty_mem_FixSet_of_isNEP
   -- `∅ ∈ U.powerset`
   have : (∅ : Finset α) ⊆ H.U := by
     intro x hx
-    simpa using hx
+    exfalso
+    exact (List.mem_nil_iff x).mp hx
   exact Finset.mem_powerset.2 this
 
 
@@ -163,8 +163,10 @@ lemma HornNF.isNEP_of_isClosed_empty
   intro h hempty
   have : h ∈ (∅ : Finset α) := hClosed (h := h) (P := (∅ : Finset α)) hempty (by
     intro x hx
-    simpa using hx)
-  simpa using this
+    exact hx
+    )
+  exfalso
+  exact (List.mem_nil_iff h).mp (hClosed hempty fun ⦃a⦄ a_1 => a_1)
 
 /-- `H` is NEP iff the empty set is closed w.r.t. `H`. -/
 lemma HornNF.isNEP_iff_isClosed_empty
@@ -262,7 +264,7 @@ def HornNF.deleteRules (H : HornNF α) (v : α) : HornNF α :=
     by_cases hh : h = v
     · subst hh
       -- prem v = ∅ in the deletion world, so membership is impossible
-      simpa using hP
+      simp at hP
     ·
       -- eliminate the `if` by rewriting with `hh`
       have hPfilter : P ∈ (H.prem h).filter (fun Q => v ∉ Q) := by
@@ -287,7 +289,7 @@ def HornNF.deleteRules (H : HornNF α) (v : α) : HornNF α :=
     · subst hh
       -- prem v = ∅ in the deletion world, so Nonempty is impossible
       rcases hne with ⟨P, hP⟩
-      simpa using hP
+      simp at hP
     ·
       -- if prem_del h is nonempty, then prem h is nonempty
       have hne' : (H.prem h).Nonempty := by
@@ -304,7 +306,7 @@ def HornNF.deleteRules (H : HornNF α) (v : α) : HornNF α :=
     by_cases hh : h = v
     · subst hh
       -- prem v = ∅ in the deletion world, so membership is impossible
-      simpa using hP
+      simp at hP
     ·
       have hP' : P ∈ H.prem h := by
         simp_all only [↓reduceIte, Finset.mem_filter]
@@ -322,36 +324,14 @@ def HornNF.deleteRules (H : HornNF α) (v : α) : HornNF α :=
     (HornNF.deleteRules H v).prem h = (H.prem h).filter (fun P => v ∉ P) := by
   simp [HornNF.deleteRules, hh]
 
-/-
-Head-free case:
-If a head `v` has no premises in `H`,
-then rule-level deletion at `v` coincides with
-simple filtering of premises (i.e. no rule interaction occurs).
 
-This is the formal "head-free deletion" statement
-used in the Del=Hole plan.
--/
-lemma deleteRules_head_free
-    (H : HornNF α)
-    (v : α)
-    (hfree : (H.prem v) = ∅) :
-    HornNF.deleteRules H v =
-    { U    := H.U.erase v
-      prem := fun h =>
-        if h = v then ∅ else (H.prem h).filter (fun P => v ∉ P)
-      prem_subset_U := (HornNF.deleteRules H v).prem_subset_U
-      head_mem_U    := (HornNF.deleteRules H v).head_mem_U
-      nf            := (HornNF.deleteRules H v).nf } := by
-  classical
-  -- This is definitional; no interaction occurs when prem v = ∅.
-  rfl
 
 /-
 ------------------------------------------------------------
   2d. DR1 ⇒ premise uniqueness for a fixed head (Q1)
 ------------------------------------------------------------ -/
 
-
+---DR1でどっちも前提ならば一致する。下で使っている。
 lemma prem_eq_of_mem_of_mem
     (H : HornNF α) (v : α)
     (hDR1 : HornNF.IsDR1 H)
@@ -364,6 +344,7 @@ lemma prem_eq_of_mem_of_mem
   exact hP
   exact hQ
 
+---下で使っている。
 lemma prem_card_eq_one_of_DR1_of_nonempty
     (H : HornNF α) (v : α)
     (hDR1 : HornNF.IsDR1 H)
@@ -375,7 +356,7 @@ lemma prem_card_eq_one_of_DR1_of_nonempty
   have hge1 : 1 ≤ (H.prem v).card := Nat.succ_le_of_lt hpos
   exact Nat.le_antisymm hle1 hge1
 
-
+---DR1でhead-freeでなければ、head次数は1となる。HornBridgeで使っている。
 lemma prem_card_eq_one_of_DR1_of_ne_empty
     (H : HornNF α) (v : α)
     (hDR1 : HornNF.IsDR1 H)
@@ -385,6 +366,7 @@ lemma prem_card_eq_one_of_DR1_of_ne_empty
   apply prem_card_eq_one_of_DR1_of_nonempty (H := H) (v := v) (hDR1 := hDR1)
   exact Finset.nonempty_iff_ne_empty.mpr hne
 
+---現状使ってない。
 /-- Under DR1, nonempty `prem v` has a unique premise element. -/
 lemma exists_unique_prem_of_DR1_of_nonempty
     (H : HornNF α) (v : α)
@@ -398,6 +380,7 @@ lemma exists_unique_prem_of_DR1_of_nonempty
   intro Q hQ
   exact prem_eq_of_mem_of_mem (H := H) (v := v) (hDR1 := hDR1) (hP := hQ) (hQ := hP)
 
+---現状使ってなさそう。DR1だったら、Pが前提であれば、前提の集合は、それだけになる。
 /-- Under DR1, membership `P ∈ prem v` forces `prem v = {P}`. -/
 lemma prem_eq_singleton_of_DR1_of_mem
     (H : HornNF α) (v : α)
@@ -411,7 +394,7 @@ lemma prem_eq_singleton_of_DR1_of_mem
   constructor
   · intro hQ
     have : Q = P := prem_eq_of_mem_of_mem (H := H) (v := v) (hDR1 := hDR1) (hP := hQ) (hQ := hP)
-    simpa [this]
+    exact Finset.mem_singleton.mpr this
   · intro hQ
     -- Q ∈ {P} implies Q = P
     simpa using (by
@@ -444,5 +427,30 @@ def Horn.toHornNF (_ : Horn α) : HornNF α :=
       simp at hP
   }
 -/
+
+/-
+Head-free case:
+If a head `v` has no premises in `H`,
+then rule-level deletion at `v` coincides with
+simple filtering of premises (i.e. no rule interaction occurs).
+
+This is the formal "head-free deletion" statement
+used in the Del=Hole plan.
+----hfreeの仮定なしでなりたつので使う時は仮定をとって、名前を変えて使う。現状利用してない。
+-/
+lemma deleteRules_head_free
+    (H : HornNF α)
+    (v : α)
+    (hfree : (H.prem v) = ∅) :
+    HornNF.deleteRules H v =
+    { U    := H.U.erase v
+      prem := fun h =>
+        if h = v then ∅ else (H.prem h).filter (fun P => v ∉ P)
+      prem_subset_U := (HornNF.deleteRules H v).prem_subset_U
+      head_mem_U    := (HornNF.deleteRules H v).head_mem_U
+      nf            := (HornNF.deleteRules H v).nf } := by
+  classical
+  -- This is definitional; no interaction occurs when prem v = ∅.
+  rfl
 
 end Dr1nds

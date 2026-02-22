@@ -3,9 +3,9 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Data.Int.Basic
 import Mathlib.Algebra.BigOperators.Group.Finset.Basic
---import LeanCopilot
+import Mathlib.Tactic
 
-import Dr1nds.S0_CoreDefs
+import Dr1nds.SetFamily.CoreDefs
 
 namespace Dr1nds
 
@@ -17,7 +17,6 @@ variable {α : Type} [DecidableEq α]
   Policy:
     * base defs: S0_CoreDefs
     * this file fixes the I/O of the accounting identity
-    * proofs can be filled later (axiom / lemma skeleton)
 ============================================================ -/
 
 namespace Accounting
@@ -57,8 +56,7 @@ lemma w_succ (n : Nat) (X : Finset α) :
   【場所】
   ここで証明してもよいし、基本ファイルに移してもよい。
   -/
-  simp [Dr1nds.w, Nat.succ_eq_add_one, Int.natCast_succ, sub_eq_add_neg,
-    add_assoc, add_left_comm, add_comm]
+  simp [Dr1nds.w, Nat.succ_eq_add_one, sub_eq_add_neg, add_assoc, add_left_comm, add_comm]
 
 omit [DecidableEq α] in
 /-- succ shift for NDS: NDS (n+1) C = NDS n C - |C| -/
@@ -87,7 +85,7 @@ lemma w_of_mem_erase
       -- In this case, `n = k.succ` and `n-1 = k`.
       -- Use `card_erase_add_one` to relate `|X|` and `|X.erase u|`.
       -- Then it is a direct calculation from the definition of `w`.
-      simp [Dr1nds.w, Int.natCast_succ, sub_eq_add_neg, add_assoc, add_left_comm, add_comm]
+      simp [Dr1nds.w, sub_eq_add_neg, add_assoc, add_left_comm, add_comm]
       -- 2. (k + 1 - 1) を k に簡約する
       -- 3. u ∈ X なので、X.erase u の濃度は X.card - 1 になることを適用
       rw [Finset.card_erase_of_mem hu]
@@ -217,12 +215,12 @@ lemma sum_filter_mem_eq_sum_image_con
   (n : Nat) (C : Finset (Finset α)) (u : α) :
   (∑ X ∈ (C.filter (fun X => u ∈ X)), w (α := α) n (X.erase u))
     =
-  (∑ Y ∈ (con (α := α) u C), w (α := α) n Y) := by
+  (∑ Y ∈ (Con (α := α) u C), w (α := α) n Y) := by
   classical
   -- s = {X ∈ C | u∈X}, g = erase u
   -- sum_image:  ∑ y in s.image g, f y = ∑ x in s, f (g x)
   -- これを左右どちらに合わせるかだけ
-  simpa [con] using
+  simpa [Con] using
     (Finset.sum_image
       (s := C.filter (fun X => u ∈ X))
       (f := fun Y => w (α := α) n Y)
@@ -246,7 +244,7 @@ lemma sum_filter_mem_eq_sum_image_con
   これは erase の injectivity から導かれる。
 -/
 lemma card_con_eq_deg (C : Finset (Finset α)) (u : α) :
-  (con (α := α) u C).card = deg (α := α) C u :=
+  (Con (α := α) u C).card = deg (α := α) C u :=
 by
   classical
   -- We count `con u C` by exhibiting a bijection between
@@ -255,9 +253,9 @@ by
   --   t := con u C = s.image (fun X => X.erase u).
   -- The map is `X ↦ X.erase u`, which is injective on `u ∈ X`.
   let s : Finset (Finset α) := C.filter (fun X => u ∈ X)
-  let t : Finset (Finset α) := con (α := α) u C
+  let t : Finset (Finset α) := Con (α := α) u C
   have ht : t = s.image (fun X : Finset α => X.erase u) := by
-    simp [t, s, con]
+    simp [t, s, Con]
   -- Use `Finset.card_bij` (injective-on-domain is enough; no global injectivity needed).
   have hcard : s.card = t.card := by
     -- Bijection data
@@ -293,8 +291,8 @@ by
   S0_CoreDefs の定義に合わせて調整する必要あり。
 -/
 lemma sum_con_def (C : Finset (Finset α)) (u : α) :
-  con (α := α) u C = (C.filter (fun X => u ∈ X)).image (fun X => X.erase u) := by
-  simp [con]
+  Con (α := α) u C = (C.filter (fun X => u ∈ X)).image (fun X => X.erase u) := by
+  simp [Con]
   /-
   【用途】
   con の定義の展開に使い、CON_ID のステップ3の和の書き換えに役立てる。
@@ -348,14 +346,10 @@ lemma ndeg_eq_deg_sub_card_Del (C : Finset (Finset α)) (u : α) :
   -- Now unfold `ndeg` and compute.
   -- The intended normal form is `deg - Del.card`.
   -- This works for the standard definition `ndeg = 2*deg - |C|`.
-
-  simp [Dr1nds.ndeg, hcard]
-  simp_all only [Int.natCast_add]
-  norm_cast
-  simp_all only [Int.natCast_mul, Int.cast_ofNat_Int, Int.natCast_add]
-  omega
-
-
+  simp_all only [Nat.cast_add]
+  rw [ndeg]
+  simp_all only [Nat.cast_add]
+  ring
 
 /- ============================================================
   4. Main theorem: CON_ID
@@ -371,12 +365,74 @@ theorem CON_ID
     (n : Nat) (hn : 1 ≤ n) (C : Finset (Finset α)) (u : α) :
     NDS (α := α) n C
       =
-    NDS (α := α) (n - 1) (con (α := α) u C)
+    NDS (α := α) (n - 1) (Con (α := α) u C)
       +
     NDS (α := α) (n - 1) (Del (α := α) u C)
       +
     ndeg (α := α) C u := by
-  sorry
+  dsimp [NDS]
+  dsimp [ndeg,deg]
+  dsimp [Con,Del]
+  let ideq := sum_filter_mem_add_sum_filter_not_mem (n-1) C u
+  dsimp [w] at ideq
+  let A := C.filter (fun X => u ∈ X)
+  let B := C.filter (fun X => u ∉ X)
+  let D := Finset.image (fun X => X.erase u) A
+
+  have sum_split : ∑ X ∈ C, w n X = ∑ X ∈ A, w n X + ∑ X ∈ B, w n X := by
+    simp only [A, B]
+    exact sum_filter_mem_add_sum_filter_not_mem n C u
+  -- 2) A上: w n X = w (n-1) (X.erase u) + 1
+  have hA_eq : ∀ X ∈ A, w n X = w (n - 1) (X.erase u) + 1 := by
+    intro X hX
+    simp only [A, Finset.mem_filter] at hX
+    simp only [w, Finset.card_erase_of_mem hX.2]
+    ring_nf
+    have :X.card ≥ 1:= by
+      simp_all only [ge_iff_le, Finset.one_le_card, A, B]
+      obtain ⟨left, right⟩ := hX
+      exact ⟨u, right⟩
+    simp_all only [ge_iff_le, Finset.one_le_card, Nat.cast_sub, Nat.cast_one, A, B]
+    obtain ⟨left, right⟩ := hX
+    ring
+
+
+  -- 3) B上: w n X = w (n-1) X - 1
+  have hB_eq : ∀ X ∈ B, w n X = w (n - 1) X - 1 := by
+    intro X hX
+    simp only [w]
+    omega
+  -- 4) A上の和を書き換え
+  have sumA : ∑ X ∈ A, w n X = ∑ X ∈ A, w (n - 1) (X.erase u) + ↑A.card := by
+    rw [Finset.sum_congr rfl hA_eq]
+    rw [Finset.sum_add_distrib, Finset.sum_const]
+    simp_all only [Finset.sum_sub_distrib, Finset.sum_const, Int.nsmul_eq_mul, mul_one,
+      Finset.mem_filter, and_imp, A, B]
+  -- 5) erase の単射性
+  have hinj : ∀ X ∈ A, ∀ Y ∈ A, Finset.erase X u = Finset.erase Y u → X = Y := by
+    intro X hX Y hY heq
+    simp only [A, Finset.mem_filter] at hX hY
+    rw [← Finset.insert_erase hX.2, ← Finset.insert_erase hY.2, heq]
+  -- 6) A上のeraseの和 = D上の和
+  have sumD : ∑ X ∈ A, w (n - 1) (X.erase u) = ∑ X ∈ D, w (n - 1) X := by
+    exact (Finset.sum_image hinj).symm
+  -- 7) B上の和を書き換え
+  have sumB : ∑ X ∈ B, w n X = ∑ X ∈ B, w (n - 1) X - ↑B.card := by
+    rw [Finset.sum_congr rfl hB_eq]
+    rw [Finset.sum_sub_distrib, Finset.sum_const]
+    simp_all only [Finset.sum_sub_distrib, Finset.sum_const, Int.nsmul_eq_mul, mul_one, Finset.mem_filter, and_self,
+      and_imp, A, B, D]
+  -- 8) |A| + |B| = |C|
+  have hcard : (A.card : ℤ) + ↑B.card = ↑C.card := by
+    --have := Finset.filter_card_add_filter_neg_card_eq_card C (fun X => u ∈ X)
+    simp only [A, B]
+    have h := Finset.filter_card_add_filter_neg_card_eq_card (s := C) (p := fun X => u ∈ X)
+    push_cast [← h]
+    simp_all only [Finset.sum_sub_distrib, Finset.sum_const, Int.nsmul_eq_mul, mul_one, Finset.mem_filter, and_self,
+      and_imp, A, B, D]
+  -- 9) 合成
+  rw [sum_split, sumA, sumD, sumB]
+  linarith
 
 /- ------------------------------------------------------------
   5. Assoc-friendly variant
@@ -390,7 +446,7 @@ lemma CON_ID_assoc
   (n : Nat) (hn : 1 ≤ n) (C : Finset (Finset α)) (u : α) :
   NDS (α := α) n C
     =
-  NDS (α := α) (n - 1) (con (α := α) u C)
+  NDS (α := α) (n - 1) (Con (α := α) u C)
     +
   (NDS (α := α) (n - 1) (Del (α := α) u C) + ndeg (α := α) C u) := by
   simpa [add_assoc, add_left_comm, add_comm] using

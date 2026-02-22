@@ -1,8 +1,6 @@
 
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
-import Dr1nds.S0_CoreDefs
-import Dr1nds.S1_Families
 import Dr1nds.Horn.Horn   -- HornNF
 import Dr1nds.Horn.HornTrace
 import Dr1nds.Horn.HornClosure
@@ -48,7 +46,6 @@ IMPORTANT:
 - `Pprem.Nonempty`
 
 So this constructor takes these obligations as explicit arguments.
-This removes the need for axiom-level APIs.
 -/
 noncomputable def traceWithPrem
   (S : HornWithForbid α) (a : α) (Pprem : Finset α)

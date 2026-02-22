@@ -1,8 +1,9 @@
 -- Dr1nds/ClosureSystem/HornClosure.lean
-import Dr1nds.ClosureSystem.ClosureOperator
-import Dr1nds.Horn.Horn
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Powerset
+
+import Dr1nds.ClosureSystem.ClosureOperator
+import Dr1nds.Horn.Horn
 
 namespace Dr1nds
 

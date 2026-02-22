@@ -6,7 +6,6 @@ import Dr1nds.Horn.Horn
 import Dr1nds.Horn.HornClosure
 import Dr1nds.ClosureSystem.Basic
 import Dr1nds.Forbid.Basic
-import LeanCopilot
 
 /-
 ============================================================
@@ -422,9 +421,6 @@ lemma trace_prem_not_mem
   simp_all only [Finset.mem_erase, ne_eq, not_true_eq_false, false_and]
 
 /-- In the trace world at `a`, no premise contains `a` (binder name `Q`).
-
-This is a convenience alias of `trace_prem_not_mem` used to eliminate the
-former `Pack1.noPremContains_forbid` axiom.
 -/
 lemma trace_noPremContains
   (H : HornNF α) (a : α) :
@@ -455,43 +451,6 @@ lemma prem_subset_traceU_of_mem_prem
     exact ha_not hx
   -- combine `x ∈ H.U` and `x ≠ a`.
   exact Finset.mem_erase.mpr ⟨hxa, hxU⟩
-
-
-/--
-If `H` satisfies `IsNEP` (i.e. it has no empty premise), then any specific premise
-`Pprem ∈ H.prem a` must be nonempty.
-
-This is the minimal lemma needed to discharge the `hPne : Pprem.Nonempty` obligation
-from `IsNEP` + membership.
--/
-lemma prem_nonempty_of_isNEP_of_mem_prem
-  (H : HornNF α) {a : α} {Pprem : Finset α}
-  (hNEP : HornNF.IsNEP (α := α) H)
-  (hmem : Pprem ∈ H.prem a) :
-  Pprem.Nonempty := by
-  classical
-  -- prove `Pprem ≠ ∅`, otherwise it contradicts `IsNEP`.
-  have hne : Pprem ≠ (∅ : Finset α) := by
-    intro hEq
-    have : (∅ : Finset α) ∈ H.prem a := by
-      simpa [hEq] using hmem
-    exact hNEP (h := a) this
-  exact Finset.nonempty_iff_ne_empty.mpr hne
-
-/--
-A small package lemma: from `IsNEP` and `Pprem ∈ H.prem a`, we can produce the
-first two standard arguments used to build a trace-with-prem pack: subset-to-trace-U
-and nonemptiness.
-
-This is intended to replace the ad-hoc `tracePack1WithPrem_obligations` axiom piecewise.
--/
-theorem tracePack1WithPrem_obligations_core
-  (H : HornNF α) (a : α) (Pprem : Finset α)
-  (hNEP : HornNF.IsNEP (α := α) H)
-  (hmem : Pprem ∈ H.prem a) :
-  (Pprem ⊆ (H.trace a).U) ∧ Pprem.Nonempty := by
-  refine ⟨prem_subset_traceU_of_mem_prem (α := α) (H := H) (a := a) (Pprem := Pprem) hmem, ?_⟩
-  exact prem_nonempty_of_isNEP_of_mem_prem (α := α) (H := H) (a := a) (Pprem := Pprem) hNEP hmem
 
 
 /-- `trace` does not create empty premises: `IsNEP` is preserved by trace. -/
@@ -586,7 +545,6 @@ lemma empty_not_mem_Up_singleton
   (∅ : Finset α) ∉ Up (α := α) C ({a} : Finset α) := by
   classical
   simp [Dr1nds.Up]
-
 
 end HornNF
 end Dr1nds

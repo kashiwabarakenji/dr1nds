@@ -3,11 +3,9 @@ import Mathlib.Data.Finset.Card
 import Mathlib.Tactic
 import Dr1nds.Forbid.Basic
 import Dr1nds.Forbid.HornWithForbid
-import Dr1nds.S6_ConDelNdegId
+import Dr1nds.Forbid.ForbidTrace
+import Dr1nds.SetFamily.ConDelNdegId
 import Dr1nds.Horn.HornTrace
---import Dr1nds.Horn.HornNormalize
---import LeanCopilot
-
 
 namespace Dr1nds
 open scoped BigOperators
@@ -55,14 +53,6 @@ variable {α : Type} [DecidableEq α]
 (D) Step 形カーネル
   - `qcorr_singleton_noHead_step` / `qcorr_singleton_hasHead_P_step` を
     Induction wiring（LocalKernels / Steps）から呼べる形で提供する。
-
-## 2. 依存の一本化（重要）
-
-- `normalize` は HornTrace 側に閉じる。
-- 本ファイルは `hNoPremV` を引数でもらうだけ。
-- `hNoPremV` の供給は LocalKernels で `Pack1.noPremContains_forbid` を叩いて作る。
-  （将来 `normalize` を theorem 化したら、この axiom を差し替える。）
-
 ================================================================================
 %-/
 
@@ -706,12 +696,6 @@ lemma Qcorr_singleton_hasHead_of_Qcorr_traceP
 If `prem v = ∅` (head-free) we reduce to `NDS ≤ 0` on the trace world.
 If `prem v` is nonempty (has-head) we pick the unique premise `P` (using DR1) and reduce to
 `NDS_corr ≤ 0` on the trace world with forbid `P`.
-
-This lemma is intended as the *only* entry point used by `LocalKernels.lean` for the |A|=1 branch.
-
-NOTE: the proof is provided as a skeleton because the case split and `P` selection policy may vary
-in the project (e.g. you may want an explicit `P` parameter upstream). Replace the `sorry` blocks
-once the upstream API is frozen.
 -/
 lemma Qcorr_singleton_by_trace_cases
   (n : Nat)
@@ -815,24 +799,6 @@ lemma qcorr_singleton_hasHead_P_step
     (hvU := hvU) (hP := hP) (hUnique := hUnique)
     (hNoPremV := hNoPremV) (hQ := hQ_trace)
 
-
-
-/-!
-## (Completion helpers) singleton-forbid steps *with* an explicit `hNoPremV` argument
-
-元々ここは「noNorm（hNoPremV を外から渡さない）」の入口を axiom で置いていましたが、
-`hNoPremV` は一般には `prem v = ∅` からは導出できません。
-（他の head の premise に v が現れ得るため。）
-
-したがって、ここでは axiom を廃止し、
-`hNoPremV` を **明示引数として受け取る** theorem 版を提供します。
-
-- `hNoPremV` の供給は LocalKernels 側で `Pack1.noPremContains_forbid` 等から作る。
-- HornBridge 側はそれを受け取り、既存の `qcorr_singleton_*_step` に落とすだけ。
-- 後で normalize を theorem 化して「内部で hNoPremV を作る」設計に戻したければ、
-  そのときに改めて noNorm 版を別名で追加すればよい。
--/
-
 /-- (theorem) `qcorr_singleton_noHead_step` の `hNoPremV` 明示版。 -/
 lemma qcorr_singleton_noHead_step_noNorm
   (α : Type) [DecidableEq α]
@@ -909,11 +875,5 @@ lemma qcorr_singleton_by_trace_cases_noNorm
       (hUnique := hCard)
       (hNoPremV := hNoPremV)
       (hQ_trace := hQcorr)
-
-
-
-#print axioms Dr1nds.NDS_corr_singleton_head_free_eq
-#print axioms Dr1nds.NDS_corr_singleton_hasHead_P_eq
-#print axioms Dr1nds.HornNF.card_up_fixset_eq_card_fixset_trace
 
 end Dr1nds

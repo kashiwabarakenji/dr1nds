@@ -2,6 +2,7 @@ import Dr1nds.Horn.Horn  -- HornNF 本体（現状 Horn.lean にある前提）
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Data.Finset.Powerset
+import Dr1nds.SetFamily.CoreDefs
 import Dr1nds.Horn.Horn
 
 namespace Dr1nds
@@ -37,7 +38,7 @@ def HornNF.contraction (x : α) (H : HornNF α) : HornNF α :=
     · subst hh
       -- hP : P ∈ (if True then ∅ else ...)
       -- reduce directly to membership in ∅
-      simpa using (by simpa using hP)
+      simp_all only [↓reduceIte, Finset.notMem_empty]
     ·
       -- First, eliminate the `if` without unfolding `HornNF.contraction`
       have hPimg : P ∈ (H.prem h).image (fun Q => Q.erase x) := by
@@ -57,7 +58,7 @@ def HornNF.contraction (x : α) (H : HornNF α) : HornNF α :=
     · subst hh
       -- prem x = ∅ in contraction world
       -- hne cannot hold
-      simpa using (by simpa using hne)
+      simp_all only [↓reduceIte, Finset.not_nonempty_empty]
     ·
       -- If prem_contr h is nonempty, then prem h is nonempty
       have hne' : (H.prem h).Nonempty := by
@@ -75,7 +76,7 @@ def HornNF.contraction (x : α) (H : HornNF α) : HornNF α :=
     by_cases hh : h = x
     · subst hh
       -- prem x = ∅ in contraction world
-      simpa using (by simpa using hP)
+      simp_all only [↓reduceIte, Finset.notMem_empty]
     ·
       have hPimg : P ∈ (H.prem h).image (fun Q => Q.erase x) := by
         simpa [hh] using hP
@@ -111,7 +112,7 @@ def HornNF.contraction (x : α) (H : HornNF α) : HornNF α :=
   layer above.
 
   Future refactor plan:
-    • Move ConSet and erase lemmas to HornContraction.lean
+    • Move con and erase lemmas to HornContraction.lean
     • Move deletion–family equivalence lemmas to HornDeletion.lean
     • Keep this file definition-only (HornNF + basic operations)
 
@@ -124,10 +125,11 @@ open Finset
 -- ConSet
 ------------------------------------------------------------
 
+/- S0_CoreDefsに移動
 def ConSet {α : Type} [DecidableEq α]
   (x : α) (C : Finset (Finset α)) : Finset (Finset α) :=
   (C.filter (fun X => x ∈ X)).image (fun X => X.erase x)
-
+-/
 
 ------------------------------------------------------------
 -- erase 補題
@@ -302,7 +304,7 @@ theorem contraction_fix_equiv_forward
   (hxU : x ∈ H.U)
   {Y : Finset α}
   (hY : Y ∈ HornNF.FixSet (H.contraction x)) :
-  Y ∈ ConSet x (HornNF.FixSet H) := by
+  Y ∈ Con x (HornNF.FixSet H) := by
 
   let X := insert x Y
   classical
@@ -310,7 +312,7 @@ theorem contraction_fix_equiv_forward
   rcases hY with ⟨hYsub, hYclosed⟩
 
   -- We must show Y ∈ ConSet x (HornNF.FixSet H)
-  unfold ConSet
+  unfold Con
   apply Finset.mem_image.mpr
   refine ⟨X, ?hXmem, ?hEq⟩
 
@@ -377,10 +379,10 @@ theorem contraction_fix_equiv_backward
   (x : α)
   (_ : x ∈ H.U)
   {Y : Finset α}
-  (hY : Y ∈ ConSet x (HornNF.FixSet H)) :
+  (hY : Y ∈ Con x (HornNF.FixSet H)) :
   Y ∈ HornNF.FixSet (H.contraction x) := by
 
-  unfold ConSet at hY
+  unfold Con at hY
   rcases Finset.mem_image.mp hY with ⟨X, hXmem, rfl⟩
   rcases Finset.mem_filter.mp hXmem with ⟨hXfix, hxX⟩
 
@@ -440,7 +442,7 @@ theorem contraction_fix_equiv
   (hxU : x ∈ H.U) :
   HornNF.FixSet (H.contraction x)
   =
-  ConSet x (HornNF.FixSet H) := by
+  Con x (HornNF.FixSet H) := by
   apply Finset.ext
   intro Y
   constructor
@@ -462,7 +464,7 @@ by
   by_cases hh : h = x
   · subst hh
     -- prem x = ∅
-    simpa using (show ((H.contraction x).prem x).card ≤ 1 by simp)
+    simp_all only [contraction_prem_self, card_empty, Nat.zero_le]
   ·
     have hcard : (H.prem h).card ≤ 1 := hDR1 h
     have himg : ((H.prem h).image (fun P => P.erase x)).card ≤ (H.prem h).card :=
@@ -485,7 +487,7 @@ by
     -- prem x = ∅
     simpa using (by
       -- hP : P ∈ (H.contraction x).prem x = ∅
-      simpa using hP)
+      simp_all only [contraction_prem_self, notMem_empty])
   ·
     have hPimg : P ∈ (H.prem h).image (fun Q => Q.erase x) := by
       simpa [contraction_prem_of_ne (H := H) (x := x) hh] using hP

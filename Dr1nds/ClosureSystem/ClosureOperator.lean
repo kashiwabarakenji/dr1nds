@@ -3,7 +3,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Powerset
 import Mathlib.Data.Fintype.Defs
 
-import Dr1nds.S1_Families
+import Dr1nds.SetFamily.SetFamily
 
 namespace Dr1nds
 

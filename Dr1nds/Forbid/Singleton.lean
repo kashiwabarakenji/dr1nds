@@ -1,7 +1,7 @@
 -- Dr1nds/Forbid/Singleton.lean
 import Mathlib.Tactic
 
-import Dr1nds.S0_CoreDefs      -- Up, Hole, NDS, NDS_corr
+import Dr1nds.SetFamily.CoreDefs      -- Up, Hole, NDS, NDS_corr
 import Dr1nds.Forbid.Basic     -- singleton lemmas for Up/Hole
 
 namespace Dr1nds
@@ -19,7 +19,7 @@ variable {α : Type} [DecidableEq α]
 
 Horn ルールの「正規化」（例：`a` を前提に含む規則の削除が `Hole/Up` に与える影響）に関する主張は、
 family 単体では仮定を正しく書けないため、このファイルには置かない。
-それらは `Forbid/HornBridge.lean`（Horn 側のデータと一緒に）で lemma/axiom として扱う。
+それらは `Forbid/HornBridge.lean`（Horn 側のデータと一緒に）で lemma として扱う。
 -/
 
 
@@ -136,7 +136,7 @@ lemma int_ofNat_sub_of_le (a b : Nat) (h : b ≤ a) :
   -- `Int.ofNat_sub` expects the `≤` proof.
   simp [Int.ofNat_sub h]
 
-
+omit [DecidableEq α] in
 /-- `card_filter_add_card_filter_not` coerced to `Int`.
 
 This is useful when the surrounding goal is an `Int` identity (e.g. inside NDS/NDS_corr).
@@ -149,7 +149,7 @@ lemma int_card_filter_add_card_filter_not
   have hNat : (s.filter p).card + (s.filter (fun x => ¬ p x)).card = s.card :=
     card_filter_add_card_filter_not (s := s) (p := p)
   -- `simp` rewrites `↑(a+b)` into `↑a + ↑b`
-  simpa [Int.ofNat_add] using congrArg (fun z : Nat => (z : Int)) hNat
+  simpa [Int.natCast_add] using congrArg (fun z : Nat => (z : Int)) hNat
 
 
 omit [DecidableEq α] in
@@ -166,13 +166,5 @@ lemma NDS_succ_add_card
   -- `h : NDS (n+1) C = NDS n C - |C|`
   -- move `|C|` to the left
   linarith
-
-#print axioms Dr1nds.NDS_corr_singleton_unfold
-#print axioms Dr1nds.NDS_corr_singleton_rewrite
-#print axioms Dr1nds.card_filter_add_card_filter_not
-#print axioms Dr1nds.card_up_add_card_hole_singleton
-#print axioms Dr1nds.card_up_singleton_eq
-#print axioms Dr1nds.int_card_up_singleton_eq
-#print axioms Dr1nds.int_ofNat_sub_of_le
 
 end Dr1nds
