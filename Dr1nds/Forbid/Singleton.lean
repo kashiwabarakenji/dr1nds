@@ -16,14 +16,13 @@ variable {α : Type} [DecidableEq α]
 ## Scope
 
 このファイルは **family-level** の等式変形（`Up`/`Hole`/`NDS_corr` の singleton 展開）だけを扱う。
-
-Horn ルールの「正規化」（例：`a` を前提に含む規則の削除が `Hole/Up` に与える影響）に関する主張は、
-family 単体では仮定を正しく書けないため、このファイルには置かない。
-それらは `Forbid/HornBridge.lean`（Horn 側のデータと一緒に）で lemma として扱う。
+HornWithForbidのクラスは扱わないもの。ただし、外のファイルからは現状使われていない。
 -/
 
 
-/-- `NDS_corr n C {a}` の definitional 展開（Up/Hole をそのまま残す版）。 -/
+/-- `NDS_corr n C {a}` の definitional 展開（Up/Hole をそのまま残す版）。
+使ってない。
+-/
 lemma NDS_corr_singleton_unfold
   (n : Nat) (C : Finset (Finset α)) (a : α) :
   NDS_corr (α := α) n C ({a} : Finset α)
@@ -48,6 +47,7 @@ omit [DecidableEq α] in
 /-- `NDS` changes by exactly `|C|` when the ambient size increases by 1.
 
 This is the basic accounting identity used when shifting between `n` and `n-1`.
+下で使っている。
 -/
 lemma NDS_succ_eq_sub_card
   (n : Nat) (C : Finset (Finset α)) :
@@ -65,6 +65,7 @@ omit [DecidableEq α] in
 
 We keep this in the `Dr1nds` namespace because we use it repeatedly when rewriting
 `Up/Hole` for singleton forbids.
+下で使っている。
 -/
 lemma card_filter_add_card_filter_not
   (s : Finset α) (p : α → Prop) [DecidablePred p] :
@@ -73,7 +74,9 @@ lemma card_filter_add_card_filter_not
   simpa using (Finset.filter_card_add_filter_neg_card_eq_card (s := s) (p := p))
 
 
-/-- For singleton forbids, `Up` and `Hole` partition the family. -/
+/-- For singleton forbids, `Up` and `Hole` partition the family.
+下で使っている。
+-/
 lemma card_up_add_card_hole_singleton
   (C : Finset (Finset α)) (a : α) :
   (Up (α := α) C ({a} : Finset α)).card
@@ -87,7 +90,9 @@ lemma card_up_add_card_hole_singleton
   ] using (card_filter_add_card_filter_not (α := Finset α)
         (s := C) (p := fun X : Finset α => a ∈ X))
 
-/-- A rearranged form of `card_up_add_card_hole_singleton`. -/
+/-- A rearranged form of `card_up_add_card_hole_singleton`.
+下で使っている。
+-/
 lemma card_up_singleton_eq
   (C : Finset (Finset α)) (a : α) :
   (Up (α := α) C ({a} : Finset α)).card
@@ -104,6 +109,7 @@ lemma card_up_singleton_eq
 /-- Same as `card_up_singleton_eq`, but coerced to `Int`.
 
 This is convenient when the surrounding goal lives in `Int` (e.g. inside `NDS`).
+使ってない。
 -/
 lemma int_card_up_singleton_eq
   (C : Finset (Finset α)) (a : α) :
@@ -129,6 +135,7 @@ lemma int_card_up_singleton_eq
 
 This lemma is often what remains after rewriting cardinalities and switching between
 `Nat` and `Int` in NDS/NDSCorr calculations.
+--下で使っている。
 -/
 
 lemma int_ofNat_sub_of_le (a b : Nat) (h : b ≤ a) :
@@ -140,6 +147,7 @@ omit [DecidableEq α] in
 /-- `card_filter_add_card_filter_not` coerced to `Int`.
 
 This is useful when the surrounding goal is an `Int` identity (e.g. inside NDS/NDS_corr).
+使ってない。
 -/
 lemma int_card_filter_add_card_filter_not
   (s : Finset α) (p : α → Prop) [DecidablePred p] :
@@ -156,6 +164,7 @@ omit [DecidableEq α] in
 /-- Rearranged form of `NDS_succ_eq_sub_card`.
 
 Often you want to *add back* `|C|` rather than subtract it.
+使ってない。
 -/
 lemma NDS_succ_add_card
   (n : Nat) (C : Finset (Finset α)) :

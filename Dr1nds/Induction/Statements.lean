@@ -52,8 +52,8 @@ def Q (n : Nat) (P : Pack0 α) : Prop :=
 -- forbid あり世界（Pack1）での主命題：`NDS_corr ≤ 0`。
 -- 注意：forbid は常に `Pack1.A = closure(Araw)` を用いる。
 
-def Qcorr (n : Nat) (P : HornWithForbid α) : Prop :=
-  P.H.U.card = n → NDS_corr n P.FixSet ≤ 0
+def Qcorr (n : Nat) (F : HornWithForbid α) : Prop :=
+  F.H.U.card = n → NDS_corr n F.H.FixSet F.F ≤ 0
 
 /-
 Set-family level NEP: the family contains the empty set.

@@ -876,4 +876,17 @@ lemma qcorr_singleton_by_trace_cases_noNorm
       (hNoPremV := hNoPremV)
       (hQ_trace := hQcorr)
 
+---使ってない。LocalKernelsから移してきたが、最終的に使わなければ消してもいいかも。HornWithForbidが登場してないがtraceは入っていて、Holeは登場しているのでHornBridgeあたりか。
+theorem hole_fixset_singleton_eq_hole_trace_prem
+  (H : HornNF α) (hDR1 : HornNF.DR1 H) (a : α) (Pprem : Finset α)
+  (h_prem_a : H.prem a = {Pprem})
+  (h_norm : ∀ {h Q}, Q ∈ H.prem h → a ∉ Q) :
+  Hole (α := α) (HornNF.FixSet H) {a}
+    =
+  Hole (α := α) (HornNF.FixSet (H.trace a)) Pprem := by
+  apply hole_singleton_eq_hole_trace_prem
+  · exact hDR1
+  · simp_all only [Finset.mem_singleton]
+  · rw [h_prem_a]; exact Finset.card_singleton Pprem
+
 end Dr1nds
