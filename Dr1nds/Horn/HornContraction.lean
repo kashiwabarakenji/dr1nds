@@ -232,28 +232,35 @@ theorem deleteRules_head_free_fix_equiv
         exact (Finset.mem_erase.mp hxUerase).2
 
       have hXclosedU : HornNF.IsClosed H X := by
-        intro h P hP hsubset
-        by_cases hh : h = v
-        ·
-          subst hh
-          -- since prem v = ∅, no premise can exist
-          simp [hfree] at hP
-        ·
-          -- hP : P ∈ (H.deleteRules v).prem h
-          -- rewrite deleteRules premise description
-          have hPfilter :
-              P ∈ (H.prem h).filter (fun Q => v ∉ Q) := by
-            simp
-            constructor
-            · exact hP
-            · exact not_mem_of_subset_erase fun ⦃a⦄ a_1 => hXsub (hsubset a_1)
-          have hP' : P ∈ H.prem h :=
-            (Finset.mem_filter.mp hPfilter).1
-          simp_all only [mem_filter, true_and]
-          apply hXclosed
-          on_goal 2 => { exact hsubset
-          }
-          · simp_all only [ne_eq, not_false_eq_true, deleteRules_prem_of_ne, mem_filter, and_self]
+        dsimp [HornNF.IsClosed]
+        constructor
+        · intro h P hP hsubset
+          by_cases hh : h = v
+          ·
+            subst hh
+            -- since prem v = ∅, no premise can exist
+            simp [hfree] at hP
+          ·
+            -- hP : P ∈ (H.deleteRules v).prem h
+            -- rewrite deleteRules premise description
+            have hPfilter :
+                P ∈ (H.prem h).filter (fun Q => v ∉ Q) := by
+              simp
+              constructor
+              · exact hP
+              · exact not_mem_of_subset_erase fun ⦃a⦄ a_1 => hXsub (hsubset a_1)
+            have hP' : P ∈ H.prem h :=
+              (Finset.mem_filter.mp hPfilter).1
+            simp_all only [mem_filter, true_and]
+            dsimp [HornNF.IsClosed] at hXclosed
+            rcases hXclosed with ⟨hXclosedU, hsubset⟩
+            rename_i hsubset_1
+            simp_all only [deleteRules_U]
+            apply @hXclosedU
+            on_goal 2 => { exact hsubset_1
+            }
+            · simp_all only [ne_eq, not_false_eq_true, deleteRules_prem_of_ne, mem_filter, and_self]
+        · simp_all only
 
       exact ⟨hXsubU, hXclosedU⟩
 
@@ -281,17 +288,33 @@ theorem deleteRules_head_free_fix_equiv
       exact Finset.mem_erase.mpr ⟨hxne, hxU⟩
 
     -- closedness in deleteRules world
-    ·
-      intro h P hP hsubset
-      by_cases hh : h = v
-      · subst hh
-        simp [HornNF.deleteRules] at hP
-      ·
-        have hPfilter : P ∈ (H.prem h).filter (fun Q => v ∉ Q) := by
-          simpa [HornNF.deleteRules, hh] using hP
-        have hP' : P ∈ H.prem h :=
-          (Finset.mem_filter.mp hPfilter).1
-        exact hXclosed hP' hsubset
+    · dsimp [HornNF.IsClosed]
+      constructor
+      · intro h P hP hsubset
+        by_cases hh : h = v
+        · subst hh
+          simp [HornNF.deleteRules] at hP
+        ·
+          have hPfilter : P ∈ (H.prem h).filter (fun Q => v ∉ Q) := by
+            simpa [HornNF.deleteRules, hh] using hP
+          have hP' : P ∈ H.prem h :=
+            (Finset.mem_filter.mp hPfilter).1
+          rcases hXclosed with ⟨hXclosedU, hsubset⟩
+          rename_i hsubset_1
+          simp_all only [ne_eq, not_false_eq_true, deleteRules_prem_of_ne, mem_filter, true_and]
+          apply @hXclosedU
+          · exact hP'
+          · simp_all only
+      .
+        simp_all only [deleteRules_U]
+        intro x hx
+        simp_all only [mem_erase, ne_eq]
+        apply And.intro
+        · apply Aesop.BuiltinRules.not_intro
+          intro a
+          subst a
+          simp_all only
+        · exact hXsub hx
 
 ------------------------------------------------------------
 -- forward
@@ -334,19 +357,31 @@ theorem contraction_fix_equiv_forward
             exact Finset.mem_of_mem_erase hyUerase
 
       have hXclosed : HornNF.IsClosed H X := by
-        intro h P hP hsubset
-        by_cases hh : h = x
-        · subst hh; exact Finset.mem_insert_self _ _
+        dsimp [HornNF.IsClosed]
+        constructor
         ·
-          have hsubsetY : P.erase x ⊆ Y :=
-            erase_subset_insert (by simpa using hsubset)
-          have hmemY : h ∈ Y := by
-            have hPin : P.erase x ∈ (HornNF.contraction x H).prem h := by
-              simp [contraction_prem_of_ne (H := H) (x := x) hh]
-              simp_all only [X]
-              use P
-            exact hYclosed hPin hsubsetY
-          exact Finset.mem_insert.mpr (Or.inr hmemY)
+          intro h P hP hsubset
+          by_cases hh : h = x
+          · subst hh; exact Finset.mem_insert_self _ _
+          ·
+            have hsubsetY : P.erase x ⊆ Y :=
+              erase_subset_insert (by simpa using hsubset)
+            have hmemY : h ∈ Y := by
+              have hPin : P.erase x ∈ (HornNF.contraction x H).prem h := by
+                simp [contraction_prem_of_ne (H := H) (x := x) hh]
+                simp_all only [X]
+                use P
+              rcases hYclosed with ⟨hYsub, hsubsetY⟩
+              rename_i hsubsetY_1
+              simp_all only [ne_eq, not_false_eq_true, contraction_prem_of_ne, mem_image, contraction_U, X]
+              obtain ⟨w, h_1⟩ := hPin
+              obtain ⟨left, right⟩ := h_1
+              apply @hYsub
+              · simp_all only [ne_eq, not_false_eq_true, contraction_prem_of_ne, mem_image]
+                use w
+              · exact hsubsetY_1
+            exact Finset.mem_insert.mpr (Or.inr hmemY)
+        · simp_all only [X]
 
       have hFix : X ∈ HornNF.FixSet H := by
         simp [HornNF.FixSet]
@@ -409,27 +444,46 @@ theorem contraction_fix_equiv_backward
   --------------------------------------------------
   -- closed
   --------------------------------------------------
-  ·
-    intro h Q hQ hsubset
-    by_cases hh : h = x
-    ·
-      have hQ' := hQ
-      simp at hQ'
-      subst hh
-      simp_all only [mem_FixSet_iff, mem_powerset, and_self, mem_filter, mem_image, contraction_prem_self,
-        notMem_empty]
-    ·
-      have hQ' := hQ
-      simp [contraction_prem_of_ne (H := H) (x := x) hh] at hQ'
-      rcases hQ' with ⟨P, hP, hPeq⟩
-      subst hPeq
+  · dsimp [HornNF.IsClosed]
+    constructor
+    · intro h Q hQ hsubset
+      by_cases hh : h = x
+      ·
+        have hQ' := hQ
+        simp at hQ'
+        subst hh
+        simp_all only [mem_FixSet_iff, and_self, mem_filter, mem_image, contraction_prem_self,
+          notMem_empty]
+      ·
+        have hQ' := hQ
+        simp [contraction_prem_of_ne (H := H) (x := x) hh] at hQ'
+        rcases hQ' with ⟨P, hP, hPeq⟩
+        subst hPeq
 
-      have hPX :=
-        subset_of_erase_subset_erase_insert hxX hsubset
+        have hPX :=
+          subset_of_erase_subset_erase_insert hxX hsubset
+        simp_all only [mem_erase, ne_eq, not_false_eq_true, true_and]
+        rcases hXclosed with ⟨hXsub, hsubset⟩
+        simp_all only [mem_filter, and_self, mem_image, mem_FixSet_iff, ne_eq, not_false_eq_true,
+          contraction_prem_of_ne]
+        obtain ⟨w, h_1⟩ := hY
+        obtain ⟨w_1, h_2⟩ := hQ
+        obtain ⟨left, right⟩ := h_1
+        obtain ⟨left_1, right_1⟩ := h_2
+        obtain ⟨left, right_2⟩ := left
+        apply @hXsub
+        on_goal 2 => { exact hPX
+        }
+        · simp_all only
+    ·
+      simp_all only [mem_filter, and_self, mem_image, mem_FixSet_iff, contraction_U]
+      obtain ⟨w, h⟩ := hY
+      obtain ⟨left, right⟩ := h
+      obtain ⟨left, right_1⟩ := left
+      intro y hy
       simp_all only [mem_erase, ne_eq, not_false_eq_true, true_and]
-      apply hXclosed
-      on_goal 2 => { exact hPX }
-      · simp_all only
+      obtain ⟨left_1, right_2⟩ := hy
+      exact hXsub right_2
 
 ------------------------------------------------------------
 -- 最終定理

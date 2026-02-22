@@ -173,19 +173,21 @@ lemma deletion_filter_equiv
     have hvX := hmem.2
 
     have hFix_data := (mem_FixSet_iff H X).mp hFix
-    have hsubU := hFix_data.1
-    have ⟨hsubU, hClosed⟩ := hFix_data
+    rcases hFix_data with ⟨hFix_data1,hFix_data2⟩
 
     --------------------------------------------------------------
     -- 1. ¬ P ⊆ X
     --------------------------------------------------------------
     have hNotP : ¬ P ⊆ X := by
       intro hPX
-      have hv : v ∈ X := by
-        apply hClosed
-        · exact hP
-        · exact hPX
-      exact hvX hv
+      dsimp [HornNF.FixSet] at hFix
+      simp_all only [Finset.mem_filter, not_false_eq_true, and_self, mem_FixSet_iff, and_true,
+        Finset.mem_powerset]
+      have : v ∈ X := by
+        specialize hFix_data1 hP hPX
+        exact hFix_data1
+      exfalso
+      exact hvX (hFix_data1 hP hPX)
 
     --------------------------------------------------------------
     -- 2. trace で閉
@@ -193,99 +195,96 @@ lemma deletion_filter_equiv
     have hTraceClosed :
       HornNF.IsClosed (H.trace v) X := by
       unfold HornNF.IsClosed
-      intro h Q hQ hQsub
+      constructor
+      · intro h Q hQ hQsub
 
-      by_cases h_eq_v : h = v
-      · subst h_eq_v
-        -- trace.prem v = ∅
-        simp [HornNF.trace] at hQ
+        by_cases h_eq_v : h = v
+        · subst h_eq_v
+          -- trace.prem v = ∅
+          simp [HornNF.trace] at hQ
 
-      · -- h ≠ v
-        simp [HornNF.trace, h_eq_v] at hQ
-        rcases hQ with ⟨⟨Q₀, hQ₀, hcase⟩, _⟩
+        · -- h ≠ v
+          simp [HornNF.trace, h_eq_v] at hQ
+          rcases hQ with ⟨⟨Q₀, hQ₀, hcase⟩, _⟩
 
-        by_cases hvQ₀ : v ∈ Q₀
-        · -- composite rule
-          simp [hvQ₀] at hcase
-          rcases hcase with ⟨Pu, hPu, hEq⟩
-          subst hEq
+          by_cases hvQ₀ : v ∈ Q₀
+          · -- composite rule
+            simp [hvQ₀] at hcase
+            rcases hcase with ⟨Pu, hPu, hEq⟩
+            subst hEq
 
-          -- DR1 で Pu = P
-          have h_single :
-            ∀ Q ∈ H.prem v, Q = P := by
-            have hcard := Finset.card_eq_one.mp hUnique
-            intro Q hQv
-            obtain ⟨a, ha⟩ := hcard
-            have hQ' : Q = a := by simpa [ha] using hQv
-            have hP' : P = a := by simpa [ha] using hP
-            exact hQ'.trans hP'.symm
+            -- DR1 で Pu = P
+            have h_single :
+              ∀ Q ∈ H.prem v, Q = P := by
+              have hcard := Finset.card_eq_one.mp hUnique
+              intro Q hQv
+              obtain ⟨a, ha⟩ := hcard
+              have hQ' : Q = a := by simpa [ha] using hQv
+              have hP' : P = a := by simpa [ha] using hP
+              exact hQ'.trans hP'.symm
 
-          have hPu_eq : Pu = P := h_single Pu hPu
-          subst hPu_eq
+            have hPu_eq : Pu = P := h_single Pu hPu
+            subst hPu_eq
 
-          ------------------------------------------------------------
-          -- Q₀.erase v ⊆ X
-          ------------------------------------------------------------
-          have hQ₀sub :
-            Q₀.erase v ⊆ X := by
-            intro x hx
-            rename_i right
-            simp_all only [Finset.mem_filter, not_false_eq_true, and_self, mem_FixSet_iff, Finset.mem_powerset,
-              Finset.mem_union, Finset.mem_erase, ne_eq, true_and, not_or]
-            obtain ⟨left, right⟩ := right
-            obtain ⟨left_1, right_1⟩ := hx
-            apply hQsub
-            simp_all only [Finset.mem_union, Finset.mem_erase, ne_eq, not_false_eq_true, and_self, true_or]
+            ------------------------------------------------------------
+            -- Q₀.erase v ⊆ X
+            ------------------------------------------------------------
+            have hQ₀sub :
+              Q₀.erase v ⊆ X := by
+              intro x hx
+              rename_i right
+              simp_all only [Finset.mem_filter, not_false_eq_true, and_self, mem_FixSet_iff,
+                Finset.mem_union, Finset.mem_erase, ne_eq, true_and, not_or]
+              obtain ⟨left, right⟩ := right
+              obtain ⟨left_1, right_1⟩ := hx
+              apply hQsub
+              simp_all only [Finset.mem_union, Finset.mem_erase, ne_eq, not_false_eq_true, and_self, true_or]
 
-          ------------------------------------------------------------
-          -- Q₀ ⊆ X
-          ------------------------------------------------------------
-          have hQ₀sub_full :
-            Q₀ ⊆ X := by
-            intro x hxQ₀
-            by_cases h_eq_v : h = v
-            · cases h_eq_v
-              -- v ∈ X を導いて矛盾
-              have hv_mem : v ∈ X := by
-                apply hClosed hQ₀
-                intro y hy
-                by_cases hyv : y = v
-                · subst hyv
-                  exact False.elim (h_eq_v rfl)
-                · have hy' : y ∈ Q₀.erase v :=
-                    Finset.mem_erase.mpr ⟨hyv, hy⟩
-                  exact hQ₀sub hy'
-              exact False.elim (hvX hv_mem)
-            · have hx' : x ∈ Q₀.erase v := by
-                apply Finset.mem_erase.mpr
-                rw [← @Finset.notMem_singleton]
-                simp
-                constructor
-                · show ¬x = v
-                  intro hxv
-                  subst hxv
-                  exact hNotP (Finset.subset_union_right.trans hQsub)
-                · simp_all only [Finset.mem_filter, not_false_eq_true, and_self, mem_FixSet_iff, Finset.mem_powerset,
-                  Finset.mem_union, Finset.mem_erase, ne_eq, true_and, not_or]
-                --   ⟨hxv, hxQ₀⟩
-              exact hQ₀sub hx'
+            ------------------------------------------------------------
+            -- Q₀ ⊆ X
+            ------------------------------------------------------------
+            have hQ₀sub_full :
+              Q₀ ⊆ X := by
+              intro x hxQ₀
+              by_cases h_eq_v : h = v
+              · cases h_eq_v
+                -- v ∈ X を導いて矛盾
+                have hv_mem : v ∈ X := by
+                  simp_all only [Finset.mem_filter, not_false_eq_true, and_self, mem_FixSet_iff, not_true_eq_false]
+                exact False.elim (hvX hv_mem)
+              · have hx' : x ∈ Q₀.erase v := by
+                  apply Finset.mem_erase.mpr
+                  rw [← @Finset.notMem_singleton]
+                  simp
+                  constructor
+                  · show ¬x = v
+                    intro hxv
+                    subst hxv
+                    exact hNotP (Finset.subset_union_right.trans hQsub)
+                  · simp_all only [Finset.mem_filter, not_false_eq_true, and_self, mem_FixSet_iff,
+                    Finset.mem_union, Finset.mem_erase, ne_eq, true_and, not_or]
+                  --   ⟨hxv, hxQ₀⟩
+                exact hQ₀sub hx'
 
-          ------------------------------------------------------------
-          -- 閉性適用
-          ------------------------------------------------------------
-          exact hClosed hQ₀ hQ₀sub_full
+            ------------------------------------------------------------
+            -- 閉性適用
+            ------------------------------------------------------------
+            exact hFix_data1 hQ₀ hQ₀sub_full
 
-        · -- ordinary rule
-          simp [hvQ₀] at hcase
-          subst hcase
-          exact hClosed hQ₀ hQsub
+          · -- ordinary rule
+            simp [hvQ₀] at hcase
+            subst hcase
+            exact hFix_data1 hQ₀ hQsub
+      · dsimp [HornNF.trace]
+        exact subset_erase_of_subset hFix_data2 hvX
 
     --------------------------------------------------------------
     -- universe 部分
     --------------------------------------------------------------
-    have hsubU_pow := hFix_data.1
-    have hsubU : X ⊆ H.U :=
-      Finset.mem_powerset.mp hsubU_pow
+    --have hsubU_pow := hFix_data.1
+    have hsubU : X ⊆ H.U := by
+      apply Finset.mem_powerset.mp
+      simp_all only [Finset.mem_filter, not_false_eq_true, and_self, mem_FixSet_iff, Finset.mem_powerset]
 
     have hsubU' : X ⊆ (H.trace v).U := by
       intro x hx
@@ -301,7 +300,7 @@ lemma deletion_filter_equiv
       have hpow :
         X ∈ (H.trace v).U.powerset :=
         Finset.mem_powerset.mpr hsubU'
-      exact ⟨hpow, hTraceClosed⟩
+      simp_all only [Finset.mem_filter, not_false_eq_true, and_self, mem_FixSet_iff, Finset.mem_powerset]
 
     exact ⟨hTraceFix, hNotP⟩
 
@@ -314,19 +313,39 @@ lemma deletion_filter_equiv
 
     have hTraceData :=
       (mem_FixSet_iff (H.trace v) X).mp hTraceFix
-    have hsubU' := hTraceData.1
-    have hTraceClosed :
-      HornNF.IsClosed (H.trace v) X :=
-      hTraceData.2
+    simp
+    constructor
+    · dsimp [HornNF.IsClosed]
+      constructor
+      ·
+        intro h P hP hPX
+        have hTraceClosed :
+          HornNF.IsClosed (H.trace v) X := by
+            simp_all only [not_false_eq_true, and_self, mem_FixSet_iff]
+        dsimp [HornNF.IsClosed] at hTraceClosed
+        rcases hTraceClosed with ⟨hTraceClosed1,hTraceClose2⟩
+        dsimp [HornNF.trace] at hTraceClosed1
+        sorry
+      · dsimp [HornNF.FixSet] at hTraceFix
+        simp at hTraceFix
+        dsimp [HornNF.trace] at hTraceFix
+        have :X ⊆ H.U.erase v := by
+          simp_all only [mem_FixSet_iff, not_false_eq_true, and_self]
+        rw [Finset.subset_erase] at this
+        exact this.1
 
     --------------------------------------------------------------
     -- v ∉ X
     --------------------------------------------------------------
     have hvX : v ∉ X := by
       intro hv
-      have := Finset.mem_powerset.mp hsubU' hv
-      simp [HornNF.trace] at this
-
+      dsimp [HornNF.FixSet] at h
+      simp at h
+      dsimp [HornNF.trace] at h
+      rw [Finset.subset_erase] at h
+      have : v ∉ X := by
+        simp_all only [mem_FixSet_iff, not_false_eq_true]
+      simp_all only [mem_FixSet_iff, not_false_eq_true]
 
     --------------------------------------------------------------
     -- H で閉
@@ -334,67 +353,60 @@ lemma deletion_filter_equiv
     have hClosed :
       HornNF.IsClosed H X := by
       unfold HornNF.IsClosed
-      intro h Q hQ hQsub
+      constructor
+      ·
+        intro h Q hQ hQsub
 
-      by_cases h_eq_v : h = v
-      · --subst h_eq_v
-        -- Q = P
-        have h_single :
-          ∀ Q ∈ H.prem v, Q = P := by
-          have hcard := Finset.card_eq_one.mp hUnique
-          intro Q hQv
-          obtain ⟨a, ha⟩ := hcard
-          have hQ' :
-            Q = a := by
-            simpa [ha] using hQv
-          have hP' :
-            P = a := by
-            simpa [ha] using hP
-          exact hQ'.trans hP'.symm
+        by_cases h_eq_v : h = v
+        · --subst h_eq_v
+          -- Q = P
+          have h_single :
+            ∀ Q ∈ H.prem v, Q = P := by
+            have hcard := Finset.card_eq_one.mp hUnique
+            intro Q hQv
+            obtain ⟨a, ha⟩ := hcard
+            have hQ' :
+              Q = a := by
+              simpa [ha] using hQv
+            have hP' :
+              P = a := by
+              simpa [ha] using hP
+            exact hQ'.trans hP'.symm
 
-        have hQeq : Q = P := by
-          subst h_eq_v
-          simp_all only [not_false_eq_true]
-        subst hQeq
-        exfalso
-        exact hNotP hQsub
+          have hQeq : Q = P := by
+            subst h_eq_v
+            simp_all only [not_false_eq_true]
+          subst hQeq
+          exfalso
+          exact hNotP hQsub
 
-      · -- h ≠ v
-        have hQ_trace :
-          Q ∈ (H.trace v).prem h := by
-          simp [HornNF.trace, h_eq_v]
-          by_cases hvQ : v ∈ Q
-          · -- v ∈ Q and Q ⊆ X would give v ∈ X, contradicting hvX
-            exfalso; exact hvX (hQsub hvQ)
-          · -- v ∉ Q: Q is unchanged in trace, and h ∉ Q by NF
-            exact ⟨⟨Q, hQ, by simp [hvQ]⟩, H.nf hQ⟩
+        · -- h ≠ v
+          have hQ_trace :
+            Q ∈ (H.trace v).prem h := by
+            simp [HornNF.trace, h_eq_v]
+            by_cases hvQ : v ∈ Q
+            · -- v ∈ Q and Q ⊆ X would give v ∈ X, contradicting hvX
+              exfalso; exact hvX (hQsub hvQ)
+            · -- v ∉ Q: Q is unchanged in trace, and h ∉ Q by NF
+              exact ⟨⟨Q, hQ, by simp [hvQ]⟩, H.nf hQ⟩
 
-        simp_all only [not_false_eq_true, and_self, mem_FixSet_iff, Finset.mem_powerset]
-        apply hTraceClosed
-        on_goal 2 => { exact hQsub
-        }
-        · simp_all only
+          simp_all only [not_false_eq_true, and_self, mem_FixSet_iff]
+          dsimp [HornNF.IsClosed] at hTraceData
+          obtain ⟨left, right⟩ := hTraceData
+          apply @left
+          on_goal 2 => { exact hQsub
+          }
+          · simp_all only
 
-    have hFix :
-      X ∈ HornNF.FixSet H := by
-      apply (mem_FixSet_iff H X).mpr
-      have hsubU : X ⊆ H.U := by
-        intro x hx
-        have hsubU : X ⊆ H.U := by
-          intro x hx
-          have hxU : x ∈ (H.trace v).U :=
-            Finset.mem_powerset.mp hsubU' hx
-          exact (Finset.mem_erase.mp hxU).2
-        exact hsubU hx
+      · dsimp [HornNF.FixSet] at hTraceFix
+        simp at hTraceFix
+        dsimp [HornNF.trace] at hTraceFix
+        rw [Finset.subset_erase] at hTraceFix
+        simp_all only [mem_FixSet_iff, not_false_eq_true, and_self]
 
-      have hpow :
-        X ∈ H.U.powerset :=
-        Finset.mem_powerset.mpr hsubU
-      exact ⟨hpow, hClosed⟩
 
-    apply Finset.mem_filter.mpr
-    exact ⟨hFix, hvX⟩
 
+    · simp_all only [not_false_eq_true, and_self, mem_FixSet_iff]
 
 /--
 A usable (proved) version of `deletion_as_forbid`.

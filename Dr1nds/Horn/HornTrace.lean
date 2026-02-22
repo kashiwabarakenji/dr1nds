@@ -252,47 +252,67 @@ by
   ----------------------------------------------------------------
   -- → direction
   ----------------------------------------------------------------
-  · intro htrace h P hP hsubset
+  ·
+    intro htrace
+    constructor
+    ·
+      intro h P hP hsubset
 
-    by_cases h_eq_v : h = v
-    · subst h_eq_v
-      -- H.prem v = ∅
-      simp [hfree] at hP
+      by_cases h_eq_v : h = v
+      · subst h_eq_v
+        -- H.prem v = ∅
+        simp [hfree] at hP
 
-    · -- use trace_prem_head_free
-      have hmem_trace :
-        P ∈ (H.trace v).prem h :=
-      by
-        -- rewrite trace premises in head-free case
-        have := trace_prem_head_free H v hfree h_eq_v
-        simp [this]
-        -- goal becomes: P ∈ (H.prem h).filter (v ∉ ·)
-        exact ⟨hP, by
-          -- show v ∉ P
-          intro hvP
-          have : v ∈ X := hsubset hvP
-          exact hvX this
-        ⟩
+      · -- use trace_prem_head_free
+        have hmem_trace :
+          P ∈ (H.trace v).prem h :=
+        by
+          -- rewrite trace premises in head-free case
+          have := trace_prem_head_free H v hfree h_eq_v
+          simp [this]
+          -- goal becomes: P ∈ (H.prem h).filter (v ∉ ·)
+          exact ⟨hP, by
+            -- show v ∉ P
+            intro hvP
+            have : v ∈ X := hsubset hvP
+            exact hvX this
+          ⟩
 
-      exact htrace hmem_trace hsubset
-
+        exact htrace.1 hmem_trace hsubset
+    · rcases htrace with ⟨htrace1,htrace2⟩
+      dsimp [HornNF.trace] at htrace2
+      rw [Finset.subset_erase] at htrace2
+      exact htrace2.1
 
   ----------------------------------------------------------------
   -- ← direction
   ----------------------------------------------------------------
-  · intro hH h P hP hsubset
+  · intro hH
+    constructor
+    · intro h P hP hsubset
 
-    by_cases h_eq_v : h = v
-    · subst h_eq_v
-      -- trace prem at v is empty since H.prem v = ∅
-      simp [HornNF.trace, hfree] at hP
+      by_cases h_eq_v : h = v
+      · subst h_eq_v
+        -- trace prem at v is empty since H.prem v = ∅
+        simp [HornNF.trace, hfree] at hP
 
-    · -- unfold trace premise
-      have :=
-        trace_prem_head_free H v hfree h_eq_v
-      simp [this] at hP
-      rcases hP with ⟨hP, hvP⟩
-      exact hH hP hsubset
+      · -- unfold trace premise
+        have :=
+          trace_prem_head_free H v hfree h_eq_v
+        simp [this] at hP
+        rcases hP with ⟨hP, hvP⟩
+        obtain ⟨left, right⟩ := hH
+        exact left hP hsubset
+    · dsimp [HornNF.trace]
+      obtain ⟨left, right⟩ := hH
+      intro x hx
+      simp_all only [Finset.mem_erase, ne_eq]
+      apply And.intro
+      · apply Aesop.BuiltinRules.not_intro
+        intro a
+        subst a
+        simp_all only
+      · exact right hx
 
 /--
 If no premise in `H` contains `v`, then in the trace world the premises for any head `h ≠ v`
@@ -357,49 +377,63 @@ Horn Bridgeから使われている。
 -/
 lemma isClosed_union_singleton_of_noPremContains
   (H : HornNF α)
-  (v : α)
+  (hv: v ∈ H.U)
   (hNoPremV : ∀ {h : α} {Q : Finset α}, Q ∈ H.prem h → v ∉ Q)
   {Y : Finset α}
   (hY : HornNF.IsClosed (H.trace v) Y) :
   HornNF.IsClosed H (Y ∪ ({v} : Finset α)) := by
   classical
   unfold HornNF.IsClosed at *
-  intro h Q hQ hQsub
-  by_cases h_eq_v : h = v
-  · subst h_eq_v
-    -- goal: v ∈ Y ∪ {v}
-    simp
-  ·
-    -- show Q ⊆ Y (since v ∉ Q)
-    have hQsubY : Q ⊆ Y := by
-      intro x hxQ
-      have hxIn : x ∈ Y ∪ ({v} : Finset α) := hQsub hxQ
-      by_cases hxv : x = v
-      · subst hxv
-        exact False.elim ((hNoPremV (h := h) (Q := Q) hQ) hxQ)
-      ·
-        -- from hxIn : x ∈ Y ∪ {v} and x ≠ v, infer x ∈ Y
-        have : x ∈ Y := by
-          have hx : x ∈ Y ∨ x ∈ ({v} : Finset α) := by
-            exact Finset.mem_union.mp (hQsub hxQ)
-          cases hx with
-          | inl hxy => exact hxy
-          | inr hxsing =>
-              have : x = v := by
-                simpa [Finset.mem_singleton] using hxsing
-              exact False.elim (hxv this)
-        exact this
-    -- rewrite premises for h ≠ v
-    have hEq : (H.trace v).prem h = H.prem h :=
-      trace_prem_eq_of_noPremContains H v (by
-        intro h' P' hP'
-        exact hNoPremV (h := h') (Q := P') hP'
-      ) (h := h) h_eq_v
-    have hQtrace : Q ∈ (H.trace v).prem h := by
-      simpa [hEq] using hQ
-    have hhY : h ∈ Y := hY hQtrace hQsubY
-    -- conclude h ∈ Y ∪ {v}
-    exact Finset.mem_union_left _ (by simpa using hhY)
+  constructor
+  · intro h Q hQ hQsub
+    by_cases h_eq_v : h = v
+    · subst h_eq_v
+      -- goal: v ∈ Y ∪ {v}
+      simp
+    ·
+      -- show Q ⊆ Y (since v ∉ Q)
+      have hQsubY : Q ⊆ Y := by
+        intro x hxQ
+        have hxIn : x ∈ Y ∪ ({v} : Finset α) := hQsub hxQ
+        by_cases hxv : x = v
+        · subst hxv
+          exact False.elim ((hNoPremV (h := h) (Q := Q) hQ) hxQ)
+        ·
+          -- from hxIn : x ∈ Y ∪ {v} and x ≠ v, infer x ∈ Y
+          have : x ∈ Y := by
+            have hx : x ∈ Y ∨ x ∈ ({v} : Finset α) := by
+              exact Finset.mem_union.mp (hQsub hxQ)
+            cases hx with
+            | inl hxy => exact hxy
+            | inr hxsing =>
+                have : x = v := by
+                  simpa [Finset.mem_singleton] using hxsing
+                exact False.elim (hxv this)
+          exact this
+      -- rewrite premises for h ≠ v
+      have hEq : (H.trace v).prem h = H.prem h :=
+        trace_prem_eq_of_noPremContains H v (by
+          intro h' P' hP'
+          exact hNoPremV (h := h') (Q := P') hP'
+        ) (h := h) h_eq_v
+      have hQtrace : Q ∈ (H.trace v).prem h := by
+        simpa [hEq] using hQ
+      have hhY : h ∈ Y := by
+        rcases hY with ⟨hY1,hY2⟩
+        dsimp [HornNF.trace] at hY2
+        rw [Finset.subset_erase] at hY2
+        exact hY1 hQtrace hQsubY
+      -- conclude h ∈ Y ∪ {v}
+      exact Finset.mem_union_left _ (by simpa using hhY)
+  · rcases hY with ⟨hY, hvY⟩
+    dsimp [HornNF.trace] at hvY
+    rw [Finset.subset_erase] at hvY
+    have hYU: Y ⊆ H.U := by exact hvY.1
+    have hv :v ∈ H.U := by simp_all only
+    simp_all only [true_and, Finset.union_singleton]
+    rw [Finset.insert_subset_iff]
+    simp_all only [and_self]
+
 
 
 /--

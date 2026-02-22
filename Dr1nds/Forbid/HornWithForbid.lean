@@ -84,12 +84,11 @@ def HornWithForbid.contraction (S : HornWithForbid α) (v : α)
       by_cases hv:h = v
       ·
         rename_i h_1
-        simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset,
-          Finset.singleton_subset_iff, Finset.subset_singleton_iff, not_or, ↓reduceIte, Finset.notMem_empty]
+        simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.subset_singleton_iff,
+          not_or, ↓reduceIte, Finset.notMem_empty]
       ·
-        simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset,
-          Finset.singleton_subset_iff, Finset.subset_singleton_iff, not_or, ↓reduceIte,
-          Finset.mem_image]
+        simp_all only [mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.subset_singleton_iff,
+          not_or, ↓reduceIte, Finset.mem_image]
         obtain ⟨a,ha⟩ := P
         have : a ≠ ∅ := by
           intro hcon
@@ -108,12 +107,18 @@ def HornWithForbid.contraction (S : HornWithForbid α) (v : α)
           subst this
           simp_all only [Finset.erase_singleton, and_true, ne_eq, Finset.singleton_ne_empty, not_false_eq_true,
             subset_refl]
+          obtain ⟨left, right⟩ := h_sc
+          obtain ⟨left_1, right⟩ := right
+          obtain ⟨left_2, right_1⟩ := cond1
+          simp_all only [Finset.subset_singleton_iff, Finset.mem_singleton, Finset.singleton_subset_iff]
         rcases cond1 with ⟨cond11,cond12⟩
         simp at cond12
         let ha1 := ha.1
         have hv_eq : h = v := by
         -- cond12 に P = {v} を入れる
-          exact cond12 (h := h) (P := ({v} : Finset α)) ha1 (Or.inr rfl)
+          simp at cond11
+          apply cond11 (h := h) (P := ({v} : Finset α)) ha1
+          exact Finset.subset_singleton_iff.mp fun ⦃a⦄ a_1 => a_1
         exact hv hv_eq
 
     F := S.F.erase v
@@ -145,7 +150,12 @@ theorem contract_FixSet_eq (S : HornWithForbid α) (v : α)
   have hvU : v ∈ S.H.U := by
     have hsingleton : ({v} : Finset α) ∈ HornNF.FixSet S.H :=
       (HornWithForbid.mem_FixSet_withForbid_iff S {v}).1 h_sc |>.1
-    have hpow : ({v} : Finset α) ∈ S.H.U.powerset := (mem_FixSet_iff S.H {v}).1 hsingleton |>.1
+    have hpow : ({v} : Finset α) ∈ S.H.U.powerset := by
+      simp
+      dsimp [HornNF.FixSet] at hsingleton
+      simp at hsingleton
+      exact hsingleton.1
+      --(mem_FixSet_iff S.H {v}).1 hsingleton |>.1
     have hsubset : ({v} : Finset α) ⊆ S.H.U := by
       simpa [Finset.mem_powerset] using hpow
     exact hsubset (by simp)
@@ -219,7 +229,9 @@ lemma nep_iff_empty_mem_FixSet
    { U := S.H.U, C := S.FixSet, subset_univ := by
       intro X hX
       -- FixSet members are subsets of U
-      simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+      simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff]
+      dsimp [HornNF.IsClosed] at hX
+      simp_all only
    }
      : SetFamily α
     )
@@ -233,7 +245,9 @@ lemma empty_mem_of_nep_FixSet
    { U := S.H.U, C := S.FixSet, subset_univ := by
       intro X hX
       -- FixSet members are subsets of U
-      simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+      simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff]
+      dsimp [HornNF.IsClosed] at hX
+      simp_all only
    }
      : SetFamily α
     )) :
@@ -322,7 +336,31 @@ lemma Hole_FixSet_eq_Hole_FixSet_closure
     refine (mem_Hole_FixSet_iff (α := α) H A X).2 ?_
     refine ⟨hmem.1, ?_⟩
     intro hAX
-    have hXclosed : HornNF.IsClosed H X := (mem_FixSet_iff H X).1 hmem.1 |>.2
+    have hXclosed : HornNF.IsClosed H X := by
+      constructor
+      · --let mf := (mem_FixSet_iff H X).1 hmem.1 |>.2
+        intro h P hP hPX
+        dsimp [Hole] at hX
+        simp at hX
+        dsimp [HornNF.FixSet] at hmem
+        simp at hmem
+        rcases hmem with ⟨hmem1,hmem2⟩
+        dsimp [HornNF.IsClosed] at hmem1
+        simp_all only [not_false_eq_true, and_true]
+        obtain ⟨left, right⟩ := hmem1
+        obtain ⟨left_1, right⟩ := right
+        simp_all only
+        apply @left_1
+        · exact hP
+        · simp_all only
+
+      · dsimp [Hole] at hX
+        simp at hX
+        dsimp [ HornNF.FixSet] at hmem
+        rcases hmem with ⟨hmem1,hmem2⟩
+        exact mem_FixSet_subset_U H hmem1
+
+
     have hcl : HornNF.closure H A ⊆ X :=
       (closure_subset_iff_subset_of_isClosed (α := α) H A X hA hXclosed).2 hAX
     exact hmem.2 hcl
@@ -331,10 +369,29 @@ lemma Hole_FixSet_eq_Hole_FixSet_closure
     refine (mem_Hole_FixSet_iff (α := α) H (HornNF.closure H A) X).2 ?_
     refine ⟨hmem.1, ?_⟩
     intro hcl
-    have hXclosed : HornNF.IsClosed H X := (mem_FixSet_iff H X).1 hmem.1 |>.2
+    have hXclosed : HornNF.IsClosed H X := by
+      constructor
+      · intro h P hPh hPX
+        dsimp [Hole] at hX
+        simp at hX
+        dsimp [HornNF.FixSet] at hmem
+        simp at hmem
+        rcases hmem with ⟨hmem1,hmem2⟩
+        dsimp [HornNF.IsClosed] at hmem1
+        simp_all only [not_false_eq_true, and_true]
+        obtain ⟨left, right⟩ := hmem1
+        obtain ⟨left_1, right⟩ := right
+        simp_all only
+        apply @left_1
+        · exact hPh
+        · simp_all only
+      · dsimp [HornNF.FixSet] at hmem
+        simp at hmem
+        simp_all only [mem_Hole_iff, mem_FixSet_iff, not_false_eq_true, and_self]
     have hAX : A ⊆ X :=
       (closure_subset_iff_subset_of_isClosed (α := α) H A X hA hXclosed).1 hcl
     exact hmem.2 hAX
+
 
 /-
 lemma NDS_corr_eq_of_closure (n : Nat) (H : HornNF α) (A : Finset α) (hA : A ⊆ H.U) :
@@ -403,7 +460,9 @@ lemma nep_FixSet_iff_nep_base
       subset_univ := by
         intro X hX
         -- FixSet members are subsets of U
-        simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+        simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff]
+        dsimp [HornNF.IsClosed] at hX
+        simp_all only
     } : SetFamily α)
   ↔
   SetFamily.NEP (
@@ -423,8 +482,8 @@ lemma nep_FixSet_iff_nep_base
       (empty_mem_FixSet_iff_empty_mem_base (α := α) S).1 hempty_forbid
     -- base NEP is definitional `∅ ∈ base`
     simp [SetFamily.NEP]
-    simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, Finset.subset_empty, true_and, mem_FixSet_iff,
-      Finset.mem_powerset, Finset.empty_subset]
+    simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, Finset.subset_empty, true_and,
+      mem_FixSet_iff]
   · intro hNEP_base
     -- base NEP is definitional `∅ ∈ base`
     have hempty_base : (∅ : Finset α) ∈ HornNF.FixSet S.H := by
@@ -444,7 +503,9 @@ lemma nep_FixSet_iff_empty_mem_base
       subset_univ := by
         intro X hX
         -- FixSet members are subsets of U
-        simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+        simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff]
+        obtain ⟨left, right⟩ := hX
+        simpa using left.2
     } : SetFamily α)
   ↔ (∅ : Finset α) ∈ HornNF.FixSet S.H := by
   classical
@@ -455,7 +516,9 @@ lemma nep_FixSet_iff_empty_mem_base
           C := S.FixSet
           subset_univ := by
             intro X hX
-            simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff, Finset.mem_powerset]
+            simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff]
+            obtain ⟨left, right⟩ := hX
+            simpa using left.2
         } : SetFamily α)
       ↔ (∅ : Finset α) ∈ S.FixSet := by
     rfl
