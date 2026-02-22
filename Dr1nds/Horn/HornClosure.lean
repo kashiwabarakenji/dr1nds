@@ -30,23 +30,33 @@ namespace HornNF
 theorem closure_isClosed (H : HornNF α) (X : Finset α) :
   HornNF.IsClosed H (H.closure X) := by
   classical
-  intro h P hPh hPsub
-  -- show `h ∈ H.U.filter ...`
-  apply Finset.mem_filter.mpr
+  dsimp [HornNF.IsClosed]
   constructor
-  · -- h ∈ U
-    have : (H.prem h).Nonempty := ⟨P, hPh⟩
-    exact H.head_mem_U this
-  · -- show: for all closed Y with X ⊆ Y, we have h ∈ Y
-    intro Y hYclosed hXY
-    have hPY : P ⊆ Y := by
-      intro p hpP
-      have hp_cl : p ∈ H.closure X := hPsub hpP
-      -- unfold membership in closure: p ∈ U and the property
-      have hp_prop : ∀ Z : Finset α, HornNF.IsClosed H Z → X ⊆ Z → p ∈ Z :=
-        (Finset.mem_filter.mp hp_cl).2
-      exact hp_prop Y hYclosed hXY
-    exact hYclosed (h := h) (P := P) hPh hPY
+  ·
+    intro h P hPh hPsub
+    -- show `h ∈ H.U.filter ...`
+    apply Finset.mem_filter.mpr
+    constructor
+    · -- h ∈ U
+      have : (H.prem h).Nonempty := ⟨P, hPh⟩
+      exact H.head_mem_U this
+    · -- show: for all closed Y with X ⊆ Y, we have h ∈ Y
+      intro Y hYclosed hXY
+      have hPY : P ⊆ Y := by
+        intro p hpP
+        have hp_cl : p ∈ H.closure X := hPsub hpP
+        -- unfold membership in closure: p ∈ U and the property
+        have hp_prop : ∀ Z : Finset α, HornNF.IsClosed H Z → X ⊆ Z → p ∈ Z :=
+          (Finset.mem_filter.mp hp_cl).2
+        exact hp_prop Y hYclosed hXY
+      --dsimp [HornNF.closure] at hPsub
+      dsimp [HornNF.IsClosed] at hYclosed
+      rcases hYclosed with ⟨hYclosed1,hYclosed2⟩
+      apply @hYclosed1
+      · exact hPh
+      · simp_all only
+
+  · simp [closure]
 
 /-- `X ⊆ U` implies `X ⊆ closure X` (extensive, as a subset lemma). -/
 theorem subset_closure (H : HornNF α) (X : Finset α) (hX : X ⊆ H.U) :
@@ -58,6 +68,51 @@ theorem subset_closure (H : HornNF α) (X : Finset α) (hX : X ⊆ H.U) :
   · exact hX hxX
   · intro Y hYclosed hXY
     exact hXY hxX
+
+theorem IsClosed_iff (H :HornNF α) (X : Finset α) :
+  H.IsClosed X ↔ H.closure X = X := by
+  constructor
+  · intro h
+    dsimp [HornNF.IsClosed] at h
+    dsimp [HornNF.closure]
+    ext y
+    constructor
+    ·
+      intro a
+      simp_all only [Finset.mem_filter]
+      obtain ⟨left, right⟩ := a
+      apply right
+      · exact h
+      · simp_all only [subset_refl]
+    · intro hY
+      simp
+      constructor
+      · rcases h with ⟨h1,h2⟩
+        apply h2
+        simp_all only
+      ·
+        intro Y a a_1
+        apply a_1
+        simp_all only
+  · intro h
+    dsimp [HornNF.closure] at h
+    constructor
+    · intro hh P hP hhP
+      rw [←h]
+      simp
+      constructor
+      · have : (H.prem hh).Nonempty := by use P
+        let hp := H.head_mem_U this
+        simp_all only
+      · intro Y hY hXY
+        dsimp [HornNF.IsClosed] at hY
+        obtain ⟨left, right⟩ := hY
+        apply @left
+        · exact hP
+        · exact hhP.trans hXY
+
+    · rw [←h]
+      simp
 
 /-- `closure X` is always a subset of `U` (by definition as a `filter` over `U`). -/
 theorem closure_subset_U (H : HornNF α) (X : Finset α) :

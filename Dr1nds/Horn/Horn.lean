@@ -76,10 +76,10 @@ for every head h and premise P ∈ prem h,
   P ⊆ X ⇒ h ∈ X.
 -/
 def HornNF.IsClosed (H : HornNF α) (X : Finset α) : Prop :=
-  ∀ {h : α} {P : Finset α},
+  (∀ {h : α} {P : Finset α},
     P ∈ H.prem h →
     P ⊆ X →
-    h ∈ X
+    h ∈ X) ∧ (X ⊆ H.U)
 
 
 /-
@@ -95,18 +95,14 @@ lemma HornNF.isClosed_empty_of_isNEP
   (hNEP : H.IsNEP) :
   HornNF.IsClosed H (∅ : Finset α) := by
   classical
-  intro h P hP hPsub
-  have hPempty : P = (∅ : Finset α) := by
-    -- any element of `P` would have to lie in `∅`
-    apply Finset.eq_empty_iff_forall_notMem.2
-    intro x hx
-    have : x ∈ (∅ : Finset α) := hPsub hx
-    exact (List.mem_nil_iff x).mp (hPsub hx)
-  -- contradict NEP (since `P = ∅` would mean an empty premise appears)
-  have : (∅ : Finset α) ∈ H.prem h := by
-    simpa [hPempty] using hP
-  exact False.elim (hNEP (h := h) this)
-
+  dsimp [HornNF.IsClosed]
+  simp_all only [Finset.subset_empty, Finset.notMem_empty, imp_false, Finset.forall_mem_not_eq', Finset.empty_subset,
+    and_true]
+  intro h
+  apply Aesop.BuiltinRules.not_intro
+  intro a
+  apply hNEP
+  · exact a
 
 
 noncomputable def HornNF.FixSet (H : HornNF α) : Finset (Finset α) :=
@@ -125,17 +121,17 @@ by
 ------------------------------------------------------------ -/
 
 @[simp] lemma mem_FixSet_iff (H : HornNF α) (X : Finset α) :
-    X ∈ HornNF.FixSet H ↔ X ∈ H.U.powerset ∧ H.IsClosed X := by
+    X ∈ HornNF.FixSet H ↔ H.IsClosed X := by
   classical
   simp [HornNF.FixSet]
+  intro a
+  simpa using a.2
 
 lemma mem_FixSet_subset_U (H : HornNF α) {X : Finset α}
     (hX : X ∈ HornNF.FixSet H) : X ⊆ H.U := by
   classical
-  have hXpow : X ∈ H.U.powerset := (mem_FixSet_iff (H := H) (X := X)).1 hX |>.1
-  exact (Finset.mem_powerset.mp hXpow)
-
-
+  simp_all only [mem_FixSet_iff]
+  simpa using hX.2
 
 /-- If `H` is NEP, then `∅ ∈ FixSet H` (so the family-level NEP holds for `FixSet H`). -/
 lemma HornNF.empty_mem_FixSet_of_isNEP
@@ -145,14 +141,11 @@ lemma HornNF.empty_mem_FixSet_of_isNEP
   classical
   -- Use the `mem_FixSet_iff` bridge to avoid unfolding `FixSet`.
   apply (mem_FixSet_iff (H := H) (X := (∅ : Finset α))).2
-  refine And.intro ?_ (HornNF.isClosed_empty_of_isNEP (H := H) hNEP)
-  -- `∅ ∈ U.powerset`
-  have : (∅ : Finset α) ⊆ H.U := by
-    intro x hx
-    exfalso
-    exact (List.mem_nil_iff x).mp hx
-  exact Finset.mem_powerset.2 this
-
+  simp [IsClosed]
+  intro h
+  apply Aesop.BuiltinRules.not_intro
+  intro a
+  apply hNEP a
 
 /-- If the empty set is closed w.r.t. `H`, then `H` is NEP (no empty premise). -/
 lemma HornNF.isNEP_of_isClosed_empty
@@ -161,12 +154,8 @@ lemma HornNF.isNEP_of_isClosed_empty
   H.IsNEP := by
   classical
   intro h hempty
-  have : h ∈ (∅ : Finset α) := hClosed (h := h) (P := (∅ : Finset α)) hempty (by
-    intro x hx
-    exact hx
-    )
-  exfalso
-  exact (List.mem_nil_iff h).mp (hClosed hempty fun ⦃a⦄ a_1 => a_1)
+  obtain ⟨x, hx⟩ := hClosed
+  simp_all only [Finset.subset_empty, Finset.notMem_empty, imp_false, Finset.forall_mem_not_eq', Finset.empty_subset]
 
 /-- `H` is NEP iff the empty set is closed w.r.t. `H`. -/
 lemma HornNF.isNEP_iff_isClosed_empty
@@ -189,9 +178,10 @@ lemma HornNF.isNEP_iff_empty_mem_FixSet
   · intro hempty
     have hClosed : HornNF.IsClosed H (∅ : Finset α) := by
       -- unpack `∅ ∈ FixSet H` using the bridge lemma
-      exact (mem_FixSet_iff (H := H) (X := (∅ : Finset α))).1 hempty |>.2
+      simp_all only [mem_FixSet_iff]
     let hi := HornNF.isNEP_of_isClosed_empty (H := H)
-    simp_all only [mem_FixSet_iff, Finset.mem_powerset, Finset.empty_subset, and_self]
+    simp_all only [mem_FixSet_iff]
+
 
 /-
   ------------------------------------------------------------

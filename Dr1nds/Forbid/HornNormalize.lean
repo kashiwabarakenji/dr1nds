@@ -200,9 +200,9 @@ noncomputable def ClosureForbid (F: HornWithForbid α) : HornWithForbid α where
   H := F.H
   hDR1 := F.hDR1
   hNEP := F.hNEP
-  F := F.H.closure F.F
+  F := F.H.toClosureOperator.cl F.F
   F_subset_U := by
-    unfold closure
+    unfold toClosureOperator.cl
     simp_all only [Finset.filter_subset]
   F_nonempty := by
     have :F.F ⊆ F.H.closure F.F := by
@@ -216,14 +216,67 @@ theorem closureForbid_NDS_corr_spec (F: HornWithForbid α) :
   NDS_corr n (F.FixSet) ≤ NDS_corr n (ClosureForbid F).FixSet := by
   let F' := ClosureForbid F
   have eq : Hole F.H.FixSet F.F = Hole F'.H.FixSet F'.F := by
-    dsimp [Hole]
+    -- Using simp_rw to unfold definitions. This is safer than dsimp/cases.
+    simp_rw [Hole, F', ClosureForbid]
     ext X
+    -- The goal is now `(IsClosed ∧ Disjoint) ↔ (IsClosed ∧ Disjoint_closure)`
     constructor
-    · intro hX
+    · -- Direction `→`
+      intro h
+      -- Accessing parts of the conjunction with .1 and .2
+      simp at h
+      have hX_closed := h.1
+      have hX_disjoint := h.2
       simp
-      simp at hX
-      dsimp [F']
-      sorry
+      refine ⟨hX_closed, ?_⟩
+      -- To prove this, we need a lemma stating that if `X` is closed,
+      -- its complement `F.H.U \ X` is also closed.
+      -- The proof for this lemma is non-trivial with the current setup and is left as sorry.
+      have h_compl_closed : HornNF.IsClosed F.H (F.H.U \ X) := by sorry
+      --have h_ss := HornNF.closure_subset_of_subset_isClosed F.H (hY := h_compl_closed)
+      intro h
+      have mono: F.F ⊆ F.H.toClosureOperator.cl F.F := by
+        have :F.F ⊆ F.H.U := by exact F.F_subset_U
+        exact F.H.toClosureOperator.extensive this
+      have idem : X = F.H.toClosureOperator.cl X := by
+        have mono2: X ⊆ F.H.U := by simp_all only [and_self, not_false_eq_true]
+        let fh := F.H.toClosureOperator.extensive mono2
+        rcases hX_closed with ⟨h1,h2⟩
+        dsimp [HornNF.IsClosed] at h2
+        dsimp [HornNF.toClosureOperator]
+        dsimp [HornNF.closure]
+        simp_all only [true_and, not_false_eq_true, and_true]
+        ext a : 1
+        simp_all only [Finset.mem_filter]
+        apply Iff.intro
+        · intro a_1
+          apply And.intro
+          · exact mono2 a_1
+          · intro Y a_2 a_3
+            apply a_3
+            simp_all only
+        · intro a_1
+          simp_all only [subset_refl]
+
+
+
+
+      have : F.F ⊆ X := by exact fun ⦃a⦄ a_1 => h (mono a_1)
+      exact hX_disjoint this
+    · -- Direction `←`
+      intro h
+      simp at h
+      have hX_closed := h.1
+      have hX_disjoint_closure := h.2
+      simp
+      refine ⟨hX_closed, ?_⟩
+
+      let fd := Finset.disjoint_of_subset_right
+      intro half_le_self
+      · -- `F.F` is a subset of its closure.
+        apply HornNF.subset_closure
+        exact F.F_subset_U
+      · exact hX_disjoint_closure
   dsimp [HornWithForbid.FixSet]
   simp
   exact ge_of_eq (congrArg (NDS_corr n) (id (Eq.symm eq)))
