@@ -256,7 +256,48 @@ theorem Qcorr_ge2_hasHead
   (∀ P:Pack0 α, P.H.U.card = n → Q n P) → (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
   F.H.U.card = n + 1 → ¬IsForbidSingleton F → IsSC1 F h → HasHead1 F h →
    Qcorr (n+1) F
-:= sorry
+:= by
+  -- 1. Introduce all hypotheses.
+  intro hQ_pack0 hQ_forbid hn_card h_not_singleton h_sc1 h_has_head
+
+  -- 2. Prepare arguments for the `_get` function.
+  -- We need to show `F.F.card ≥ 2` from `¬IsForbidSingleton F`.
+  have h_geq2 : F.F.card ≥ 2 := by
+    dsimp [IsForbidSingleton] at h_not_singleton
+    -- F.F is non-empty and its card is not 1, so it must be ≥ 2.
+    have h_nonempty : F.F.Nonempty := F.F_nonempty
+    cases h_card_cases : F.F.card with -- `card_cases` lemma from this file can be used.
+    | zero => exfalso; simp_all only [zero_ne_one, not_false_eq_true, Finset.card_eq_zero, Finset.notMem_empty]
+    | succ m =>
+      cases m with
+      | zero => -- card = 1
+        exfalso; exact h_not_singleton (by simp [h_card_cases])
+      | succ m' => -- card = m' + 2 ≥ 2
+        apply Nat.le_add_left
+
+  -- 3. Obtain the smaller problem `F'` using the `_get` axiom.
+  obtain ⟨F', hF'⟩ := Qcorr_ge2_hasHead_get F h h_geq2 hh h_has_head
+  rcases hF' with ⟨hF'_card, h_ineq⟩
+
+  -- The goal is `Qcorr (n+1) F`, which unfolds to `F.NDS_corr (n+1) ≤ 0`.
+  -- We use the induction hypothesis `hQ_forbid` on the smaller problem `F'`.
+  -- 4. First, show `F'` has the correct card size for the IH.
+  have hF'_card_n : F'.H.U.card = n := by
+    rw [hF'_card, hn_card]
+    simp -- n + 1 - 1 = n
+
+  -- 5. Apply the induction hypothesis to F'.
+  specialize hQ_forbid F' hF'_card_n
+  -- Now `hQ_forbid` is the proposition `Qcorr n F'`, which is `F'.NDS_corr n ≤ 0`.
+
+  -- 6. Chain the inequalities to prove the goal.
+  -- `h_ineq` (from `_get`) gives `F.NDS_corr (n+1) ≤ F'.NDS_corr n`.
+  -- `hQ_forbid` (from IH) gives `F'.NDS_corr n ≤ 0`.
+  rw [hn_card] at h_ineq
+  dsimp [Qcorr]
+  intro hn
+  exact Int.le_trans h_ineq (hQ_forbid hF'_card_n)
+
 
 noncomputable def Qcorr_ge2_headFree_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (geq2: F.F.card ≥ 2) (ha:a ∈ F.F) (hs:¬HasHead1 F a):
     ∃ P':Pack0 α , P'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (NDS P'.H.U.card P'.H.FixSet)
@@ -293,6 +334,8 @@ theorem Qcorr_ge2_headFree
   rw [h1] at hQ
   rw [h1] at h2
   exact Int.le_trans h2 hQ
+
+--禁止集合の閉包をとってもNDSが変わらないというものは、HornNormalizeにおいている。
 
 --パラレルな頂点が存在する場合
 

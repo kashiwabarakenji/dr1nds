@@ -105,7 +105,7 @@ theorem Qcorr_step1
   intro hQ hQcorr
   classical
   intro F hn
-  by_cases hPar : Parallel1 F
+  by_cases hPar : Parallel1 F -- 禁止集合の大きさの分岐を先に変更する。
   · -- parallel branch（独立核）
     obtain ⟨F',hF⟩ := Qcorr_succ_of_parallel_get (α := α) (n := n + 1) F hn hPar
     sorry
