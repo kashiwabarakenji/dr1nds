@@ -9,31 +9,6 @@ import Dr1nds.Horn.HornClosure
 namespace Dr1nds
 variable {α : Type} [DecidableEq α]
 
-/-
-S10(wiring) 相当：
-- case split と「どの局所核を呼ぶか」だけを書く
-- 数学的な中身（局所核）は LocalKernels 側へ
--/
-
-/- ============================================================
-  (W0) forbid なし pack：SC 点 h に対する head-structure 3-way split
-
-  NOTE (設計メモ / 凍結ポイント)
-  - Steps(S10) は *wiring のみ* を書く方針。
-    この 3-way split 自体は「分岐仕様」なので、最終的には
-      (a) Induction/Statements.lean（仕様として凍結）
-      または
-      (b) Induction/LocalKernels.lean（局所核として供給）
-    に移動するのが筋。
-
-  - いまはコンパイルと全体配線の安定化を優先し、ここに axiom として置く。
-============================================================ -/
-
-axiom SC_head_cases0
-  (P : Pack0 α) (h : α) :
-  IsSC0 P h →
-  (¬HasHead0 P h) ∨ (HasHead0 P h)
-
 /- ============================================================
   (S10-0) Q-step (forbid-free)
 ============================================================ -/
@@ -50,17 +25,7 @@ theorem Q_step0
   classical
   by_cases hPar : Parallel0 P
   · -- parallel branch（独立核）
-    /-
-    obtain ⟨u,v,huv,hu,hv⟩ := hPar
-    have :HasParallel0 P u:= by
-      use v
-      simp_all only [ne_eq, and_self, and_true]
-      apply Aesop.BuiltinRules.not_intro
-      intro a
-      subst a
-      simp_all only [not_true_eq_false]
-    -/
-    exact Q_of_parallel (α := α) (n := n) (P := P) hQ hn hPar
+     exact Q_of_parallel (α := α) (n := n) (P := P) hQ hn hPar
 
   · -- no-parallel branch：SC を取って分岐
     have hNP : NoParallel0 P := by
@@ -71,8 +36,7 @@ theorem Q_step0
     have hSC : IsSC0 P h := choose_SC_no_parallel_spec (α := α) P hNP
 
     -- SC 点で head 構造を 3-way split
-    have hcases : (¬HasHead0 P h) ∨ (HasHead0 P h) :=
-      SC_head_cases0 (α := α) (P := P) (h := h) hSC
+    have hcases : (¬HasHead0 P h) ∨ (HasHead0 P h) := by exact Decidable.not_or_of_imp fun a => a
 
     cases hcases with
     | inl hNo =>
@@ -124,9 +88,21 @@ theorem Qcorr_step1
       exact Int.le_trans hF hQcorr
 
     · --  aがheadのルールがないとき。
-      --ここで閉包をとりたい。
-      obtain ⟨F',hF⟩ := Qcorr_singleton_headFree_get (α := α) F a  hAeq hs
-      sorry
+      have :¬HasHead1s F h1 := by
+        intro h
+        have :{a} = F.F := by
+          simp_all only
+        let hex : ∃ b, F.F = {b} := ⟨a, hAeq⟩
+        have hspec := Classical.choose_spec hex  -- : F.F = {Classical.choose hex}
+        have hchoose : Classical.choose hex = a := by
+          have : {Classical.choose hex} = ({a} : Finset α) := by rw [← hspec, hAeq]
+          exact Finset.singleton_injective this
+        dsimp [HasHead1s] at h
+        rw [hchoose] at h
+        exact hs h
+
+      exact Qcorr_singleton_headFree (α := α) n F hQ hn h1 this
+
   · -- A.card≥2（A 内 SC を取って進める）
     let Fclosed := HornNF.ClosureForbid F
     ---禁止集合を閉集合に変えたものを作る必要がある。
@@ -135,30 +111,48 @@ theorem Qcorr_step1
       intro hn
       let cn := HornNF.closureForbid_NDS_corr_spec (n+1) F
       dsimp [Fclosed] at this
-      exact Int.le_trans cn this
+      rw [←cn] at this
+      exact this
 
     by_cases hPar : Parallel1 Fclosed -- 禁止集合の大きさの分岐を先に変更する。
     · -- parallel branch（独立核）
       dsimp [Qcorr]
       exact Qcorr_ge_hasParallel (α := α) (n := n) Fclosed hQcorr hn hPar hn
     · -- no-parallel branch：A の大きさで分岐
-      have hNP : NoParallel1 F := by
-        sorry
+      have hNP : NoParallel1 Fclosed := by
+        dsimp [Fclosed]
+        dsimp [NoParallel1]
+        dsimp [Parallel1]
+        simp_all only [not_exists, ne_eq, not_and, not_false_eq_true, implies_true, Fclosed]
 
+      let a := choose_SC_in_forbid (α := α) Fclosed hNP
+      have hmem : a ∈ Fclosed.F := choose_SC_in_forbid_mem (α := α) Fclosed hNP
+      have hSC : IsSC1 Fclosed a := choose_SC_in_forbid_spec (α := α) Fclosed hNP
+      have fs : ¬IsForbidSingleton Fclosed := by
+        dsimp [IsForbidSingleton]
+        dsimp [Fclosed]
+        have: F.F ⊆ F.H.closure F.F := by
+          have : F.F ⊆ F.H.toClosureOperator.cl F.F := by
+            exact F.H.toClosureOperator.extensive F.F_subset_U
+          exact this
+        have : F.F.card ≤ (F.H.closure F.F).card := by
+          exact Finset.card_le_card this
+        have :F.F.card ≥ 2 := by simp_all only [choose_SC_in_forbid_mem, ge_iff_le, Fclosed, a]
+        have :(F.H.closure F.F).card ≥ 2 := by
+          (expose_names; exact Nat.le_trans hge2 this_2)
+        exact Nat.ne_of_lt' this
+      have : Fclosed.H.U.card = n + 1 := by
+        simp_all [Fclosed, a]
+        exact hn
 
-
-    let h := choose_SC_in_forbid (α := α) F hNP
-    have hmem : h ∈ F.F := choose_SC_in_forbid_mem (α := α) F hNP
-    have hSC : IsSC1 F h := choose_SC_in_forbid_spec (α := α) F hNP
-    have fs : ¬IsForbidSingleton F := by
-      dsimp [IsForbidSingleton]
-      exact Nat.ne_of_lt' hge2
-
-    by_cases hs:HasHead1 F h
-    · exact Qcorr_ge2_hasHead (α := α) (n := n) F (h := h) hmem hQ hQcorr hn fs hSC hs
-    · exact Qcorr_ge2_headFree (α := α) (n := n) F (h := h) hmem hQ hQcorr hn fs hSC hs
-
-
-
+      by_cases hs:HasHead1 F a
+      · let qc := Qcorr_ge2_hasHead (α := α) (n := n) Fclosed (a := a) hmem hQcorr hn fs hSC hs
+        dsimp [Qcorr] at qc
+        specialize qc this
+        exact qc
+      · let qc := Qcorr_ge2_headFree (α := α) (n := n) Fclosed (a := a) hmem hQ hn fs hSC hs
+        dsimp [Qcorr] at qc
+        specialize qc this
+        exact qc
 
 end Dr1nds

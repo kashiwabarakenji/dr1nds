@@ -157,9 +157,13 @@ def HasHead1 (F :HornWithForbid  α) (h : α) : Prop :=
 def IsForbidSingleton (F :HornWithForbid  α): Prop :=
   F.F.card = 1
 
+--シングルトンの禁止集合を与えたときに、headがあるかどうか。
 def HasHead1s (F :HornWithForbid  α) (fs: IsForbidSingleton F):Prop := by
   let h := Classical.choose (Finset.card_eq_one.mp fs)
   exact (F.H.prem h).Nonempty
+
+
+
 
 -----------------------------------------------------
 
@@ -288,13 +292,13 @@ noncomputable def Qcorr_ge2_hasHead_get {α :Type} [DecidableEq α](F : HornWith
 := sorry
 
 theorem Qcorr_ge2_hasHead
-  (n : Nat) (F : HornWithForbid α) (h : α) (hh : h ∈ F.F):
-  (∀ P:Pack0 α, P.H.U.card = n → Q n P) → (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
-  F.H.U.card = n + 1 → ¬IsForbidSingleton F → IsSC1 F h → HasHead1 F h →
+  (n : Nat) (F : HornWithForbid α) (a : α) (hh : a ∈ F.F):
+   (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
+  F.H.U.card = n + 1 → ¬IsForbidSingleton F → IsSC1 F a → HasHead1 F a →
    Qcorr (n+1) F
 := by
   -- 1. Introduce all hypotheses.
-  intro hQ_pack0 hQ_forbid hn_card h_not_singleton h_sc1 h_has_head
+  intro hQ_forbid hn_card h_not_singleton h_sc1 h_has_head
 
   -- 2. Prepare arguments for the `_get` function.
   -- We need to show `F.F.card ≥ 2` from `¬IsForbidSingleton F`.
@@ -311,8 +315,8 @@ theorem Qcorr_ge2_hasHead
       | succ m' => -- card = m' + 2 ≥ 2
         apply Nat.le_add_left
 
-  -- 3. Obtain the smaller problem `F'` using the `_get` axiom.
-  obtain ⟨F', hF'⟩ := Qcorr_ge2_hasHead_get F h h_geq2 hh h_has_head
+  -- 3. Obtain the smaller problem `F'` using the `_get`
+  obtain ⟨F', hF'⟩ := Qcorr_ge2_hasHead_get F a h_geq2 hh h_has_head
   rcases hF' with ⟨hF'_card, h_ineq⟩
 
   -- The goal is `Qcorr (n+1) F`, which unfolds to `F.NDS_corr (n+1) ≤ 0`.
