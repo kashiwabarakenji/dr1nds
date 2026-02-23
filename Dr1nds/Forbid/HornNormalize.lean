@@ -237,8 +237,8 @@ noncomputable def ClosureForbid (F: HornWithForbid α) : HornWithForbid α where
       exact F.F_nonempty
     exact ne.mono this
 
-theorem closureForbid_NDS_corr_spec (F: HornWithForbid α) :
-  NDS_corr n (F.FixSet) ≤ NDS_corr n (ClosureForbid F).FixSet := by
+theorem closureForbid_NDS_corr_spec (n : Nat)(F: HornWithForbid α) :
+  NDS_corr n (F.H.FixSet) F.F ≤ NDS_corr n (ClosureForbid F).H.FixSet (ClosureForbid F).F:= by
   let F' := ClosureForbid F
   have eq : Hole F.H.FixSet F.F = Hole F'.H.FixSet F'.F := by
     -- Using simp_rw to unfold definitions. This is safer than dsimp/cases.
@@ -280,9 +280,6 @@ theorem closureForbid_NDS_corr_spec (F: HornWithForbid α) :
         · intro a_1
           simp_all only [subset_refl]
 
-
-
-
       have : F.F ⊆ X := by exact fun ⦃a⦄ a_1 => h (mono a_1)
       exact hX_disjoint this
     · -- Direction `←`
@@ -311,13 +308,51 @@ theorem closureForbid_NDS_corr_spec (F: HornWithForbid α) :
           exact eq0
         simp_all only [not_false_eq_true, and_self]
 
-  dsimp [HornWithForbid.FixSet]
-  simp
-  exact ge_of_eq (congrArg (NDS_corr n) (id (Eq.symm eq)))
+  dsimp [NDS_corr]
+  --dsimp [ClosureForbid]
+  dsimp [F'] at eq
+  rw [←eq]
 
+  have: Up F.H.FixSet F.F = Up (ClosureForbid F).H.FixSet (ClosureForbid F).F  := by
+    ext X
+    constructor
+    · intro hX
+      dsimp [Up] at hX
+      dsimp [Up]
+      simp at hX
+      simp
+      dsimp [ClosureForbid]
+      constructor
+      · simp_all only
+      · have mono:F.H.toClosureOperator.cl F.F ⊆ F.H.toClosureOperator.cl X := by
+          apply F.H.toClosureOperator.monotone
+          dsimp [HornNF.toClosureOperator]
+          exact F.F_subset_U
+          dsimp [HornNF.toClosureOperator]
+          dsimp [HornNF.IsClosed] at hX
+          simp_all only
+          simp_all only
+        have eq0: F.H.closure X = X := by
+          exact (IsClosed_iff F.H X).mp hX.1
+        have eq:F.H.toClosureOperator.cl X = X := by
+          dsimp [HornNF.toClosureOperator]
+          exact eq0
+        simp_all only
+    · intro hX
+      dsimp [Up]
+      dsimp [Up] at hX
+      simp
+      simp at hX
+      dsimp [ClosureForbid] at hX
+      constructor
+      · simp_all only
+      · rcases hX with ⟨h1,h2⟩
+        have extensive: F.F ⊆ F.H.toClosureOperator.cl F.F := by
+          apply F.H.toClosureOperator.extensive
+          exact F.F_subset_U
+        exact fun ⦃a⦄ a_1 => h2 (extensive a_1)
 
-
-
+  simp_all only [le_refl]
 
 end HornNF
 end Dr1nds

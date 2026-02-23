@@ -50,6 +50,7 @@ theorem Q_step0
   classical
   by_cases hPar : Parallel0 P
   · -- parallel branch（独立核）
+    /-
     obtain ⟨u,v,huv,hu,hv⟩ := hPar
     have :HasParallel0 P u:= by
       use v
@@ -58,18 +59,8 @@ theorem Q_step0
       intro a
       subst a
       simp_all only [not_true_eq_false]
-    obtain ⟨P',hP⟩ := Q_succ_of_parallel_get (α := α) (n := n + 1) (P := P) hn u this
-    simp at hP
-    dsimp [Q]
-    intro h
-    specialize hQ P'
-    specialize hQ hP.1
-    dsimp [Q] at hQ
-    simp_all only [forall_const]
-    simp_all only [ne_eq]
-    obtain ⟨left, right⟩ := hP
-    subst left
-    exact right.trans hQ
+    -/
+    exact Q_of_parallel (α := α) (n := n) (P := P) hQ hn hPar
 
   · -- no-parallel branch：SC を取って分岐
     have hNP : NoParallel0 P := by
@@ -94,10 +85,7 @@ theorem Q_step0
   (S10-1) Qcorr-step (with forbid A)
 ============================================================ -/
 
-
-
-
-
+-----禁止集合がある場合。
 theorem Qcorr_step1
   (n : Nat) :
   (∀ P: Pack0 α ,(P.H.U.card = n → Q n P)) → (∀ F: HornWithForbid α , (F.H.U.card = n → Qcorr (α := α) n F))
@@ -105,58 +93,70 @@ theorem Qcorr_step1
   intro hQ hQcorr
   classical
   intro F hn
-  by_cases hPar : Parallel1 F -- 禁止集合の大きさの分岐を先に変更する。
-  · -- parallel branch（独立核）
-    obtain ⟨F',hF⟩ := Qcorr_succ_of_parallel_get (α := α) (n := n + 1) F hn hPar
-    sorry
-  · -- no-parallel branch：A の大きさで分岐
-    have hNP : NoParallel1 F := by
-      exact hPar
-    have hCardCases := card_cases (α := α) F.F  --ここではまだ閉包はとらない。
-    rcases hCardCases with h0 | h1 | hge2
-    · -- A.card=0（暫定：専用核）
-      let fe :=F.F_nonempty
-      exfalso
-      simp_all only [not_false_eq_true, not_exists, ne_eq, not_and, Finset.card_eq_zero]
-      simp [h0] at fe
-    · -- A.card=1（専用核：台落ち）
-      -- `A.card = 1` から代表元 `a` を取り、`A = {a}` を得る。
-      obtain ⟨a, hAeq⟩ := Finset.card_eq_one.mp h1
-      by_cases hs:HasHead1 F a
-      · -- a がheadのルールがあるとき。
-        obtain ⟨F',hF⟩ := Qcorr_singleton_hasHead_get (α := α) F a hAeq hs
-        dsimp [Qcorr]
-        intro hf
-        specialize hQcorr F'
-        have : F'.H.U.card = n := by simp_all only [not_false_eq_true, not_exists, ne_eq,
-          not_and, Finset.card_singleton, add_tsub_cancel_right, forall_const]
-        specialize hQcorr this
-        dsimp [Qcorr] at hQcorr
-        specialize hQcorr this
-        rw [this] at hF
-        rw [hf] at hF
-        simp at hF
-        --片方が集合族のNDSで、片方が表示のNDSなので変換する必要がある。変換は定義を展開すればいい。
-        dsimp [HornWithForbid.NDS_corr] at hF
-        dsimp [HornWithForbid.BaseC] at hF
-        exact Int.le_trans hF hQcorr
 
-      · --  aがheadのルールがないとき。
-        --ここで閉包をとりたい。
-        obtain ⟨F',hF⟩ := Qcorr_singleton_headFree_get (α := α) F a  hAeq hs
+  have hCardCases := card_cases (α := α) F.F  --ここではまだ閉包はとらない。
+  rcases hCardCases with h0 | h1 | hge2
+  · -- A.card=0（暫定：専用核）
+    let fe :=F.F_nonempty
+    exfalso
+    simp_all only [Finset.card_eq_zero]
+    simp [h0] at fe
+  · -- A.card=1（専用核：台落ち）
+    -- `A.card = 1` から代表元 `a` を取り、`A = {a}` を得る。
+    obtain ⟨a, hAeq⟩ := Finset.card_eq_one.mp h1
+    by_cases hs:HasHead1 F a
+    · -- a がheadのルールがあるとき。
+      obtain ⟨F',hF⟩ := Qcorr_singleton_hasHead_get (α := α) F a hAeq hs
+      dsimp [Qcorr]
+      intro hf
+      specialize hQcorr F'
+      have : F'.H.U.card = n := by simp_all only [Finset.card_singleton, add_tsub_cancel_right,
+        forall_const]
+      specialize hQcorr this
+      dsimp [Qcorr] at hQcorr
+      specialize hQcorr this
+      rw [this] at hF
+      rw [hf] at hF
+      simp at hF
+      --片方が集合族のNDSで、片方が表示のNDSなので変換する必要がある。変換は定義を展開すればいい。
+      dsimp [HornWithForbid.NDS_corr] at hF
+      dsimp [HornWithForbid.BaseC] at hF
+      exact Int.le_trans hF hQcorr
+
+    · --  aがheadのルールがないとき。
+      --ここで閉包をとりたい。
+      obtain ⟨F',hF⟩ := Qcorr_singleton_headFree_get (α := α) F a  hAeq hs
+      sorry
+  · -- A.card≥2（A 内 SC を取って進める）
+    let Fclosed := HornNF.ClosureForbid F
+    ---禁止集合を閉集合に変えたものを作る必要がある。
+    suffices NDS_corr (n+1) Fclosed.H.FixSet Fclosed.F ≤ 0 from by
+      dsimp [Qcorr]
+      intro hn
+      let cn := HornNF.closureForbid_NDS_corr_spec (n+1) F
+      dsimp [Fclosed] at this
+      exact Int.le_trans cn this
+
+    by_cases hPar : Parallel1 Fclosed -- 禁止集合の大きさの分岐を先に変更する。
+    · -- parallel branch（独立核）
+      dsimp [Qcorr]
+      exact Qcorr_ge_hasParallel (α := α) (n := n) Fclosed hQcorr hn hPar hn
+    · -- no-parallel branch：A の大きさで分岐
+      have hNP : NoParallel1 F := by
         sorry
-    · -- A.card≥2（A 内 SC を取って進める）
-      ---禁止集合を閉集合に変えたものを作る必要がある。
-      let h := choose_SC_in_forbid (α := α) F hNP
-      have hmem : h ∈ F.F := choose_SC_in_forbid_mem (α := α) F hNP
-      have hSC : IsSC1 F h := choose_SC_in_forbid_spec (α := α) F hNP
-      have fs : ¬IsForbidSingleton F := by
-        dsimp [IsForbidSingleton]
-        exact Nat.ne_of_lt' hge2
 
-      by_cases hs:HasHead1 F h
-      · exact Qcorr_ge2_hasHead (α := α) (n := n) F (h := h) hmem hQ hQcorr hn fs hSC hs
-      · exact Qcorr_ge2_headFree (α := α) (n := n) F (h := h) hmem hQ hQcorr hn fs hSC hs
+
+
+    let h := choose_SC_in_forbid (α := α) F hNP
+    have hmem : h ∈ F.F := choose_SC_in_forbid_mem (α := α) F hNP
+    have hSC : IsSC1 F h := choose_SC_in_forbid_spec (α := α) F hNP
+    have fs : ¬IsForbidSingleton F := by
+      dsimp [IsForbidSingleton]
+      exact Nat.ne_of_lt' hge2
+
+    by_cases hs:HasHead1 F h
+    · exact Qcorr_ge2_hasHead (α := α) (n := n) F (h := h) hmem hQ hQcorr hn fs hSC hs
+    · exact Qcorr_ge2_headFree (α := α) (n := n) F (h := h) hmem hQ hQcorr hn fs hSC hs
 
 
 
