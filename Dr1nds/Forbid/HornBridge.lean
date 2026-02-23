@@ -146,28 +146,28 @@ lemma hole_singleton_eq_fixset_trace_head_free
     · intro hX
       have hXmem := (mem_FixSet_iff (H.trace v) X).mp hX
       have hXsubErase : X ⊆ H.U.erase v := by
-        simpa [HornNF.trace] using Finset.mem_powerset.mp hXmem.1
+        simp_all only [mem_FixSet_iff]
+        exact hXmem.2
       have hvX : v ∉ X := by
         intro hv; exact (Finset.mem_erase.mp (hXsubErase hv)).1 rfl
       have hXsubU : X ⊆ H.U := fun x hx => (Finset.mem_erase.mp (hXsubErase hx)).2
-      have hXclosed : HornNF.IsClosed H X :=
-        (HornNF.trace_isClosed_iff_head_free H v hfree hvX).mp hXmem.2
-      exact Finset.mem_filter.mpr
-        ⟨(mem_FixSet_iff H X).mpr ⟨Finset.mem_powerset.mpr hXsubU, hXclosed⟩, hvX⟩
+      have hXclosed : HornNF.IsClosed H X := by
+        apply  (HornNF.trace_isClosed_iff_head_free H v hfree hvX).mp
+        exact hXmem
+      apply Finset.mem_filter.mpr
+      simp_all only [mem_FixSet_iff, not_false_eq_true, and_self]
     · intro hX
       have hXfilt := Finset.mem_filter.mp hX
       have hXmem := (mem_FixSet_iff H X).mp hXfilt.1
       have hvX : v ∉ X := hXfilt.2
-      have hXsubU : X ⊆ H.U := Finset.mem_powerset.mp hXmem.1
-      have hXclosed : HornNF.IsClosed H X := hXmem.2
+      have hXsubU : X ⊆ H.U := by
+        dsimp [HornNF.IsClosed] at hXmem
+        simp_all only [Finset.mem_filter, not_false_eq_true, and_self, mem_FixSet_iff, and_true]
+      have hXclosed : HornNF.IsClosed H X := hXmem
       have hXclosedTrace : HornNF.IsClosed (H.trace v) X :=
         (HornNF.trace_isClosed_iff_head_free H v hfree hvX).mpr hXclosed
       apply (mem_FixSet_iff (H.trace v) X).mpr
-      refine ⟨Finset.mem_powerset.mpr ?_, hXclosedTrace⟩
-      have : X ⊆ H.U.erase v := by
-        intro x hx
-        exact Finset.mem_erase.mpr ⟨fun hxv => hvX (hxv ▸ hx), hXsubU hx⟩
-      simpa [HornNF.trace] using this
+      simp_all only [Finset.mem_filter, not_false_eq_true, and_self, mem_FixSet_iff]
   calc
     Hole (α := α) (HornNF.FixSet H) ({v} : Finset α)
         = (HornNF.FixSet H).filter (fun X => v ∉ X) := by simp [Hole]
@@ -213,20 +213,26 @@ lemma card_up_fixset_eq_card_fixset_trace_head_free
 
     -- closedness of insert v X in H (uses hNoPremV)
     have hclosed_ins : HornNF.IsClosed H (insert v X) := by
-      intro h P hP hPsub
-      have hvP : v ∉ P := hNoPremV hP
-      have hPsubX : P ⊆ X := by
-        intro x hxP
-        have hxIns : x ∈ insert v X := hPsub hxP
-        rcases Finset.mem_insert.mp hxIns with rfl | hxX
-        · exfalso; exact hvP hxP
-        · exact hxX
-      -- transfer closedness: trace and H coincide on sets not containing v
-      have hclosedH_X : HornNF.IsClosed H X :=
-        (HornNF.trace_isClosed_iff_head_free (H := H) (v := v) (hfree := hfree) (hvX := hvX)).1
-          hXclosedTrace
-      have hhX : h ∈ X := hclosedH_X hP hPsubX
-      exact Finset.mem_insert_of_mem hhX
+      dsimp [HornNF.IsClosed]
+      constructor
+      · intro h P hP hPsub
+        have hvP : v ∉ P := hNoPremV hP
+        have hPsubX : P ⊆ X := by
+          intro x hxP
+          have hxIns : x ∈ insert v X := hPsub hxP
+          rcases Finset.mem_insert.mp hxIns with rfl | hxX
+          · exfalso; exact hvP hxP
+          · exact hxX
+        -- transfer closedness: trace and H coincide on sets not containing v
+        have hclosedH_X : HornNF.IsClosed H X :=
+          (HornNF.trace_isClosed_iff_head_free (H := H) (v := v) (hfree := hfree) (hvX := hvX)).1
+            hXclosedTrace
+        have hhX : h ∈ X := by
+          dsimp [HornNF.IsClosed] at hclosedH_X
+          rcases hclosedH_X with ⟨h1,h2⟩
+          exact h1 hP hPsubX
+        exact Finset.mem_insert_of_mem hhX
+      · exact hsubU
 
     have hFix : insert v X ∈ HornNF.FixSet H := by
       refine Finset.mem_filter.mpr ?_
@@ -237,6 +243,7 @@ lemma card_up_fixset_eq_card_fixset_trace_head_free
     exact Finset.mem_filter.mpr ⟨hFix, by
       simp_all only [mem_FixSet_iff, and_self, Finset.mem_powerset, Finset.singleton_subset_iff, Finset.mem_insert,
         or_false]
+
     ⟩
 
   -- 左 → 右 : Y ∈ Up ↦ erase v Y ∈ Fix(trace)
@@ -266,15 +273,21 @@ lemma card_up_fixset_eq_card_fixset_trace_head_free
 
     -- show IsClosed H (Y.erase v) from IsClosed H Y
     have hclosedH : HornNF.IsClosed H (Y.erase v) := by
-      intro h P hP hPsub
-      have hPsubY : P ⊆ Y := by
-        intro x hxP
-        exact Finset.mem_of_mem_erase (hPsub hxP)
-      have hhY : h ∈ Y := hYclosed hP hPsubY
-      by_cases hEq : h = v
-      · subst hEq
-        simp_all only [mem_FixSet_iff, and_self, Finset.mem_powerset, Finset.notMem_empty]
-      · exact Finset.mem_erase.mpr ⟨hEq, hhY⟩
+      constructor
+      ·
+        intro h P hP hPsub
+        have hPsubY : P ⊆ Y := by
+          intro x hxP
+          exact Finset.mem_of_mem_erase (hPsub hxP)
+        have hhY : h ∈ Y := by
+          dsimp [HornNF.IsClosed] at hYclosed
+          rcases hYclosed with ⟨h1,h2⟩
+          exact h1 hP hPsubY
+        by_cases hEq : h = v
+        · subst hEq
+          simp_all only [mem_FixSet_iff, and_self, Finset.mem_powerset, Finset.notMem_empty]
+        · exact Finset.mem_erase.mpr ⟨hEq, hhY⟩
+      · exact (Finset.erase_subset_iff_of_mem hvU).mpr hYsubU
 
     have hclosedTrace : HornNF.IsClosed (H.trace v) (Y.erase v) :=
       (HornNF.trace_isClosed_iff_head_free (H := H) (v := v) (hfree := hfree) (hvX := hvX)).2
@@ -327,8 +340,8 @@ lemma card_up_fixset_eq_card_fixset_trace_head_free
           have : v ∈ ({v} : Finset α) := by simp
           exact hvYsub this
         -- now insert/erase cancels
-        simp_all only [mem_FixSet_iff, Finset.mem_powerset, Up_singleton_eq_filter_mem, Finset.mem_filter,
-          Finset.mem_insert, true_or, and_true, and_imp, Finset.singleton_subset_iff, Finset.insert_erase]
+        simp_all only [mem_FixSet_iff, Up_singleton_eq_filter_mem, Finset.mem_filter,
+          Finset.mem_insert, true_or, and_true, Finset.singleton_subset_iff, Finset.insert_erase]
       )
 
   exact hcard.symm
@@ -432,13 +445,16 @@ lemma card_up_fixset_eq_card_fixset_trace_has_head
     -- closedness of insert v X in H (use the dedicated lemma from HornTrace)
     have hclosed_ins : HornNF.IsClosed H (insert v X) := by
       -- prove closedness for `X ∪ {v}` using the lemma in `HornTrace.lean`
-      have hclosed_union : HornNF.IsClosed H (X ∪ ({v} : Finset α)) :=
-        Dr1nds.HornNF.isClosed_union_singleton_of_noPremContains
-          (H := H) (v := v)
-          (hNoPremV := by
-            intro h Q hQ
-            exact hNoPremV (h := h) (P := Q) hQ)
-          (Y := X) hXclosedTrace
+      have hclosed_union : HornNF.IsClosed H (X ∪ ({v} : Finset α)) := by
+        let hi := Dr1nds.HornNF.isClosed_union_singleton_of_noPremContains
+            (H := H) (v := v) (Y:= X)
+            (hNoPremV := by
+              intro h Q hQ
+              exact hNoPremV hQ
+            )
+        apply hi
+        simp_all only [mem_FixSet_iff, and_self, Finset.mem_powerset]
+        exact hXclosedTrace
       -- rewrite `insert v X` as `X ∪ {v}`
       simp_all only [mem_FixSet_iff, and_self, Finset.mem_powerset, Finset.union_singleton]
 
@@ -478,28 +494,33 @@ lemma card_up_fixset_eq_card_fixset_trace_has_head
 
     -- closedness in trace
     have hclosedTrace : HornNF.IsClosed (H.trace v) (Y.erase v) := by
-      intro h P hP hPsub
-      by_cases hh : h = v
-      · subst hh
-        -- trace prem at v is empty
-        simp [HornNF.trace] at hP
-      · -- h ≠ v
-        have hPremEq : (H.trace v).prem h = H.prem h :=
-          HornNF.trace_prem_eq_of_noPremContains (H := H) (v := v)
-            (hNoPremV := by
-              intro h' P' hP'
-              exact hNoPremV (h := h') (P := P') hP')
-            (hneq := hh)
-        have hP' : P ∈ H.prem h := by
-          simpa [hPremEq] using hP
-        -- lift subset to Y (since v ∉ P)
-        have hvP : v ∉ P := hNoPremV hP'
-        have hPsubY : P ⊆ Y := by
-          intro x hxP
-          have hxE : x ∈ Y.erase v := hPsub hxP
-          exact Finset.mem_of_mem_erase hxE
-        have hhY : h ∈ Y := hYclosed (h := h) (P := P) hP' hPsubY
-        exact Finset.mem_erase.mpr ⟨hh, hhY⟩
+      dsimp [HornNF.IsClosed]
+      constructor
+      · intro h P hP hPsub
+        by_cases hh : h = v
+        · subst hh
+          -- trace prem at v is empty
+          simp [HornNF.trace] at hP
+        · -- h ≠ v
+          have hPremEq : (H.trace v).prem h = H.prem h :=
+            HornNF.trace_prem_eq_of_noPremContains (H := H) (v := v)
+              (hNoPremV := by
+                intro h' P' hP'
+                exact hNoPremV (h := h') (P := P') hP')
+              (hneq := hh)
+          have hP' : P ∈ H.prem h := by
+            simpa [hPremEq] using hP
+          -- lift subset to Y (since v ∉ P)
+          have hvP : v ∉ P := hNoPremV hP'
+          have hPsubY : P ⊆ Y := by
+            intro x hxP
+            have hxE : x ∈ Y.erase v := hPsub hxP
+            exact Finset.mem_of_mem_erase hxE
+          have hhY : h ∈ Y :=  by
+            rcases hYclosed with ⟨h1,h2⟩
+            exact h1 hP' hPsubY
+          exact Finset.mem_erase.mpr ⟨hh, hhY⟩
+      · exact hsubUerase
 
     exact Finset.mem_filter.mpr ⟨hpow', hclosedTrace⟩
 

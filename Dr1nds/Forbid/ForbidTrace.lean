@@ -318,14 +318,33 @@ lemma deletion_filter_equiv
     · dsimp [HornNF.IsClosed]
       constructor
       ·
-        intro h P hP hPX
+        intro head Q hQ hQsub
         have hTraceClosed :
           HornNF.IsClosed (H.trace v) X := by
-            simp_all only [not_false_eq_true, and_self, mem_FixSet_iff]
-        dsimp [HornNF.IsClosed] at hTraceClosed
-        rcases hTraceClosed with ⟨hTraceClosed1,hTraceClose2⟩
-        dsimp [HornNF.trace] at hTraceClosed1
-        sorry
+            simpa [mem_FixSet_iff] using hTraceFix
+        rcases hTraceClosed with ⟨hTraceClosed1, hTraceClosed2⟩
+
+        have hvX : v ∉ X := by
+          intro hv
+          have hvU : v ∈ (H.trace v).U := hTraceClosed2 hv
+          simp [HornNF.trace] at hvU
+
+        by_cases h_eq_v : head = v
+        · subst h_eq_v
+          have hQeq : Q = P :=
+            prem_eq_of_mem_of_mem
+              (H := H) (v := head) (hDR1 := hDR1) (hP := hQ) (hQ := hP)
+          subst hQeq
+          exfalso
+          exact hNotP hQsub
+        ·
+          have hQ_trace : Q ∈ (H.trace v).prem head := by
+            simp [HornNF.trace, h_eq_v]
+            by_cases hvQ : v ∈ Q
+            · exfalso
+              exact hvX (hQsub hvQ)
+            · exact ⟨⟨Q, hQ, by simp [hvQ]⟩, H.nf hQ⟩
+          exact hTraceClosed1 hQ_trace hQsub
       · dsimp [HornNF.FixSet] at hTraceFix
         simp at hTraceFix
         dsimp [HornNF.trace] at hTraceFix

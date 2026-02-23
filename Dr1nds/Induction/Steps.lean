@@ -43,13 +43,22 @@ forbid なし版の帰納ステップ（構造のみ）：
 Parallel なら独立核へ、NoParallel なら SC を取り 3-way split。
 -/
 theorem Q_step0
-  (n : Nat):
-   (∀ P : Pack0 α,(P.H.U.card = n → Q n P)) → (∀ P : Pack0 α,P.H.U.card = n+1 → Q (n+1) P) := by
-  intro hQ P hn
+  (n : Nat)(P : Pack0 α):
+   (∀ P : Pack0 α,(P.H.U.card = n → Q n P)) →  (∀ F: HornWithForbid α , (F.H.U.card = n → Qcorr (α := α) n F))
+    → P.H.U.card = n+1 → Q (n+1) P := by
+  intro hQ hQcorr hn
   classical
   by_cases hPar : Parallel0 P
   · -- parallel branch（独立核）
-    obtain ⟨P',hP⟩ := Q_succ_of_parallel (α := α) (n := n + 1) (P := P) hn hPar
+    obtain ⟨u,v,huv,hu,hv⟩ := hPar
+    have :HasParallel0 P u:= by
+      use v
+      simp_all only [ne_eq, and_self, and_true]
+      apply Aesop.BuiltinRules.not_intro
+      intro a
+      subst a
+      simp_all only [not_true_eq_false]
+    obtain ⟨P',hP⟩ := Q_succ_of_parallel_get (α := α) (n := n + 1) (P := P) hn u this
     simp at hP
     dsimp [Q]
     intro h
@@ -57,13 +66,9 @@ theorem Q_step0
     specialize hQ hP.1
     dsimp [Q] at hQ
     simp_all only [forall_const]
-    obtain ⟨w, h_1⟩ := hPar
-    obtain ⟨left, right⟩ := hP
-    obtain ⟨w_1, h_1⟩ := h_1
-    obtain ⟨left_1, right_1⟩ := h_1
-    obtain ⟨left_2, right_1⟩ := right_1
-    subst left
     simp_all only [ne_eq]
+    obtain ⟨left, right⟩ := hP
+    subst left
     exact right.trans hQ
 
   · -- no-parallel branch：SC を取って分岐
@@ -81,26 +86,15 @@ theorem Q_step0
     cases hcases with
     | inl hNo =>
         -- head なし
-        exact Q_branch_headFree (α := α) (n := n) (P := P) (h := h) hSC hNo hQ
+        exact Q_branch_headFree (α := α) (n := n) (P := P) (h := h) hQ hn hSC hNo
     | inr hrest =>
-        exact Q_branch_hasHead (α := α) (n := n) (P := P) (h := h) hSC hrest hQ
+        exact Q_branch_hasHead (α := α) (n := n) (P := P) (h := h) hQ hQcorr hn hSC hrest
 
 /- ============================================================
   (S10-1) Qcorr-step (with forbid A)
 ============================================================ -/
 
-/--
-forbid あり版の帰納ステップ（構造のみ）：
-Parallel なら独立核へ、NoParallel なら
-|A|=1 を専用核、|A|≥2 を “A 内 SC” で進める。
--/
-noncomputable def Qcorr_Singleton_HasHead {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:HasHead1 F a):
-    ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (F'.NDS_corr (F.H.U.card - 1))
-:= sorry
 
-noncomputable def Qcorr_Singleton_NoHead {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:¬HasHead1 F a):
-    ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr (F.H.U.card - 1)) ≤ (F'.NDS_corr F.H.U.card)
-:= sorry
 
 
 
@@ -113,7 +107,7 @@ theorem Qcorr_step1
   intro F hn
   by_cases hPar : Parallel1 F
   · -- parallel branch（独立核）
-    obtain ⟨F',hF⟩ := Qcorr_succ_of_parallel (α := α) (n := n + 1) F hn hPar
+    obtain ⟨F',hF⟩ := Qcorr_succ_of_parallel_get (α := α) (n := n + 1) F hn hPar
     sorry
   · -- no-parallel branch：A の大きさで分岐
     have hNP : NoParallel1 F := by
@@ -130,7 +124,7 @@ theorem Qcorr_step1
       obtain ⟨a, hAeq⟩ := Finset.card_eq_one.mp h1
       by_cases hs:HasHead1 F a
       · -- a がheadのルールがあるとき。
-        obtain ⟨F',hF⟩ := Qcorr_Singleton_HasHead (α := α) F a hAeq hs
+        obtain ⟨F',hF⟩ := Qcorr_singleton_hasHead_get (α := α) F a hAeq hs
         dsimp [Qcorr]
         intro hf
         specialize hQcorr F'
@@ -149,17 +143,20 @@ theorem Qcorr_step1
 
       · --  aがheadのルールがないとき。
         --ここで閉包をとりたい。
-        obtain ⟨F',hF⟩ := Qcorr_Singleton_NoHead (α := α) F a  hAeq hs
+        obtain ⟨F',hF⟩ := Qcorr_singleton_headFree_get (α := α) F a  hAeq hs
         sorry
     · -- A.card≥2（A 内 SC を取って進める）
       ---禁止集合を閉集合に変えたものを作る必要がある。
       let h := choose_SC_in_forbid (α := α) F hNP
       have hmem : h ∈ F.F := choose_SC_in_forbid_mem (α := α) F hNP
       have hSC : IsSC1 F h := choose_SC_in_forbid_spec (α := α) F hNP
+      have fs : ¬IsForbidSingleton F := by
+        dsimp [IsForbidSingleton]
+        exact Nat.ne_of_lt' hge2
 
       by_cases hs:HasHead1 F h
-      · exact Qcorr_ge2_HasHead (α := α) (n := n) (P := P) (h := h) hSC hmem hSC
-      · exact Qcorr_ge2_NoHead (α := α) (n := n) (P := P) (h := h) hSC hmem hSC
+      · exact Qcorr_ge2_hasHead (α := α) (n := n) F (h := h) hmem hQ hQcorr hn fs hSC hs
+      · exact Qcorr_ge2_headFree (α := α) (n := n) F (h := h) hmem hQ hQcorr hn fs hSC hs
 
 
 

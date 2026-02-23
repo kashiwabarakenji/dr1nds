@@ -97,20 +97,35 @@ theorem hole_fixset_singleton_normalize_eq
     =
   Hole (α := α) (FixSet H) ({a} : Finset α) := by
   ext X
-  simp only [mem_Hole_iff, mem_FixSet_iff, Finset.mem_powerset, singleton_subset_iff]
+  simp only [mem_Hole_iff, mem_FixSet_iff, singleton_subset_iff]
   constructor
   · rintro ⟨⟨hU, hCl_norm⟩, haX⟩
-    refine ⟨⟨hU, ?_⟩, haX⟩
-    intro h P hP hsub
-    by_cases haP : a ∈ P
-    · exact absurd (hsub haP) haX
-    · exact hCl_norm (Finset.mem_filter.mpr ⟨hP, haP⟩) hsub
+    constructor
+    · dsimp [HornNF.IsClosed]
+      constructor
+      ·         --refine ⟨⟨hU, ?_⟩, haX⟩
+        intro h P hP hsub
+        by_cases haP : a ∈ P
+        · exact absurd (hsub haP) haX
+        · dsimp [HornNF.normalizePrem] at hCl_norm
+          dsimp [HornNF.normalizePrem] at hU
+          have :P ∈ (H.normalize a).prem h := by
+            dsimp [HornNF.normalize]
+            simp
+            exact And.symm ⟨haP, hP⟩
+          exact hU this hsub
+      · exact hCl_norm
+    · exact haX
   · rintro ⟨⟨hU, hCl⟩, haX⟩
-    refine ⟨⟨hU, ?_⟩, haX⟩
-    intro h P hP hsub
-    simp [normalizePrem, normalize] at hP
-    exact hCl hP.1 hsub
-
+    dsimp [HornNF.IsClosed]
+    constructor
+    · constructor
+      · intro h P hP hsub
+        simp [normalizePrem, normalize] at hP
+        obtain ⟨left, right⟩ := hP
+        exact hU left hsub
+      · exact hCl
+    · exact haX
 /--
 On singleton forbid, the `NDS_corr` of the original system is bounded by the normalized one.
 -/
@@ -124,10 +139,20 @@ lemma ndscorr_singleton_normalize_le
     intro X hX
     simp [Up] at hX ⊢
     refine ⟨?_, hX.2⟩
-    refine ⟨hX.1.1, ?_⟩
-    intro h P hP hsub
-    simp [normalizePrem, normalize] at hP
-    exact hX.1.2 hP.1 hsub
+    dsimp [HornNF.IsClosed]
+    constructor
+    · intro h P hP hsub
+      simp [normalizePrem, normalize] at hP
+      rcases hX with ⟨h1,h2⟩
+      dsimp [HornNF.IsClosed] at h1
+      simp_all only [Hole_singleton_eq_filter_notmem]
+      obtain ⟨left, right⟩ := hP
+      obtain ⟨left_1, right_1⟩ := h1
+      exact left_1 left hsub
+    · dsimp [HornNF.normalizePrem]
+      dsimp [HornNF.normalize]
+      dsimp [HornNF.IsClosed] at hX
+      simp_all only [Hole_singleton_eq_filter_notmem]
   simp only [NDS_corr, hHole]
   linarith [Int.ofNat_le.mpr hCard]
 
@@ -202,8 +227,8 @@ noncomputable def ClosureForbid (F: HornWithForbid α) : HornWithForbid α where
   hNEP := F.hNEP
   F := F.H.toClosureOperator.cl F.F
   F_subset_U := by
-    unfold toClosureOperator.cl
-    simp_all only [Finset.filter_subset]
+    unfold toClosureOperator
+    exact closure_subset_U F.H F.F
   F_nonempty := by
     have :F.F ⊆ F.H.closure F.F := by
       apply subset_closure
@@ -239,13 +264,16 @@ theorem closureForbid_NDS_corr_spec (F: HornWithForbid α) :
         have :F.F ⊆ F.H.U := by exact F.F_subset_U
         exact F.H.toClosureOperator.extensive this
       have idem : X = F.H.toClosureOperator.cl X := by
-        have mono2: X ⊆ F.H.U := by simp_all only [and_self, not_false_eq_true]
+        have mono2: X ⊆ F.H.U := by
+          simp_all only [and_self, not_false_eq_true]
+          intro y hy
+          exact hX_closed.2 hy
         let fh := F.H.toClosureOperator.extensive mono2
         rcases hX_closed with ⟨h1,h2⟩
-        dsimp [HornNF.IsClosed] at h2
+        --dsimp [HornNF.IsClosed] at h2
         dsimp [HornNF.toClosureOperator]
         dsimp [HornNF.closure]
-        simp_all only [true_and, not_false_eq_true, and_true]
+        simp_all only [not_false_eq_true, and_true]
         ext a : 1
         simp_all only [Finset.mem_filter]
         apply Iff.intro
@@ -271,12 +299,24 @@ theorem closureForbid_NDS_corr_spec (F: HornWithForbid α) :
       simp
       refine ⟨hX_closed, ?_⟩
 
-      let fd := Finset.disjoint_of_subset_right
+      --let fd := Finset.disjoint_of_subset_right
       intro half_le_self
       · -- `F.F` is a subset of its closure.
-        apply HornNF.subset_closure
-        exact F.F_subset_U
-      · exact hX_disjoint_closure
+        have mono:F.H.toClosureOperator.cl F.F ⊆ F.H.toClosureOperator.cl X := by
+          apply F.H.toClosureOperator.monotone
+          dsimp [HornNF.toClosureOperator]
+          exact F.F_subset_U
+          dsimp [HornNF.toClosureOperator]
+          dsimp [HornNF.IsClosed] at hX_closed
+          simp_all only [not_false_eq_true, and_true]
+          exact half_le_self
+        have eq0: F.H.closure X = X := by
+          exact (IsClosed_iff F.H X).mp hX_closed
+        have eq:F.H.toClosureOperator.cl X = X := by
+          dsimp [HornNF.toClosureOperator]
+          exact eq0
+        simp_all only [not_false_eq_true, and_self]
+
   dsimp [HornWithForbid.FixSet]
   simp
   exact ge_of_eq (congrArg (NDS_corr n) (id (Eq.symm eq)))
