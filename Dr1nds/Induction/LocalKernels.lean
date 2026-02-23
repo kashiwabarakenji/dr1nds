@@ -1,4 +1,6 @@
 -- Dr1nds/Induction/LocalKernels.lean
+import Mathlib.Data.Nat.Init
+import Mathlib.Order.Basic
 import Mathlib.Tactic
 import Dr1nds.Horn.HornTrace
 import Dr1nds.Forbid.HornNormalize
@@ -126,56 +128,171 @@ def HasHead1s (F :HornWithForbid  α) (fs: IsForbidSingleton F):Prop := by
 -----------------------------------------------------
 
 noncomputable def Q_branch_headFree_get {α :Type} [DecidableEq α](P : Pack0 α) (a: α)  (hs:¬HasHead0 P a):
-    ∃ P':Pack0 α , P'.H.U.card = P.H.U.card - 1 ∧ (NDS P'.H.U.card P'.H.FixSet) ≤ (NDS P'.H.U.card P'.H.FixSet)
-:= sorry
+    ∃ P':Pack0 α , P'.H.U.card = P.H.U.card - 1 ∧ (NDS P.H.U.card P.H.FixSet) ≤ (NDS P'.H.U.card P'.H.FixSet)
+  := sorry
 
-axiom Q_branch_headFree
+theorem Q_branch_headFree
   (n : Nat) (P : Pack0 α) (h : α) :
   (∀ P':Pack0 α, P'.H.U.card = n → Q n P') →
   P.H.U.card = n + 1 → IsSC0 P h → ¬HasHead0 P h →
-   Q (n+1) P
+   Q (n+1) P := by
+  intro hQ hn hSC hh
+  obtain ⟨P',hP'⟩ := Q_branch_headFree_get P h hh
+  dsimp [Q]
+  intro hn'
+  specialize hQ P'
+  have :P'.H.U.card = n := by simp_all only [add_tsub_cancel_right, forall_const]
+  specialize hQ this
+  dsimp [Q] at hQ
+  specialize hQ this
+  rw [←this] at hQ
+  rw [←hn']
+  rcases hP' with ⟨h1,h2⟩
+  exact Int.le_trans h2 hQ
 
 noncomputable def Q_branch_hasHead_get {α :Type} [DecidableEq α](P : Pack0 α) (a: α)  (hs:HasHead0 P a):
-    ∃ P':Pack0 α , P'.H.U.card = P.H.U.card - 1 ∧ (NDS P'.H.U.card P'.H.FixSet) ≤ (NDS P'.H.U.card P'.H.FixSet)
+    ∃ P':Pack0 α , P'.H.U.card = P.H.U.card - 1 ∧ (NDS P.H.U.card P.H.FixSet) ≤ (NDS P'.H.U.card P'.H.FixSet)
 := sorry
 
-axiom Q_branch_hasHead
+theorem Q_branch_hasHead
   (n : Nat) (P : Pack0 α) (h : α) :
   (∀ P:Pack0 α, P.H.U.card = n → Q n P) → (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
   P.H.U.card = n + 1 → IsSC0 P h → HasHead0 P h →
-  Q (n+1) P
-
-noncomputable def Qcorr_singleton_headFree_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:¬HasHead1 F a):
-    ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr (F.H.U.card - 1)) ≤ (F'.NDS_corr F.H.U.card)
-:= sorry
-
-axiom Qcorr_singleton_hasHead
-  (n : Nat) (F : HornWithForbid α) :
-  (∀ P:Pack0 α, P.H.U.card = n → Q n P) → (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
-  F.H.U.card = n + 1 → (fb:IsForbidSingleton F) → HasHead1s F fb→
-   Qcorr (n+1) F
+  Q (n+1) P := by
+  intro hQ hQcorr hn hSC hh
+  obtain ⟨P',hP'⟩ := Q_branch_hasHead_get P h hh
+  dsimp [Q]
+  intro hn'
+  specialize hQ P'
+  have :P'.H.U.card = n := by simp_all only [add_tsub_cancel_right, forall_const]
+  specialize hQ this
+  dsimp [Q] at hQ
+  specialize hQ this
+  rw [←this] at hQ
+  rw [←hn']
+  rcases hP' with ⟨h1,h2⟩
+  exact Int.le_trans h2 hQ
 
 noncomputable def Qcorr_singleton_hasHead_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:HasHead1 F a):
     ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (F'.NDS_corr (F.H.U.card - 1))
 := sorry
 
-axiom Qcorr_singleton_headFree
-  (n : Nat) (F : HornWithForbid α)  :
-  (∀ P:Pack0 α, P.H.U.card = n → Q n P) → (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F')→
-  F.H.U.card = n + 1 → (fb:IsForbidSingleton F) → ¬HasHead1s F fb→
-   Qcorr (n+1) F
+theorem Qcorr_singleton_hasHead
+  (n : Nat) (F : HornWithForbid α) :
+   (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
+  F.H.U.card = n + 1 → (fb:IsForbidSingleton F) → HasHead1s F fb→
+   Qcorr (n+1) F := by
+  intro hQcorr hn hSC hh
+  dsimp [IsForbidSingleton] at hSC
+  have :∃ a , F.F = {a} := by exact Finset.card_eq_one.mp hSC
+  obtain ⟨a,ha⟩ := this
+  have : HasHead1 F a := by
+    dsimp [HasHead1s] at hh
+    simp_all only [Finset.singleton_inj, Classical.choose_eq']
+    simp_all only [Finset.card_singleton]
+    exact hh
+  obtain ⟨F',hF'⟩ := Qcorr_singleton_hasHead_get F a ha this
+  dsimp [Qcorr]
+  intro hn
+  specialize hQcorr F'
+  have :F'.H.U.card = n := by
+    simp_all only [add_tsub_cancel_right, forall_const]
+  specialize hQcorr this
+  dsimp [Qcorr] at hQcorr
+  specialize hQcorr this
+  rw [←hn]
+  rw [←this] at hQcorr
+  rcases hF' with ⟨h1,h2⟩
+  dsimp [HornWithForbid.NDS_corr] at h2
+  dsimp [HornWithForbid.BaseC] at h2
+  rw [h1] at hQcorr
+  --dsimp [HornNF.FixSet] at hQcorr
+  --dsimp [HornNF.FixSet] at h2
+  exact Int.le_trans h2 hQcorr
 
-axiom Qcorr_ge2_hasHead
+noncomputable def Qcorr_singleton_headFree_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:¬HasHead1 F a):
+    ∃ P':Pack0 α , P'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (NDS P'.H.U.card P'.H.FixSet)
+:= sorry
+
+theorem Qcorr_singleton_headFree
+  (n : Nat) (F : HornWithForbid α)  :
+  (∀ P:Pack0 α, P.H.U.card = n → Q n P) →
+  F.H.U.card = n + 1 → (fb:IsForbidSingleton F) → ¬HasHead1s F fb→
+   Qcorr (n+1) F := by
+  intro hQ hn hSC hh
+  dsimp [IsForbidSingleton] at hSC
+  have :∃ a , F.F = {a} := by exact Finset.card_eq_one.mp hSC
+  obtain ⟨a,ha⟩ := this
+  have : ¬HasHead1 F a := by
+    dsimp [HasHead1s] at hh
+    simp_all only [Finset.singleton_inj, Classical.choose_eq']
+    simp_all only [Finset.card_singleton]
+    dsimp [HasHead1]
+    exact hh
+  obtain ⟨P',hP'⟩ := Qcorr_singleton_headFree_get F a ha this
+  dsimp [Qcorr]
+  intro hn
+  specialize hQ P'
+  have :P'.H.U.card = n := by
+    simp_all only [add_tsub_cancel_right, forall_const]
+  specialize hQ this
+  dsimp [Q] at hQ
+  specialize hQ this
+  rw [←hn]
+  rw [←this] at hQ
+  rcases hP' with ⟨h1,h2⟩
+  dsimp [HornWithForbid.NDS_corr] at h2
+  dsimp [HornWithForbid.BaseC] at h2
+  rw [h1] at hQ
+  rw [h1] at h2
+  exact Int.le_trans h2 hQ
+
+noncomputable def Qcorr_ge2_hasHead_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (geq2: F.F.card ≥ 2) (ha:a ∈ F.F) (hs:HasHead1 F a):
+    ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (F'.NDS_corr (F.H.U.card - 1))
+:= sorry
+
+theorem Qcorr_ge2_hasHead
   (n : Nat) (F : HornWithForbid α) (h : α) (hh : h ∈ F.F):
   (∀ P:Pack0 α, P.H.U.card = n → Q n P) → (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
   F.H.U.card = n + 1 → ¬IsForbidSingleton F → IsSC1 F h → HasHead1 F h →
    Qcorr (n+1) F
+:= sorry
 
-axiom Qcorr_ge2_headFree
-  (n : Nat) (F : HornWithForbid α) (h : α) (hh : h ∈ F.F):
-  (∀ P:Pack0 α, P.H.U.card = n → Q n P) → (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
-  F.H.U.card = n + 1 → ¬IsForbidSingleton F → IsSC1 F h → ¬HasHead1 F h →
-  Qcorr (n+1) F
+noncomputable def Qcorr_ge2_headFree_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (geq2: F.F.card ≥ 2) (ha:a ∈ F.F) (hs:¬HasHead1 F a):
+    ∃ P':Pack0 α , P'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (NDS P'.H.U.card P'.H.FixSet)
+:= sorry
+
+theorem Qcorr_ge2_headFree
+  (n : Nat) (F : HornWithForbid α) (a : α) (ha : a ∈ F.F):
+  (∀ P:Pack0 α, P.H.U.card = n → Q n P) →
+  F.H.U.card = n + 1 → ¬IsForbidSingleton F → IsSC1 F a → ¬HasHead1 F a →
+  Qcorr (n+1) F := by
+  intro hQ hn hs hSC hh
+  have geq2: F.F.card ≥ 2:= by
+    dsimp [IsForbidSingleton] at hs
+    have ne := HornWithForbid.F_nonempty (α := α) F
+    apply (Nat.two_le_iff F.F.card).mpr
+    simp_all only [ne_eq, Finset.card_eq_zero, not_false_eq_true, and_true]
+    apply Aesop.BuiltinRules.not_intro
+    intro a_1
+    simp_all only [Finset.notMem_empty]
+  obtain ⟨P',hP'⟩ := Qcorr_ge2_headFree_get F a geq2 ha hh
+  dsimp [Qcorr]
+  intro hn
+  specialize hQ P'
+  have :P'.H.U.card = n := by
+    simp_all only [add_tsub_cancel_right, forall_const]
+  specialize hQ this
+  dsimp [Q] at hQ
+  specialize hQ this
+  rw [←hn]
+  rw [←this] at hQ
+  rcases hP' with ⟨h1,h2⟩
+  dsimp [HornWithForbid.NDS_corr] at h2
+  dsimp [HornWithForbid.BaseC] at h2
+  rw [h1] at hQ
+  rw [h1] at h2
+  exact Int.le_trans h2 hQ
 
 --パラレルな頂点が存在する場合
 

@@ -254,11 +254,6 @@ theorem closureForbid_NDS_corr_spec (F: HornWithForbid α) :
       have hX_disjoint := h.2
       simp
       refine ⟨hX_closed, ?_⟩
-      -- To prove this, we need a lemma stating that if `X` is closed,
-      -- its complement `F.H.U \ X` is also closed.
-      -- The proof for this lemma is non-trivial with the current setup and is left as sorry.
-      have h_compl_closed : HornNF.IsClosed F.H (F.H.U \ X) := by sorry
-      --have h_ss := HornNF.closure_subset_of_subset_isClosed F.H (hY := h_compl_closed)
       intro h
       have mono: F.F ⊆ F.H.toClosureOperator.cl F.F := by
         have :F.F ⊆ F.H.U := by exact F.F_subset_U
@@ -270,7 +265,6 @@ theorem closureForbid_NDS_corr_spec (F: HornWithForbid α) :
           exact hX_closed.2 hy
         let fh := F.H.toClosureOperator.extensive mono2
         rcases hX_closed with ⟨h1,h2⟩
-        --dsimp [HornNF.IsClosed] at h2
         dsimp [HornNF.toClosureOperator]
         dsimp [HornNF.closure]
         simp_all only [not_false_eq_true, and_true]
