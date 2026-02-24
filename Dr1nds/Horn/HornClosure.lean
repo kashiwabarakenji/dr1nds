@@ -175,20 +175,20 @@ theorem subset_closure_A
   (H : HornNF α) (A : Finset α)
   (hA : A ⊆ H.U) :
   A ⊆ HornNF.closure (α := α) H A := by
-  simpa using (HornNF.subset_closure (α := α) (H := H) (X := A) (hX := hA))
+  exact HornNF.subset_closure (α := α) (H := H) (X := A) (hX := hA)
 
 /-- `closure H A ⊆ H.U` (binder name `A`). -/
 theorem closure_subset_U_A
   (H : HornNF α) (A : Finset α) :
   HornNF.closure (α := α) H A ⊆ H.U := by
-  simpa using (HornNF.closure_subset_U (α := α) (H := H) (X := A))
+  exact HornNF.closure_subset_U (α := α) (H := H) (X := A)
 
 /-- Idempotence: `closure H (closure H A) = closure H A` (binder name `A`). -/
 theorem closure_idem_A
   (H : HornNF α) (A : Finset α) :
   HornNF.closure (α := α) H (HornNF.closure (α := α) H A)
     = HornNF.closure (α := α) H A := by
-  simpa using (HornNF.closure_idem (α := α) (H := H) (X := A))
+  exact HornNF.closure_idem (α := α) (H := H) (X := A)
 
 end HornNF
 
@@ -276,7 +276,7 @@ lemma SC_closure_singleton  (H : HornNF α) (x : α):
       simp_all only [mem_FixSet_iff, Finset.mem_singleton, Finset.singleton_subset_iff, Finset.mem_filter, implies_true,
         and_true]
       subst a
-      simpa using h.2
+      exact h.2 (by simp)
   · intro h
     dsimp [HornNF.FixSet]
     simp

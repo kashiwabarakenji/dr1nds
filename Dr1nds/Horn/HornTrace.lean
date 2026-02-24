@@ -563,7 +563,7 @@ lemma empty_mem_Hole_singleton_iff
 
 /-- If `∅ ∈ C`, then also `∅ ∈ Hole C {a}` (the forward direction packaged).
 
-This is often the exact shape needed by `have`-steps in `Steps.lean`.
+This is often the exact shape needed by `have`-steps in `Induction/Main.lean`.
 -/
 lemma empty_mem_Hole_singleton_of_empty_mem
   (C : Finset (Finset α)) (a : α)

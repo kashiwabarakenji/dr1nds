@@ -78,7 +78,8 @@ lemma iterInter_mem
   refine Finset.induction_on S (motive := fun S =>
     (∀ {X : Finset α}, X ∈ S → X ∈ CS.C) → iterInter (α := α) CS S ∈ CS.C) ?base ?step hS
   · intro _
-    simpa using CS.top_mem
+    simp [iterInter]
+    exact CS.top_mem
   · intro X S hXnot ih hXS
     have hXmem : X ∈ CS.C := hXS (by simp)
     have hSmem : iterInter (α := α) CS S ∈ CS.C := by

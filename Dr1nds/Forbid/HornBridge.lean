@@ -489,9 +489,8 @@ lemma card_up_fixset_eq_card_fixset_trace
   (Up (α := α) (HornNF.FixSet H) ({v} : Finset α)).card
     =
   (HornNF.FixSet (H.trace v)).card := by
-  simpa using
-    (Dr1nds.card_up_fixset_eq_card_fixset_trace_has_head (α := α)
-      (H := H) (v := v) (hvU := hvU) (hNoPremV := hNoPremV))
+  exact Dr1nds.card_up_fixset_eq_card_fixset_trace_has_head (α := α)
+    (H := H) (v := v) (hvU := hvU) (hNoPremV := hNoPremV)
 
 end HornNF
 

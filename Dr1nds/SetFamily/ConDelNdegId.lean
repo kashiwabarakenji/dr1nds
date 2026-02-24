@@ -21,39 +21,14 @@ variable {α : Type} [DecidableEq α]
 
 namespace Accounting
 
-/-
-  【証明戦略（日本語）】
-  1) C に関する和を u∈X と u∉X のフィルターに分解する。
-     → 本ファイルの lemma sum_filter_mem_add_sum_filter_not_mem を使用。
-  2) w の項を u∈X と u∉X でそれぞれ w_of_mem_erase, w_of_not_mem を使って書き換える。
-  3) u∈X のフィルター上の和を erase u の像（con u C）上の和に書き換える。
-     → lemma sum_filter_mem_eq_sum_image_con と erase_inj_on_mem の injectivity を利用。
-  4) +1/ -1 のカウントを ndeg にまとめる。
-     → card_eq_deg_add_card_Del と ndeg_eq_deg_sub_card_Del を利用。
-  5) 唯一の非自明な組合せ論的ポイントは erase の injectivity（lemma erase_injOn）。
-
--/
-
-
 /- ============================================================
   0. Tiny accounting lemmas about w
-
-  【注意】
-  本ファイルは CON_ID の **入出力仕様（I/O）を固定化（frozen）したもの**です。
 ============================================================ -/
 
 omit [DecidableEq α] in
 /-- succ shift: w (n+1) X = w n X - 1 -/
 lemma w_succ (n : Nat) (X : Finset α) :
     w (α := α) n.succ X = w (α := α) n X - 1 := by
-  /-
-  【用途】
-  w の定義上の基本的な性質。CON_ID のステップ2の w の書き換えに利用。
-  【証明方針】
-  定義展開後の単純な算術操作（Natの引き算など）。
-  【場所】
-  ここで証明してもよいし、基本ファイルに移してもよい。
-  -/
   simp [Dr1nds.w, Nat.succ_eq_add_one, sub_eq_add_neg, add_assoc, add_left_comm, add_comm]
 
 omit [DecidableEq α] in
@@ -114,7 +89,7 @@ lemma w_of_not_mem
     w (α := α) n X
         = w (α := α) (n - 1).succ X := by simp_all only [Nat.succ_eq_add_one, Nat.sub_add_cancel]
     _   = w (α := α) (n - 1) X - 1 := by
-          simpa using (w_succ (α := α) (n := n - 1) (X := X))
+          exact w_succ (α := α) (n := n - 1) (X := X)
 
 
 /- ============================================================
@@ -151,7 +126,7 @@ lemma card_filter_mem_add_card_filter_not_mem
   by
     classical
     -- standard partition of a finset by a decidable predicate
-    simpa using (Finset.filter_card_add_filter_neg_card_eq_card (s := C) (p := fun X : Finset α => u ∈ X))
+    exact Finset.filter_card_add_filter_neg_card_eq_card (s := C) (p := fun X : Finset α => u ∈ X)
 
 /-- Sum partition: sum over C is sum over the disjoint union of the two filters. -/
 lemma sum_filter_mem_add_sum_filter_not_mem
@@ -199,25 +174,13 @@ lemma erase_inj_on_mem
   exact (erase_injOn (α := α) u) huX huY hEq
 
 
-/- ============================================================
-  2.5. Missing glue lemmas (planned)
-============================================================ -/
-
-/--
-(sum_filter_mem_eq_sum_image_con)
-  ∑ X ∈ (C.filter (fun X => u ∈ X)), w n (X.erase u)
-  を con u C に対する和に書き換える補助定理。
-  これは CON_ID のステップ3の sum_image 適用に必要。
--/
+/-- Rewrite the filtered sum over `erase` to the corresponding sum over `Con`. -/
 lemma sum_filter_mem_eq_sum_image_con
   (n : Nat) (C : Finset (Finset α)) (u : α) :
   (∑ X ∈ (C.filter (fun X => u ∈ X)), w (α := α) n (X.erase u))
     =
   (∑ Y ∈ (Con (α := α) u C), w (α := α) n Y) := by
   classical
-  -- s = {X ∈ C | u∈X}, g = erase u
-  -- sum_image:  ∑ y in s.image g, f y = ∑ x in s, f (g x)
-  -- これを左右どちらに合わせるかだけ
   simpa [Con] using
     (Finset.sum_image
       (s := C.filter (fun X => u ∈ X))
@@ -225,14 +188,12 @@ lemma sum_filter_mem_eq_sum_image_con
       (g := fun X => X.erase u)
       (by
         intro X hX Y hY hXY
-        -- hX : X ∈ filter ... なので u∈X が取れる
         have huX : u ∈ X := by
-          -- filter の membership を分解
           have : u ∈ X := by
-            simpa using (Finset.mem_filter.mp hX).2
+            exact (Finset.mem_filter.mp hX).2
           exact this
         have huY : u ∈ Y := by
-          simpa using (Finset.mem_filter.mp hY).2
+          exact (Finset.mem_filter.mp hY).2
         exact erase_inj_on_mem ({X ∈ C | u ∈ X}) u hX hY huX huY hXY
       )).symm
 
@@ -283,22 +244,10 @@ by
   -- `con u C` is `t`.
   simpa [deg, s, t] using hcard.symm
 
-/--
-(sum_con_def)
-  con の定義を展開し、con u C = (C.filter (u∈X)).image (λ X, X.erase u) であることを示す補助定理。
-  S0_CoreDefs の定義に合わせて調整する必要あり。
--/
+/-- Unfolding lemma for `Con`. -/
 lemma sum_con_def (C : Finset (Finset α)) (u : α) :
   Con (α := α) u C = (C.filter (fun X => u ∈ X)).image (fun X => X.erase u) := by
   simp [Con]
-  /-
-  【用途】
-  con の定義の展開に使い、CON_ID のステップ3の和の書き換えに役立てる。
-  【証明方針】
-  con の定義を確認し、Finset の image と filter の関係を示す。
-  【場所】
-  ここで証明予定。定義に合わせて調整が必要。
-  -/
 
 /- ============================================================
   3. Bridge: deg / ndeg relation to the two filters
@@ -380,7 +329,6 @@ theorem CON_ID
   have sum_split : ∑ X ∈ C, w n X = ∑ X ∈ A, w n X + ∑ X ∈ B, w n X := by
     simp only [A, B]
     exact sum_filter_mem_add_sum_filter_not_mem n C u
-  -- 2) A上: w n X = w (n-1) (X.erase u) + 1
   have hA_eq : ∀ X ∈ A, w n X = w (n - 1) (X.erase u) + 1 := by
     intro X hX
     simp only [A, Finset.mem_filter] at hX
@@ -395,40 +343,32 @@ theorem CON_ID
     ring
 
 
-  -- 3) B上: w n X = w (n-1) X - 1
   have hB_eq : ∀ X ∈ B, w n X = w (n - 1) X - 1 := by
     intro X hX
     simp only [w]
     omega
-  -- 4) A上の和を書き換え
   have sumA : ∑ X ∈ A, w n X = ∑ X ∈ A, w (n - 1) (X.erase u) + ↑A.card := by
     rw [Finset.sum_congr rfl hA_eq]
     rw [Finset.sum_add_distrib, Finset.sum_const]
     simp_all only [Finset.sum_sub_distrib, Finset.sum_const, Int.nsmul_eq_mul, mul_one,
       Finset.mem_filter, and_imp, A, B]
-  -- 5) erase の単射性
   have hinj : ∀ X ∈ A, ∀ Y ∈ A, Finset.erase X u = Finset.erase Y u → X = Y := by
     intro X hX Y hY heq
     simp only [A, Finset.mem_filter] at hX hY
     rw [← Finset.insert_erase hX.2, ← Finset.insert_erase hY.2, heq]
-  -- 6) A上のeraseの和 = D上の和
   have sumD : ∑ X ∈ A, w (n - 1) (X.erase u) = ∑ X ∈ D, w (n - 1) X := by
     exact (Finset.sum_image hinj).symm
-  -- 7) B上の和を書き換え
   have sumB : ∑ X ∈ B, w n X = ∑ X ∈ B, w (n - 1) X - ↑B.card := by
     rw [Finset.sum_congr rfl hB_eq]
     rw [Finset.sum_sub_distrib, Finset.sum_const]
     simp_all only [Finset.sum_sub_distrib, Finset.sum_const, Int.nsmul_eq_mul, mul_one, Finset.mem_filter, and_self,
       and_imp, A, B, D]
-  -- 8) |A| + |B| = |C|
   have hcard : (A.card : ℤ) + ↑B.card = ↑C.card := by
-    --have := Finset.filter_card_add_filter_neg_card_eq_card C (fun X => u ∈ X)
     simp only [A, B]
     have h := Finset.filter_card_add_filter_neg_card_eq_card (s := C) (p := fun X => u ∈ X)
     push_cast [← h]
     simp_all only [Finset.sum_sub_distrib, Finset.sum_const, Int.nsmul_eq_mul, mul_one, Finset.mem_filter, and_self,
       and_imp, A, B, D]
-  -- 9) 合成
   rw [sum_split, sumA, sumD, sumB]
   linarith
 

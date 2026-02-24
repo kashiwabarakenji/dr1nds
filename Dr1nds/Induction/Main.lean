@@ -1,4 +1,4 @@
--- Dr1nds/Induction/Steps.lean
+-- Dr1nds/Induction/Main.lean
 import Mathlib.Tactic
 
 import Dr1nds.Induction.Statements
@@ -24,13 +24,11 @@ theorem Q_step0
   intro hQ hQcorr hn
   classical
   by_cases hPar : Parallel0 P
-  · -- parallel branch（独立核）
+  · -- parallel branch
      exact Q_of_parallel (α := α) (n := n) (P := P) hQ hn hPar
 
-  · -- no-parallel branch：SC を取って分岐
+  · -- no-parallel branch
     have hNP : NoParallel0 P := by
-      -- NOTE (設計メモ): 現在 NoParallel0 は abbrev True なので trivial。
-      -- 将来 `NoParallel0 P := ¬ Parallel0 P` に差し替えたら、ここは `hPar` から構成する。
       trivial
     have hU_nonempty : P.H.U.Nonempty := by
       have hpos : 0 < P.H.U.card := by omega
@@ -38,12 +36,10 @@ theorem Q_step0
     let h := choose_SC_no_parallel (α := α) P hU_nonempty hNP
     have hSC : P.H.IsSC h := choose_SC_no_parallel_spec (α := α) P hU_nonempty hNP
 
-    -- SC 点で head 構造を 3-way split
     have hcases : (¬P.H.hasHead h) ∨ (P.H.hasHead h) := by exact Decidable.not_or_of_imp fun a => a
 
     cases hcases with
     | inl hNo =>
-        -- head なし
         exact Q_branch_headFree (α := α) (n := n) (P := P) (h := h) hQ hn hSC hNo
     | inr hrest =>
         exact Q_branch_hasHead (α := α) (n := n) (P := P) (h := h) hQ hQcorr hn hSC hrest
@@ -52,7 +48,6 @@ theorem Q_step0
   (S10-1) Qcorr-step (with forbid A)
 ============================================================ -/
 
------禁止集合がある場合。
 theorem Qcorr_step1
   (n : Nat) :
   (∀ P: Pack0 α ,(P.H.U.card = n → Q n P)) → (∀ F: HornWithForbid α , (F.H.U.card = n → Qcorr (α := α) n F))
@@ -61,19 +56,18 @@ theorem Qcorr_step1
   classical
   intro F hn
 
-  have hCardCases := card_cases (α := α) F.F  --ここではまだ閉包はとらない。
+  have hCardCases := card_cases (α := α) F.F
   rcases hCardCases with h0 | h1 | hge2
-  · -- A.card=0（暫定：専用核）
+  · -- A.card = 0
     let fe :=F.F_nonempty
     exfalso
     simp_all only [Finset.card_eq_zero]
     simp [h0] at fe
-  · -- A.card=1（専用核：台落ち）
-    -- `A.card = 1` から代表元 `a` を取り、`A = {a}` を得る。
+  · -- A.card = 1
     obtain ⟨a, hAeq⟩ := Finset.card_eq_one.mp h1
     by_cases hs:HasHead1 F a
-    · -- a がheadのルールがあるとき。
-      obtain ⟨F',hF⟩ := Qcorr_singleton_hasHead_get (α := α) F a hAeq hs
+    ·
+      obtain ⟨F',hF⟩ := Qcorr_singleton_hasHead_get_spec (α := α) F a hAeq hs
       dsimp [Qcorr]
       intro hf
       specialize hQcorr F'
@@ -85,12 +79,11 @@ theorem Qcorr_step1
       rw [this] at hF
       rw [hf] at hF
       simp at hF
-      --片方が集合族のNDSで、片方が表示のNDSなので変換する必要がある。変換は定義を展開すればいい。
       dsimp [HornWithForbid.NDS_corr] at hF
       dsimp [HornWithForbid.BaseC] at hF
       exact Int.le_trans hF hQcorr
 
-    · --  aがheadのルールがないとき。
+    ·
       have :¬HasHead1s F h1 := by
         intro h
         have :{a} = F.F := by
@@ -106,10 +99,8 @@ theorem Qcorr_step1
 
       exact Qcorr_singleton_headFree (α := α) n F hQ hn h1 this
 
-  · -- A.card≥2（A 内 SC を取って進める）
+  · -- A.card ≥ 2
     let Fclosed := HornNF.ClosureForbid F
-    ---禁止集合を閉集合に変えたものを作る必要がある。
-    -- この処理を行ったかどうかは先に伝える必要なし。SCさえ取れれば任務完了。
     suffices NDS_corr (n+1) Fclosed.H.FixSet Fclosed.F ≤ 0 from by
       dsimp [Qcorr]
       intro hn
@@ -118,11 +109,11 @@ theorem Qcorr_step1
       rw [←cn] at this
       exact this
 
-    by_cases hPar : Parallel1 Fclosed -- 禁止集合の大きさの分岐を先に変更する。
-    · -- parallel branch（独立核）
+    by_cases hPar : Parallel1 Fclosed
+    · -- parallel branch
       dsimp [Qcorr]
       exact Qcorr_ge_hasParallel (α := α) (n := n) Fclosed hQcorr hn hPar hn
-    · -- no-parallel branch：A の大きさで分岐
+    · -- no-parallel branch
       have hNP : NoParallel1 Fclosed := by
         dsimp [Fclosed]
         dsimp [NoParallel1]
@@ -130,7 +121,7 @@ theorem Qcorr_step1
         simp_all only [not_exists, ne_eq, not_and, not_false_eq_true, implies_true, Fclosed]
       have hFclosed_closed : Fclosed.H.IsClosed Fclosed.F := by
         dsimp [Fclosed, HornNF.ClosureForbid]
-        simpa using HornNF.closure_isClosed (H := F.H) (X := F.F)
+        exact HornNF.closure_isClosed (H := F.H) (X := F.F)
       let a := choose_SC_in_forbid (α := α) Fclosed hFclosed_closed hNP
       have hmem : a ∈ Fclosed.F := choose_SC_in_forbid_mem (α := α) Fclosed hFclosed_closed hNP
       have hSC : IsSC1 Fclosed a := choose_SC_in_forbid_spec (α := α) Fclosed hFclosed_closed hNP
@@ -182,10 +173,10 @@ theorem Q_Qcorr_main :
       constructor
       · intro P hcard
         have : Q 1 P := Q_base (α := α) P
-        simpa using this
+        exact this
       · intro F hcard
         have : Qcorr 1 F := Qcorr_base (α := α) F
-        simpa using this
+        exact this
   | succ n ih =>
       rcases ih with ⟨hQ, hQcorr⟩
       constructor

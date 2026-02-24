@@ -1,5 +1,4 @@
 import Mathlib.Data.Finset.Basic
-import Dr1nds.Horn.Horn
 import Dr1nds.Horn.HornTrace
 import Dr1nds.Forbid.Basic
 import Dr1nds.Forbid.HornBridge

@@ -367,7 +367,7 @@ private lemma contraction_fix_equiv_forward
           · subst hh; exact Finset.mem_insert_self _ _
           ·
             have hsubsetY : P.erase x ⊆ Y :=
-              erase_subset_insert (by simpa using hsubset)
+              erase_subset_insert (by exact hsubset)
             have hmemY : h ∈ Y := by
               have hPin : P.erase x ∈ (HornNF.contraction x H).prem h := by
                 simp [contraction_prem_of_ne (H := H) (x := x) hh]
@@ -541,7 +541,7 @@ by
   by_cases hh : h = x
   · subst hh
     -- prem x = ∅
-    simpa using (by
+    exact (by
       -- hP : P ∈ (H.contraction x).prem x = ∅
       simp_all only [contraction_prem_self, notMem_empty])
   ·

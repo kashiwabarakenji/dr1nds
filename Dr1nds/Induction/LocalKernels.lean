@@ -1,21 +1,20 @@
 -- Dr1nds/Induction/LocalKernels.lean
 import Mathlib.Data.Nat.Init
-import Mathlib.Order.Basic
 import Mathlib.Tactic
 import Dr1nds.Horn.HornTrace
 import Dr1nds.Horn.HornContraction
 import Dr1nds.Forbid.Basic
 import Dr1nds.Forbid.HornWithForbid
 import Dr1nds.Forbid.HornBridge
-import Dr1nds.Forbid.Singleton
 import Dr1nds.Forbid.HornNormalize
 import Dr1nds.Induction.Statements
 import Dr1nds.SetFamily.ConDelNdegId
+import Dr1nds.SetFamily.HoleAccounting
 import Dr1nds.Induction.Parallel
-set_option maxHeartbeats 10000000
 
 namespace Dr1nds
 variable {α : Type} [DecidableEq α]
+section SC
 /-- SC / head-structure predicates for forbid packs. -/
 abbrev IsSC1 (F: HornWithForbid α) (h : α) : Prop :=
   F.H.closure {h} = {h}
@@ -206,12 +205,24 @@ by
   simpa [choose_SC_in_forbid] using
     (Classical.choose_spec (exists_SC_in_forbid (α := α) F hFclosed hNP)).2
 
+end SC
+section Kernels
+
 /-- Head-presence predicate for a forbid pack. -/
-def HasHead1 (F :HornWithForbid  α) (h : α) : Prop :=
+abbrev HasHead1 (F :HornWithForbid  α) (h : α) : Prop :=
   (F.H.prem h).Nonempty
 
-def IsForbidSingleton (F :HornWithForbid  α): Prop :=
+abbrev IsForbidSingleton (F :HornWithForbid  α): Prop :=
   F.F.card = 1
+
+private noncomputable def choosePrem1
+  (H : HornNF α) (hDR1 : H.IsDR1) (a : α) (hasHead : H.hasHead a) : Finset α :=
+  Classical.choose (exists_unique_prem_of_DR1_of_nonempty H a hDR1 hasHead)
+
+private lemma choosePrem1_mem
+  (H : HornNF α) (hDR1 : H.IsDR1) (a : α) (hasHead : H.hasHead a) :
+  choosePrem1 (H := H) hDR1 a hasHead ∈ H.prem a :=
+  (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty H a hDR1 hasHead)).1
 
 private lemma erase_nonempty_of_mem_not_singleton
   (F : HornWithForbid α) (a : α)
@@ -274,14 +285,14 @@ noncomputable def Q_deletion_head {α :Type} [DecidableEq α](P : Pack0 α) (a: 
   H := P.H.trace a
   hDR1 := P.H.trace_preserves_DR1 a P.hDR1
   hNEP := P.H.trace_preserves_NEP a P.hNEP
-  F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)
+  F := choosePrem1 (H := P.H) P.hDR1 a hasHead
   F_subset_U := by
-    let F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)
-    have h_mem : F ∈ P.H.prem a := (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)).1
+    let F := choosePrem1 (H := P.H) P.hDR1 a hasHead
+    have h_mem : F ∈ P.H.prem a := choosePrem1_mem (H := P.H) P.hDR1 a hasHead
     exact HornNF.prem_subset_traceU_of_mem_prem P.H h_mem
   F_nonempty := by
-    let F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)
-    have h_mem : F ∈ P.H.prem a := (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)).1
+    let F := choosePrem1 (H := P.H) P.hDR1 a hasHead
+    have h_mem : F ∈ P.H.prem a := choosePrem1_mem (H := P.H) P.hDR1 a hasHead
     have :F.Nonempty := by
       let ph := P.hNEP (h := a)
       suffices F ≠ ∅ from by
@@ -296,9 +307,8 @@ theorem Q_deletion_head_fixset_eq_Del
   (P : Pack0 α) (a : α) (hasHead : P.H.hasHead a) :
   (Q_deletion_head P a hasHead).FixSet = Del a (HornNF.FixSet P.H) := by
   classical
-  let Pprem := Classical.choose (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)
-  have hP : Pprem ∈ P.H.prem a :=
-    (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)).1
+  let Pprem := choosePrem1 (H := P.H) P.hDR1 a hasHead
+  have hP : Pprem ∈ P.H.prem a := choosePrem1_mem (H := P.H) P.hDR1 a hasHead
   have hUnique : (P.H.prem a).card = 1 := by
     exact prem_card_eq_one_of_DR1_of_ne_empty (H := P.H) (v := a) (hDR1 := P.hDR1) hasHead
   have hHole :=
@@ -358,208 +368,13 @@ theorem Qcorr_contraction_fixset_eq_Con
         omega)
   simpa [Qcorr_contraction] using contract_FixSet_eq F a hne hsc_mem
 
-lemma qcorr_contraction_card
+private lemma qcorr_contraction_card
   (F : HornWithForbid α) (a : α)
   (hSC : F.H.IsSC a) (hA : a ∈ F.F) (geq2 : F.F.card ≥ 2) :
   (Qcorr_contraction F a hSC hA geq2).H.U.card = F.H.U.card - 1 := by
   dsimp [Qcorr_contraction]
   have haU : a ∈ F.H.U := F.F_subset_U hA
   rw [contraction_U, Finset.card_erase_of_mem haU]
-
-lemma Del_Hole_eq_Del_of_mem
-  (C : Finset (Finset α)) (A : Finset α) (a : α)
-  (ha : a ∈ A) :
-  Del a (Hole (α := α) C A) = Del a C := by
-  ext X
-  constructor
-  · intro hX
-    rcases Finset.mem_filter.mp hX with ⟨hXHole, hXa⟩
-    exact Finset.mem_filter.mpr ⟨(Finset.mem_filter.mp hXHole).1, hXa⟩
-  · intro hX
-    rcases Finset.mem_filter.mp hX with ⟨hXC, hXa⟩
-    refine Finset.mem_filter.mpr ?_
-    refine ⟨?_, hXa⟩
-    refine Finset.mem_filter.mpr ?_
-    refine ⟨hXC, ?_⟩
-    intro hAX
-    exact hXa (hAX ha)
-
-lemma nds_del_add_ndeg_eq_nds_corr_singleton
-  (n : Nat) (C : Finset (Finset α)) (a : α) :
-  NDS (α := α) n (Del a C) + ndeg (α := α) C a
-    =
-  NDS_corr (α := α) (n + 1) C ({a} : Finset α) := by
-  have hcard : (Up (α := α) C ({a} : Finset α)).card + (Hole (α := α) C ({a} : Finset α)).card = C.card := by
-    exact card_Up_add_card_Hole (α := α) C ({a} : Finset α)
-  have hndeg :
-      ndeg (α := α) C a
-        = (((Up (α := α) C ({a} : Finset α)).card : Int)
-            - (Hole (α := α) C ({a} : Finset α)).card) := by
-    have hcardInt :
-        (C.card : Int)
-          = ((Up (α := α) C ({a} : Finset α)).card : Int)
-            + (Hole (α := α) C ({a} : Finset α)).card := by
-      have := congrArg (fun t : Nat => (t : Int)) hcard
-      simpa [Int.natCast_add, add_comm, add_left_comm, add_assoc] using this.symm
-    calc
-      ndeg (α := α) C a = (2 : Int) * (deg (α := α) C a : Int) - (C.card : Int) := by
-        rfl
-      _ = (2 : Int) * ((Up (α := α) C ({a} : Finset α)).card : Int) - (C.card : Int) := by
-        simp [deg, Up]
-      _ = (2 : Int) * ((Up (α := α) C ({a} : Finset α)).card : Int)
-            - (((Up (α := α) C ({a} : Finset α)).card : Int)
-              + (Hole (α := α) C ({a} : Finset α)).card) := by
-            rw [hcardInt]
-      _ = (((Up (α := α) C ({a} : Finset α)).card : Int)
-            - (Hole (α := α) C ({a} : Finset α)).card) := by
-            ring
-  calc
-    NDS (α := α) n (Del a C) + ndeg (α := α) C a
-        = NDS (α := α) n (Hole (α := α) C ({a} : Finset α))
-          + (((Up (α := α) C ({a} : Finset α)).card : Int)
-              - (Hole (α := α) C ({a} : Finset α)).card) := by
-            simp [Del, Hole, hndeg]
-    _ = (NDS (α := α) n (Hole (α := α) C ({a} : Finset α))
-          - (Hole (α := α) C ({a} : Finset α)).card)
-        + (Up (α := α) C ({a} : Finset α)).card := by
-          ring
-    _ = NDS (α := α) (n + 1) (Hole (α := α) C ({a} : Finset α))
-        + (Up (α := α) C ({a} : Finset α)).card := by
-          simp [Accounting.NDS_succ]
-    _ = NDS_corr (α := α) (n + 1) C ({a} : Finset α) := by
-          simp [NDS_corr]
-
-lemma subset_iff_erase_subset_of_mem
-  (A X : Finset α) (a : α)
-  (haA : a ∈ A) (haX : a ∈ X) :
-  A ⊆ X ↔ A.erase a ⊆ X.erase a := by
-  constructor
-  · intro h z hz
-    have hzA : z ∈ A := Finset.mem_of_mem_erase hz
-    have hzX : z ∈ X := h hzA
-    exact Finset.mem_erase.mpr ⟨(Finset.mem_erase.mp hz).1, hzX⟩
-  · intro h z hzA
-    by_cases hza : z = a
-    · subst hza
-      exact haX
-    · have hzAe : z ∈ A.erase a := Finset.mem_erase.mpr ⟨hza, hzA⟩
-      exact (Finset.mem_erase.mp (h hzAe)).2
-
-lemma Con_Hole_eq_Hole_Con_erase
-  (C : Finset (Finset α)) (A : Finset α) (a : α)
-  (haA : a ∈ A) :
-  Con (α := α) a (Hole (α := α) C A)
-    =
-  Hole (α := α) (Con (α := α) a C) (A.erase a) := by
-  classical
-  ext Y
-  constructor
-  · intro hY
-    rcases Finset.mem_image.mp hY with ⟨X, hXf, hYX⟩
-    rcases Finset.mem_filter.mp hXf with ⟨hXHole, haX⟩
-    rcases Finset.mem_filter.mp hXHole with ⟨hXC, hnotAX⟩
-    refine Finset.mem_filter.mpr ?_
-    refine ⟨?_, ?_⟩
-    · exact Finset.mem_image.mpr ⟨X, Finset.mem_filter.mpr ⟨hXC, haX⟩, hYX⟩
-    · intro hsub
-      have hAX : A ⊆ X := by
-        have hEq := (subset_iff_erase_subset_of_mem (A := A) (X := X) (a := a) haA haX)
-        exact hEq.mpr (by simpa [hYX] using hsub)
-      exact hnotAX hAX
-  · intro hY
-    rcases Finset.mem_filter.mp hY with ⟨hYcon, hnotSub⟩
-    rcases Finset.mem_image.mp hYcon with ⟨X, hXf, hYX⟩
-    rcases Finset.mem_filter.mp hXf with ⟨hXC, haX⟩
-    refine Finset.mem_image.mpr ?_
-    refine ⟨X, ?_, hYX⟩
-    refine Finset.mem_filter.mpr ?_
-    refine ⟨Finset.mem_filter.mpr ⟨hXC, ?_⟩, haX⟩
-    intro hAX
-    apply hnotSub
-    have hEq := (subset_iff_erase_subset_of_mem (A := A) (X := X) (a := a) haA haX)
-    exact by simpa [hYX] using hEq.mp hAX
-
-lemma ndeg_hole_add_up_eq_ndeg_of_mem
-  (C : Finset (Finset α)) (A : Finset α) (a : α)
-  (haA : a ∈ A) :
-  ndeg (α := α) (Hole (α := α) C A) a + (Up (α := α) C A).card
-    =
-  ndeg (α := α) C a := by
-  classical
-  have hUpSubsetDeg :
-      (Up (α := α) C A).card ≤ deg (α := α) C a := by
-    refine Finset.card_le_card ?_
-    intro X hX
-    rcases Finset.mem_filter.mp hX with ⟨hXC, hAX⟩
-    exact Finset.mem_filter.mpr ⟨hXC, hAX haA⟩
-  have hDegSplit :
-      deg (α := α) C a
-        =
-      (Up (α := α) C A).card + deg (α := α) (Hole (α := α) C A) a := by
-    -- partition `C.filter (a ∈ ·)` by `A ⊆ ·`
-    have hpart := Finset.filter_card_add_filter_neg_card_eq_card
-      (s := C.filter (fun X => a ∈ X))
-      (p := fun X : Finset α => A ⊆ X)
-    have hUpEq :
-        (C.filter (fun X => a ∈ X)).filter (fun X => A ⊆ X)
-          =
-        Up (α := α) C A := by
-      ext X; constructor
-      · intro hX
-        rcases Finset.mem_filter.mp hX with ⟨hXaC, hAX⟩
-        rcases Finset.mem_filter.mp hXaC with ⟨hXC, _⟩
-        exact Finset.mem_filter.mpr ⟨hXC, hAX⟩
-      · intro hX
-        rcases Finset.mem_filter.mp hX with ⟨hXC, hAX⟩
-        refine Finset.mem_filter.mpr ?_
-        refine ⟨Finset.mem_filter.mpr ⟨hXC, hAX haA⟩, hAX⟩
-    have hHoleEq :
-        (C.filter (fun X => a ∈ X)).filter (fun X => ¬ A ⊆ X)
-          =
-        (Hole (α := α) C A).filter (fun X => a ∈ X) := by
-      ext X; constructor <;> intro hX
-      · rcases Finset.mem_filter.mp hX with ⟨hXaC, hNotAX⟩
-        rcases Finset.mem_filter.mp hXaC with ⟨hXC, hXa⟩
-        exact Finset.mem_filter.mpr ⟨Finset.mem_filter.mpr ⟨hXC, hNotAX⟩, hXa⟩
-      · rcases Finset.mem_filter.mp hX with ⟨hXHole, hXa⟩
-        rcases Finset.mem_filter.mp hXHole with ⟨hXC, hNotAX⟩
-        exact Finset.mem_filter.mpr ⟨Finset.mem_filter.mpr ⟨hXC, hXa⟩, hNotAX⟩
-    have hpart' :
-        (Up (α := α) C A).card
-          + deg (α := α) (Hole (α := α) C A) a
-          =
-        deg (α := α) C a := by
-      simpa [deg, hUpEq, hHoleEq] using hpart
-    exact eq_comm.mp hpart'
-  have hHoleCard :
-      (Hole (α := α) C A).card = C.card - (Up (α := α) C A).card := by
-    have hpart := card_Up_add_card_Hole (α := α) C A
-    exact Nat.eq_sub_of_add_eq (by simpa [add_comm] using hpart)
-  have hDegNat :
-      deg (α := α) (Hole (α := α) C A) a
-        =
-      deg (α := α) C a - (Up (α := α) C A).card := by
-    exact Nat.eq_sub_of_add_eq (by simpa [add_comm] using hDegSplit.symm)
-  calc
-    ndeg (α := α) (Hole (α := α) C A) a + (Up (α := α) C A).card
-        =
-      ((2 : Int) * (deg (α := α) (Hole (α := α) C A) a : Int)
-        - ((Hole (α := α) C A).card : Int))
-      + (Up (α := α) C A).card := by
-          simp [ndeg]
-    _ =
-      ((2 : Int) * ((deg (α := α) C a - (Up (α := α) C A).card : Nat) : Int)
-        - ((C.card - (Up (α := α) C A).card : Nat) : Int))
-      + (Up (α := α) C A).card := by
-          rw [hDegNat, hHoleCard]
-    _ = (2 : Int) * (deg (α := α) C a : Int) - (C.card : Int) := by
-          have h1 : (Up (α := α) C A).card ≤ deg (α := α) C a := hUpSubsetDeg
-          have h2 : (Up (α := α) C A).card ≤ C.card := by
-            exact Finset.card_le_card (by intro X hX; exact (Finset.mem_filter.mp hX).1)
-          simp [Int.ofNat_sub h1, Int.ofNat_sub h2]
-          ring
-    _ = ndeg (α := α) C a := by
-          simp [ndeg]
 
 /-- Trace step for the `|F| ≥ 2` Qcorr branch (parallel case). -/
 noncomputable def Qcorr_trace {α :Type} [DecidableEq α] (F: HornWithForbid α) (a: α)  (hA: a ∈ F.F) (geq2: F.F.card ≥ 2):
@@ -586,14 +401,14 @@ noncomputable def Qcorr_deletion_head  {α :Type} [DecidableEq α] (F: HornWithF
   H := F.H.trace a
   hDR1 := F.H.trace_preserves_DR1 a F.hDR1
   hNEP := F.H.trace_preserves_NEP a F.hNEP
-  F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)
+  F := choosePrem1 (H := F.H) F.hDR1 a hasHead
   F_subset_U := by
-    let FF := Classical.choose (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)
-    have h_mem : FF ∈ F.H.prem a := (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)).1
+    let FF := choosePrem1 (H := F.H) F.hDR1 a hasHead
+    have h_mem : FF ∈ F.H.prem a := choosePrem1_mem (H := F.H) F.hDR1 a hasHead
     exact HornNF.prem_subset_traceU_of_mem_prem F.H h_mem
   F_nonempty := by
-    let FF := Classical.choose (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)
-    have h_mem : FF ∈ F.H.prem a := (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)).1
+    let FF := choosePrem1 (H := F.H) F.hDR1 a hasHead
+    have h_mem : FF ∈ F.H.prem a := choosePrem1_mem (H := F.H) F.hDR1 a hasHead
     have :FF.Nonempty := by
       let ph := F.hNEP (h := a)
       suffices FF ≠ ∅ from by
@@ -603,21 +418,20 @@ noncomputable def Qcorr_deletion_head  {α :Type} [DecidableEq α] (F: HornWithF
       exact ph h_mem
     simp_all only [FF]
 
-lemma qcorr_deletion_head_card
+private lemma qcorr_deletion_head_card
   (F : HornWithForbid α) (a : α) (hasHead : F.H.hasHead a) :
   (Qcorr_deletion_head F a hasHead).H.U.card = F.H.U.card - 1 := by
   dsimp [Qcorr_deletion_head, HornNF.trace]
   have haU : a ∈ F.H.U := F.H.head_mem_U hasHead
-  simpa using Finset.card_erase_of_mem haU
+  exact Finset.card_erase_of_mem haU
 
 /-- In the has-head branch, `Qcorr_deletion_head` realizes family-level deletion on the base fixset. -/
 theorem Qcorr_deletion_head_fixset_eq_Del
   (F : HornWithForbid α) (a : α) (hasHead : F.H.hasHead a) :
   (Qcorr_deletion_head F a hasHead).FixSet = Del a (HornNF.FixSet F.H) := by
   classical
-  let Pprem := Classical.choose (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)
-  have hP : Pprem ∈ F.H.prem a :=
-    (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)).1
+  let Pprem := choosePrem1 (H := F.H) F.hDR1 a hasHead
+  have hP : Pprem ∈ F.H.prem a := choosePrem1_mem (H := F.H) F.hDR1 a hasHead
   have hUnique : (F.H.prem a).card = 1 := by
     exact prem_card_eq_one_of_DR1_of_ne_empty (H := F.H) (v := a) (hDR1 := F.hDR1) hasHead
   have hHole :=
@@ -660,13 +474,28 @@ noncomputable def Qcorr_singleton_deletion_free {α :Type} [DecidableEq α] (F: 
   hDR1 := F.H.trace_preserves_DR1 a F.hDR1
   hNEP := F.H.trace_preserves_NEP a F.hNEP
 
+/-- Build result for the singleton/has-head branch. -/
+structure QcorrSingletonHasHeadBuildResult
+  (F : HornWithForbid α) where
+  next : HornWithForbid α
+  card_eq : next.H.U.card = F.H.U.card - 1
+  ineq : F.NDS_corr F.H.U.card ≤ next.NDS_corr (F.H.U.card - 1)
+
+/-- Build result for the singleton/head-free branch. -/
+structure QcorrSingletonHeadFreeBuildResult
+  (F : HornWithForbid α) where
+  next : Pack0 α
+  card_eq : next.H.U.card = F.H.U.card - 1
+  ineq : F.NDS_corr F.H.U.card ≤ NDS next.H.U.card next.H.FixSet
+
 /-- Legacy but reusable singleton/has-head branch constructor. -/
 noncomputable def Qcorr_singleton_hasHead_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:HasHead1 F a):
-    ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (F'.NDS_corr (F.H.U.card - 1))
+    QcorrSingletonHasHeadBuildResult F
 := by
   have ainU:a ∈ F.H.U := by exact F.H.head_mem_U hs
   let Hnorm : HornNF α := F.H.normalize a
-  obtain ⟨Pprem, hPprem_orig⟩ := hs
+  let Pprem : Finset α := Classical.choose hs
+  have hPprem_orig : Pprem ∈ F.H.prem a := Classical.choose_spec hs
   have hPprem_not_a : a ∉ Pprem := F.H.nf hPprem_orig
   have hPprem_norm : Pprem ∈ Hnorm.prem a := by
     dsimp [Hnorm, HornNF.normalize]
@@ -696,14 +525,14 @@ noncomputable def Qcorr_singleton_hasHead_get {α :Type} [DecidableEq α](F : Ho
         exact (F.hNEP (h := a)) hPprem_orig
       exact Finset.nonempty_iff_ne_empty.mpr hne
   }
-  refine ⟨F', ?_⟩
-  constructor
-  · have hainU_norm : a ∈ Hnorm.U := by
+  have hcard : F'.H.U.card = F.H.U.card - 1 := by
+    have hainU_norm : a ∈ Hnorm.U := by
       simpa [Hnorm, HornNF.normalize] using ainU
     dsimp [F', Hnorm]
     dsimp [HornNF.trace]
     simpa [HornNF.normalize] using Finset.card_erase_of_mem hainU_norm
-  · dsimp [HornWithForbid.NDS_corr, HornWithForbid.BaseC, F']
+  have hineq : F.NDS_corr F.H.U.card ≤ F'.NDS_corr (F.H.U.card - 1) := by
+    dsimp [HornWithForbid.NDS_corr, HornWithForbid.BaseC, F']
     rw [heq]
     have hmono :
       NDS_corr (F.H.U.card) (HornNF.FixSet F.H) ({a} : Finset α)
@@ -732,6 +561,20 @@ noncomputable def Qcorr_singleton_hasHead_get {α :Type} [DecidableEq α](F : Ho
             exact HornNF.normalizePrem_noPremContains (H := F.H) (a := a) hQ')
       simpa [Nat.succ_eq_add_one, hsubadd] using hEq_raw
     exact le_trans hmono (le_of_eq hEq_norm)
+  exact ⟨F', hcard, hineq⟩
+
+theorem Qcorr_singleton_hasHead_get_spec
+  {α :Type} [DecidableEq α] (F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:HasHead1 F a) :
+  ∃ F' : HornWithForbid α,
+    F'.H.U.card = F.H.U.card - 1 ∧
+      (F.NDS_corr F.H.U.card) ≤ (F'.NDS_corr (F.H.U.card - 1)) := by
+  let r := Qcorr_singleton_hasHead_get (α := α) F a heq hs
+  exact ⟨r.next, r.card_eq, r.ineq⟩
+
+noncomputable abbrev Qcorr_singleton_hasHead_build
+  {α : Type} [DecidableEq α] (F : HornWithForbid α) (a : α)
+  (heq : F.F = {a}) (hs : HasHead1 F a) :=
+  Qcorr_singleton_hasHead_get (α := α) F a heq hs
 
 theorem Qcorr_singleton_hasHead
   (n : Nat) (F : HornWithForbid α) :
@@ -744,10 +587,8 @@ theorem Qcorr_singleton_hasHead
   obtain ⟨a,ha⟩ := this
   have : HasHead1 F a := by
     dsimp [HasHead1s] at hh
-    simp_all only [Finset.singleton_inj, Classical.choose_eq']
-    simp_all only [Finset.card_singleton]
-    exact hh
-  obtain ⟨F',hF'⟩ := Qcorr_singleton_hasHead_get F a ha this
+    simpa [ha] using hh
+  obtain ⟨F',hF'⟩ := Qcorr_singleton_hasHead_get_spec F a ha this
   dsimp [Qcorr]
   intro hn
   specialize hQcorr F'
@@ -768,7 +609,7 @@ theorem Qcorr_singleton_hasHead
 
 -- NDS accounting for the singleton/head-free branch.
 noncomputable def Qcorr_singleton_headFree_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:¬HasHead1 F a):
-    ∃ P':Pack0 α , P'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (NDS P'.H.U.card P'.H.FixSet)
+    QcorrSingletonHeadFreeBuildResult F
 := by
   have ainU : a ∈ F.H.U := by
     have haF : a ∈ F.F := by simp [heq]
@@ -814,18 +655,34 @@ noncomputable def Qcorr_singleton_headFree_get {α :Type} [DecidableEq α](F : H
         NDS_corr (F.H.U.card) (HornNF.FixSet Hnorm) ({a} : Finset α) := hmono
       _ = NDS (F.H.U.card - 1) (HornNF.FixSet (Hnorm.trace a)) := hheadfree_norm
       _ = NDS (F.H.U.card - 1) (HornNF.FixSet (F.H.trace a)) := by simp [htrace_eq]
-  refine ⟨Qcorr_singleton_deletion_free F a, ?_⟩
-  constructor
-  · dsimp [Qcorr_singleton_deletion_free]
+  let P' : Pack0 α := Qcorr_singleton_deletion_free F a
+  have hcard : P'.H.U.card = F.H.U.card - 1 := by
+    dsimp [P', Qcorr_singleton_deletion_free]
     dsimp [HornNF.trace]
     exact Finset.card_erase_of_mem ainU
-  · dsimp [HornWithForbid.NDS_corr, HornWithForbid.BaseC]
+  have hineq' :
+      F.NDS_corr F.H.U.card ≤ NDS P'.H.U.card P'.H.FixSet := by
+    dsimp [P', HornWithForbid.NDS_corr, HornWithForbid.BaseC]
     rw [heq]
     dsimp [Qcorr_singleton_deletion_free]
     rw [show (F.H.trace a).U.card = F.H.U.card - 1 by
       dsimp [HornNF.trace]
       exact Finset.card_erase_of_mem ainU]
     exact hineq
+  exact ⟨P', hcard, hineq'⟩
+
+theorem Qcorr_singleton_headFree_get_spec
+  {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:¬HasHead1 F a) :
+  ∃ P' : Pack0 α,
+    P'.H.U.card = F.H.U.card - 1 ∧
+      (F.NDS_corr F.H.U.card) ≤ (NDS P'.H.U.card P'.H.FixSet) := by
+  let r := Qcorr_singleton_headFree_get (α := α) F a heq hs
+  exact ⟨r.next, r.card_eq, r.ineq⟩
+
+noncomputable abbrev Qcorr_singleton_headFree_build
+  {α : Type} [DecidableEq α] (F : HornWithForbid α) (a : α)
+  (heq : F.F = {a}) (hs : ¬HasHead1 F a) :=
+  Qcorr_singleton_headFree_get (α := α) F a heq hs
 
 theorem Qcorr_singleton_headFree
   (n : Nat) (F : HornWithForbid α)  :
@@ -838,11 +695,8 @@ theorem Qcorr_singleton_headFree
   obtain ⟨a,ha⟩ := this
   have : ¬HasHead1 F a := by
     dsimp [HasHead1s] at hh
-    simp_all only [Finset.singleton_inj, Classical.choose_eq']
-    simp_all only [Finset.card_singleton]
-    dsimp [HasHead1]
-    exact hh
-  obtain ⟨P',hP'⟩ := Qcorr_singleton_headFree_get F a ha this
+    simpa [ha] using hh
+  obtain ⟨P',hP'⟩ := Qcorr_singleton_headFree_get_spec F a ha this
   dsimp [Qcorr]
   intro hn
   specialize hQ P'
@@ -863,6 +717,7 @@ theorem Qcorr_singleton_headFree
 -----------------------------------------------------
 
 
+set_option maxHeartbeats 10000000 in
 theorem Q_branch_headFree
   (n : Nat) (P : Pack0 α) (h : α) :
   (∀ P':Pack0 α, P'.H.U.card = n → Q n P') →
@@ -919,12 +774,12 @@ theorem Q_branch_headFree
         =
       NDS n (Con h (HornNF.FixSet P.H))
         + (NDS n (Del h (HornNF.FixSet P.H)) + ndeg (HornNF.FixSet P.H) h) := by
-    simpa using
-      (Accounting.CON_ID_assoc (α := α) (n := n + 1) (hn := by omega)
-        (C := HornNF.FixSet P.H) (u := h))
+    exact Accounting.CON_ID_assoc (α := α) (n := n + 1) (hn := by omega)
+      (C := HornNF.FixSet P.H) (u := h)
   rw [hID]
   linarith
 
+set_option maxHeartbeats 10000000 in
 theorem Q_branch_hasHead
   (n : Nat) (P : Pack0 α) (h : α) :
   (∀ P:Pack0 α, P.H.U.card = n → Q n P) → (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
@@ -957,12 +812,12 @@ theorem Q_branch_hasHead
     F := ({h} : Finset α)
     F_subset_U := by
       intro x hx
-      simpa using (Finset.mem_singleton.mp hx ▸ hhU)
+      exact (Finset.mem_singleton.mp hx ▸ hhU)
     F_nonempty := by simp
   }
   have hHasHead1 : HasHead1 F0 h := by
     simpa [HasHead1, F0] using hHasHead
-  obtain ⟨F', hF'⟩ := Qcorr_singleton_hasHead_get (α := α) F0 h rfl hHasHead1
+  obtain ⟨F', hF'⟩ := Qcorr_singleton_hasHead_get_spec (α := α) F0 h rfl hHasHead1
   have hF'card_n : F'.H.U.card = n := by
     rcases hF' with ⟨hcard, _⟩
     have : F0.H.U.card = n + 1 := by simpa [F0] using hn
@@ -1034,12 +889,12 @@ theorem Q_branch_hasHead
         =
       NDS n (Con h (HornNF.FixSet P.H))
         + (NDS n (Del h (HornNF.FixSet P.H)) + ndeg (HornNF.FixSet P.H) h) := by
-    simpa using
-      (Accounting.CON_ID_assoc (α := α) (n := n + 1) (hn := by omega)
-        (C := HornNF.FixSet P.H) (u := h))
+    exact Accounting.CON_ID_assoc (α := α) (n := n + 1) (hn := by omega)
+      (C := HornNF.FixSet P.H) (u := h)
   rw [hID]
   linarith
 
+set_option maxHeartbeats 10000000 in
 theorem Qcorr_ge2_hasHead
   (n : Nat) (F : HornWithForbid α) (a : α) (hh : a ∈ F.F):
    (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
@@ -1106,12 +961,12 @@ theorem Qcorr_ge2_hasHead
     F_subset_U := by
       intro x hx
       have haU : a ∈ F.H.U := F.F_subset_U hh
-      simpa using (Finset.mem_singleton.mp hx ▸ haU)
+      exact (Finset.mem_singleton.mp hx ▸ haU)
     F_nonempty := by simp
   }
   have hHasHead1_F0 : HasHead1 F0 a := by
     simpa [HasHead1, F0] using hHasHead1
-  obtain ⟨Fs, hFs⟩ := Qcorr_singleton_hasHead_get (α := α) F0 a rfl hHasHead1_F0
+  obtain ⟨Fs, hFs⟩ := Qcorr_singleton_hasHead_get_spec (α := α) F0 a rfl hHasHead1_F0
   have hFs_card : Fs.H.U.card = n := by
     rcases hFs with ⟨hcard, _⟩
     have hF0card : F0.H.U.card = n + 1 := by simpa [F0] using hn
@@ -1150,7 +1005,7 @@ theorem Qcorr_ge2_hasHead
         NDS (α := α) n (Con (α := α) a (Hole (α := α) (HornNF.FixSet F.H) F.F))
           + (NDS (α := α) n (Del (α := α) a (Hole (α := α) (HornNF.FixSet F.H) F.F))
               + ndeg (α := α) (Hole (α := α) (HornNF.FixSet F.H) F.F) a) := by
-      simpa using hID
+      exact hID
     calc
       NDS_corr (α := α) (n + 1) (HornNF.FixSet F.H) F.F
           =
@@ -1188,6 +1043,7 @@ theorem Qcorr_ge2_hasHead
   rw [hMainEq]
   linarith [hConHole_nonpos, hDelNdeg_nonpos]
 
+set_option maxHeartbeats 10000000 in
 theorem Qcorr_ge2_headFree
   (n : Nat) (F : HornWithForbid α) (a : α) (ha : a ∈ F.F):
   (∀ P:Pack0 α, P.H.U.card = n → Q n P) →
@@ -1282,7 +1138,7 @@ theorem Qcorr_ge2_headFree
         NDS (α := α) n (Con (α := α) a (Hole (α := α) (HornNF.FixSet F.H) F.F))
           + (NDS (α := α) n (Del (α := α) a (Hole (α := α) (HornNF.FixSet F.H) F.F))
               + ndeg (α := α) (Hole (α := α) (HornNF.FixSet F.H) F.F) a) := by
-      simpa using hID
+      exact hID
     calc
       NDS_corr (α := α) (n + 1) (HornNF.FixSet F.H) F.F
           =
@@ -1322,7 +1178,7 @@ theorem Qcorr_ge2_headFree
 
 omit [DecidableEq α] in
 /-- Card-split helper: any finite set has either card = 0, card = 1, or card ≥ 2.
--- Used by `Induction/Steps.lean`.
+-- Used by `Induction/Main.lean`.
 -/
 lemma card_cases
   (A : Finset α) :
@@ -1332,4 +1188,5 @@ lemma card_cases
     omega
   exact h
 
+end Kernels
 end Dr1nds

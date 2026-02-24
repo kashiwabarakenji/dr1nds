@@ -48,7 +48,7 @@ private lemma card_filter_add_card_filter_not
   (s : Finset α) (p : α → Prop) [DecidablePred p] :
   (s.filter p).card + (s.filter (fun x => ¬ p x)).card = s.card := by
   classical
-  simpa using (Finset.filter_card_add_filter_neg_card_eq_card (s := s) (p := p))
+  exact Finset.filter_card_add_filter_neg_card_eq_card (s := s) (p := p)
 
 
 /-- Local helper: `Up` and `Hole` partition the family for singleton forbids. -/

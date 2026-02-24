@@ -13,7 +13,7 @@ namespace Dr1nds
 variable {α : Type} [DecidableEq α]
 
 -- =====================================
--- (0) parallel / no-parallel 分岐（独立核）
+-- (0) parallel / no-parallel split
 -- =====================================
 
 /- Parallel / NoParallel for forbid-free packs. -/
@@ -21,20 +21,18 @@ abbrev Parallel0 (P : Pack0 α) : Prop :=
   ∃ u v, u ≠ v ∧ u ∈ P.H.closure {v} ∧ v ∈ P.H.closure {u}
 abbrev NoParallel0 (P : Pack0 α) : Prop := ¬ Parallel0 P
 
-/-- Parallel / NoParallel for forbid packs. 禁止集合の中にパラレルがあるかどうか。-/
+/-- Parallel / NoParallel for forbid packs. -/
 abbrev Parallel1 (F: HornWithForbid α) : Prop :=
   ∃ u v, u ≠ v ∧ u ∈ F.F ∧ v ∈ F.F ∧ u ∈ F.H.closure {v} ∧ v ∈ F.H.closure {u}
 abbrev NoParallel1  (F: HornWithForbid α): Prop := ¬ Parallel1 F
 
---使わないかも。
-def HasParallel0 (P : Pack0 α) (v:α) :=
+private def HasParallel0 (P : Pack0 α) (v:α) :=
   ∃ u, u ≠ v ∧ u ∈ P.H.closure {v} ∧ v ∈ P.H.closure {u}
 
-def HasParallel1 (F : HornWithForbid α) (v:α) :=
+/-- Currently unused outside this file. -/
+private def HasParallel1 (F : HornWithForbid α) (v:α) :=
   ∃ u, u ≠ v ∧ u ∈ F.H.closure {v} ∧ v ∈ F.H.closure {u}
 
----ほかの言明に合わせて2段階にする。getのほうは、頂点をtraceしたものがNDSが大きくなくて、Packの条件を満たすというもの。頂点を引数に入れる。
----上のほうの言明は、帰納法の仮定を仮定すると、Q n が成り立つというもの。
 /-- Wiring helper: advance one step under the parallel-branch (forbid-free). -/
 noncomputable def Q_of_parallel_get
   (P : Pack0 α) (v : α) : Pack0 α where
@@ -66,8 +64,7 @@ theorem Q_of_parallel_get_spec
       NDS (n - 1) (Tr v (P.H.FixSet))
         + NDS (n - 1) (PairTr v (P.H.FixSet))
         + ndeg (P.H.FixSet) v := by
-    simpa using
-      (Accounting.TRACE_ID (α := α) (n := n) (hn := hn1) (C := P.H.FixSet) (u := v))
+    exact Accounting.TRACE_ID (α := α) (n := n) (hn := hn1) (C := P.H.FixSet) (u := v)
   have hNDSleTr : NDS n (P.H.FixSet) ≤ NDS (n - 1) (Tr v (P.H.FixSet)) := by
     rw [hTraceID, hPairNDS0]
     linarith
@@ -306,9 +303,8 @@ theorem Qcorr_of_parallel_get_spec
       NDS (n - 1) (Tr v (Hole (F.H.FixSet) F.F))
         + NDS (n - 1) (PairTr v (Hole (F.H.FixSet) F.F))
         + ndeg (Hole (F.H.FixSet) F.F) v := by
-    simpa using
-      (Accounting.TRACE_ID (α := α) (n := n) (hn := hn1)
-        (C := Hole (F.H.FixSet) F.F) (u := v))
+    exact Accounting.TRACE_ID (α := α) (n := n) (hn := hn1)
+      (C := Hole (F.H.FixSet) F.F) (u := v)
   have hCorrLeTr :
       NDS_corr n (F.H.FixSet) F.F
         ≤ NDS (n - 1) (Tr v (Hole (F.H.FixSet) F.F)) := by

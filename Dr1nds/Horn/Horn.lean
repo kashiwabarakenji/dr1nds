@@ -124,13 +124,13 @@ by
   classical
   simp [HornNF.FixSet]
   intro a
-  simpa using a.2
+  exact a.2
 
 lemma mem_FixSet_subset_U (H : HornNF α) {X : Finset α}
     (hX : X ∈ HornNF.FixSet H) : X ⊆ H.U := by
   classical
   simp_all only [mem_FixSet_iff]
-  simpa using hX.2
+  exact hX.2
 
 /-- If `H` is NEP, then `∅ ∈ FixSet H` (so the family-level NEP holds for `FixSet H`). -/
 lemma HornNF.empty_mem_FixSet_of_isNEP
@@ -204,7 +204,7 @@ lemma HornNF.empty_mem_FixSet_of_isNEP_alt
   (H : HornNF α)
   (hNEP : H.IsNEP) :
   (∅ : Finset α) ∈ HornNF.FixSet H := by
-  simpa using HornNF.empty_mem_FixSet_of_isNEP (H := H) hNEP
+  exact HornNF.empty_mem_FixSet_of_isNEP (H := H) hNEP
 
 /-- Alias of `HornNF.isNEP_of_isClosed_empty` (kept for stable downstream rewrites). -/
 lemma HornNF.isNEP_of_isClosed_empty_alt
@@ -218,13 +218,13 @@ lemma HornNF.isNEP_of_isClosed_empty_alt
 lemma HornNF.isNEP_iff_isClosed_empty_alt
   (H : HornNF α) :
   H.IsNEP ↔ HornNF.IsClosed H (∅ : Finset α) := by
-  simpa using HornNF.isNEP_iff_isClosed_empty (H := H)
+  exact HornNF.isNEP_iff_isClosed_empty (H := H)
 
 /-- Alias of `HornNF.isNEP_iff_empty_mem_FixSet` (preferred stable entry point). -/
 lemma HornNF.isNEP_iff_empty_mem_FixSet_alt
   (H : HornNF α) :
   H.IsNEP ↔ (∅ : Finset α) ∈ HornNF.FixSet H := by
-  simpa using HornNF.isNEP_iff_empty_mem_FixSet (H := H)
+  exact HornNF.isNEP_iff_empty_mem_FixSet (H := H)
 
 /-
 ------------------------------------------------------------
@@ -386,7 +386,7 @@ private lemma prem_eq_singleton_of_DR1_of_mem
     exact Finset.mem_singleton.mpr this
   · intro hQ
     -- Q ∈ {P} implies Q = P
-    simpa using (by
+    exact (by
       rcases Finset.mem_singleton.mp hQ with rfl
       exact hP)
 
@@ -409,7 +409,7 @@ def Horn.toHornNF (_ : Horn α) : HornNF α :=
     head_mem_U := by
       classical
       intro h hne
-      simpa using hne
+      exact hne
     nf := by
       classical
       intro h P hP

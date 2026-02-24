@@ -261,7 +261,7 @@ lemma nep_iff_empty_mem_base
    { U := S.H.U, C := HornNF.FixSet S.H, subset_univ := by
       intro X hX
       -- FixSet members are subsets of U
-      simpa using (mem_FixSet_subset_U (H := S.H) (X := X) hX)
+      exact mem_FixSet_subset_U (H := S.H) (X := X) hX
    }
      : SetFamily α
     )
@@ -471,7 +471,7 @@ lemma nep_FixSet_iff_nep_base
       subset_univ := by
         intro X hX
         -- FixSet members are subsets of U
-        simpa using (mem_FixSet_subset_U (H := S.H) (X := X) hX)
+        exact mem_FixSet_subset_U (H := S.H) (X := X) hX
     } : SetFamily α) := by
   classical
   constructor
@@ -487,11 +487,13 @@ lemma nep_FixSet_iff_nep_base
   · intro hNEP_base
     -- base NEP is definitional `∅ ∈ base`
     have hempty_base : (∅ : Finset α) ∈ HornNF.FixSet S.H := by
-      simpa [SetFamily.NEP] using hNEP_base
+      simp [SetFamily.NEP] at hNEP_base
+      exact (mem_FixSet_iff (H := S.H) (X := (∅ : Finset α))).2 hNEP_base
     have hempty_forbid : (∅ : Finset α) ∈ S.FixSet :=
       (empty_mem_FixSet_iff_empty_mem_base (α := α) S).2 hempty_base
     -- forbid NEP is definitional `∅ ∈ forbid`
-    simpa [SetFamily.NEP] using hempty_forbid
+    show (∅ : Finset α) ∈ S.FixSet
+    exact hempty_forbid
 
 
 /-- A convenient corollary: `S.FixSet` is NEP iff `∅` is in the base `FixSet`. -/
@@ -505,7 +507,7 @@ lemma nep_FixSet_iff_empty_mem_base
         -- FixSet members are subsets of U
         simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff]
         obtain ⟨left, _right⟩ := hX
-        simpa using left.2
+        exact left.2
     } : SetFamily α)
   ↔ (∅ : Finset α) ∈ HornNF.FixSet S.H := by
   classical
@@ -518,7 +520,7 @@ lemma nep_FixSet_iff_empty_mem_base
             intro X hX
             simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff]
             obtain ⟨left, _right⟩ := hX
-            simpa using left.2
+            exact left.2
         } : SetFamily α)
       ↔ (∅ : Finset α) ∈ S.FixSet := by
     rfl
