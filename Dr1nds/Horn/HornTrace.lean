@@ -135,7 +135,7 @@ by
         simp [huP]
 
 /-- Trace preserves NEP (no empty premise created). まだ使われてない -/
-lemma trace_preserves_NEP
+lemma trace_preserves_NEP'
   (H : HornNF α) (u : α)
   (hnep : ∀ h P, P ∈ H.prem h → P.Nonempty) :
   ∀ h P, P ∈ (trace H u).prem h → P.Nonempty :=
@@ -155,7 +155,7 @@ by
       simp_all
       exact hnep h P₀ hP₀
 
-lemma trace_preserves_NEP'
+lemma trace_preserves_NEP
   (H : HornNF α) (u : α)
   (hnep : H.IsNEP):
 (trace H u).IsNEP := by
@@ -177,7 +177,7 @@ lemma trace_preserves_NEP'
     simp_all only [not_false_eq_true, ne_eq]
     simpa using ni.2 this
 
-  let tp := trace_preserves_NEP H u this
+  let tp := trace_preserves_NEP' H u this
   intro h
   specialize tp x
   specialize tp ∅ h

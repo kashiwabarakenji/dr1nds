@@ -95,6 +95,7 @@ theorem Qcorr_ge_hasParallel
   exact Int.le_trans h2 hQcorr
 
 ---------------------------------------------
+---これは、Hornレベルで定義することではないのか。HornNF.IsSCを定義した。今後は、P.H.IsSCを使う。
 abbrev IsSC0 (P : Pack0 α) (h : α) : Prop :=
   P.H.closure {h} = {h}
 
@@ -108,7 +109,7 @@ This is the entry point to the SC-based induction branch.
 -/
 axiom exists_SC_no_parallel
   (P : Pack0 α) :
-  NoParallel0 P → ∃ h : α, IsSC0 P h
+  NoParallel0 P → ∃ h : α, P.H.IsSC h
 
 /-- Noncomputably pick an SC point from `exists_SC_no_parallel`. -/
 noncomputable def choose_SC_no_parallel
@@ -117,7 +118,7 @@ noncomputable def choose_SC_no_parallel
 
 @[simp] theorem choose_SC_no_parallel_spec
   (P : Pack0 α) (hNP : NoParallel0 P) :
-  IsSC0 P (choose_SC_no_parallel (α := α) P hNP) :=
+  P.H.IsSC (choose_SC_no_parallel (α := α) P hNP) :=
   Classical.choose_spec (exists_SC_no_parallel (α := α) P hNP)
 ------------------------------------------------
 
@@ -148,9 +149,9 @@ by
 -----------------------------------------------------
 -- Headがあるかないかの分岐。
 
-def HasHead0 (P : Pack0 α) (h : α) : Prop :=
-  (P.H.prem h).Nonempty
 
+
+--HornWithForbidに移動しても良いし、ここでもよい。
 def HasHead1 (F :HornWithForbid  α) (h : α) : Prop :=
   (F.H.prem h).Nonempty
 
@@ -164,8 +165,72 @@ def HasHead1s (F :HornWithForbid  α) (fs: IsForbidSingleton F):Prop := by
 
 
 
+-----------------------------------------------------
+--新しいローカルカーネル
+
+---contractionでは、閉集合族が閉集合族に。
+noncomputable def Q_contraction  {α :Type} [DecidableEq α](P : Pack0 α) (a: α) (hSC: P.H.IsSC a): Pack0 α where
+  H := P.H.contraction a
+  hDR1 := by exact P.H.contraction_preserves_DR1 P.hDR1 a
+  hNEP := by exact contraction_SC_NEP P.H a hSC
+
+---head freeのdeletionは、traceと同じ。だったら最初からtraceと言ってもいい気もするが。
+noncomputable def Q_trace {α :Type} [DecidableEq α](P : Pack0 α) (a: α) : Pack0 α where
+  H := P.H.trace a
+  hDR1 := by exact P.H.trace_preserves_DR1 a P.hDR1
+  hNEP :=  P.H.trace_preserves_NEP a P.hNEP
+
+noncomputable def Q_deletion_head {α :Type} [DecidableEq α](P : Pack0 α) (a: α) (hasHead: P.H.hasHead a):HornWithForbid α where
+  H := P.H.trace a
+  hDR1 := P.H.trace_preserves_DR1 a P.hDR1
+  hNEP := P.H.trace_preserves_NEP a P.hNEP
+  F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)  --- headを持つ唯一のルールのpremiseを入れる。
+  F_subset_U := by sorry
+  F_nonempty := by sorry
+
+-- 新しいローカルカーネル Qcorr編
+
+noncomputable def Qcorr_contraction {α :Type} [DecidableEq α] (F: HornWithForbid α) (a: α) (hSC:F.H.IsSC a) (hA: a ∈ F.F) (geq2: F.F.card ≥ 2):
+   HornWithForbid α where
+  H := F.H.contraction a
+  hDR1 := F.H.contraction_preserves_DR1 F.hDR1 a
+  hNEP := contraction_SC_NEP F.H a hSC
+  F := F.F.erase a
+  F_subset_U := by
+    simp_all only [ge_iff_le, contraction_U]
+    gcongr
+    simp_all only [HornWithForbid.F_subset_U]
+  F_nonempty := by
+    have hcard : (F.F.erase a).card = F.F.card - 1 :=
+    Finset.card_erase_of_mem hA
+    -- 2. card ≥ 2 より card - 1 ≥ 1
+    have hpos : (F.F.erase a).card > 0 := by
+      rw [hcard]
+      exact Nat.sub_pos_of_lt geq2   -- または omega / linarith
+      -- 3. card > 0 なら Nonempty
+    exact Finset.card_pos.mp hpos
+
+/-
+  F : Finset α                    -- forbid set
+  F_subset_U : F ⊆ H.U
+  F_nonempty : F.Nonempty
+-/
+
+
+
+
+
+
+
+
+
 
 -----------------------------------------------------
+---古いもの。完成したら消す。
+
+---これもHornレベルで定義するべきもの。HornNF.hasHeadを作った。よってこれは使わない。
+def HasHead0 (P : Pack0 α) (h : α) : Prop :=
+  (P.H.prem h).Nonempty
 
 noncomputable def Q_branch_headFree_get {α :Type} [DecidableEq α](P : Pack0 α) (a: α)  (hs:¬HasHead0 P a):
     ∃ P':Pack0 α , P'.H.U.card = P.H.U.card - 1 ∧ (NDS P.H.U.card P.H.FixSet) ≤ (NDS P'.H.U.card P'.H.FixSet)
@@ -389,7 +454,7 @@ lemma card_cases
     omega
   exact h
 
-----使ってないかも。
+----これに気が付かずにQ_traceとして再実装した。こっちを消す。
 
 noncomputable def tracePack0 (P : Pack0 α) (a : α) : Pack0 α :=
   { H := P.H.trace a
@@ -400,7 +465,7 @@ noncomputable def tracePack0 (P : Pack0 α) (a : α) : Pack0 α :=
       have hDR1'' : HornNF.DR1 (HornNF.trace P.H a) :=
         HornNF.trace_preserves_DR1 (H := P.H) (u := a) hDR1'
       simpa [HornNF.IsDR1, HornNF.DR1] using hDR1''
-    hNEP := by exact P.H.trace_preserves_NEP' a P.hNEP
+    hNEP := by exact P.H.trace_preserves_NEP a P.hNEP
   }
 
 

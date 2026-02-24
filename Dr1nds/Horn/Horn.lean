@@ -168,7 +168,6 @@ lemma HornNF.isNEP_iff_isClosed_empty
     exact HornNF.isNEP_of_isClosed_empty (H := H) hClosed
 
 /- `H` is NEP iff `FixSet H` contains the empty set (family-level NEP for `FixSet`). -/
-/- `H` is NEP iff `FixSet H` contains the empty set (family-level NEP for `FixSet`). -/
 lemma HornNF.isNEP_iff_empty_mem_FixSet
   (H : HornNF α) :
   H.IsNEP ↔ (∅ : Finset α) ∈ HornNF.FixSet H := by
@@ -320,7 +319,7 @@ def HornNF.deleteRules (H : HornNF α) (v : α) : HornNF α :=
 ------------------------------------------------------------
   2d. DR1 ⇒ premise uniqueness for a fixed head (Q1)
 ------------------------------------------------------------ -/
-
+def HornNF.hasHead (H : HornNF α )(v : α): Prop := (H.prem v).Nonempty
 ---DR1でどっちも前提ならば一致する。下で使っている。
 lemma prem_eq_of_mem_of_mem
     (H : HornNF α) (v : α)
@@ -334,11 +333,11 @@ lemma prem_eq_of_mem_of_mem
   exact hP
   exact hQ
 
----下で使っている。
+---DR1で、headを持てば、ちょうどルールの数は1つ。下で使っている。
 lemma prem_card_eq_one_of_DR1_of_nonempty
     (H : HornNF α) (v : α)
     (hDR1 : HornNF.IsDR1 H)
-    (hne : (H.prem v).Nonempty) :
+    (hne : H.hasHead v) :
     (H.prem v).card = 1 := by
   classical
   have hle1 : (H.prem v).card ≤ 1 := hDR1 v
@@ -350,18 +349,19 @@ lemma prem_card_eq_one_of_DR1_of_nonempty
 lemma prem_card_eq_one_of_DR1_of_ne_empty
     (H : HornNF α) (v : α)
     (hDR1 : HornNF.IsDR1 H)
-    (hne : (H.prem v) ≠ ∅) :
+    (hne : H.hasHead v) :
     (H.prem v).card = 1 := by
   classical
   apply prem_card_eq_one_of_DR1_of_nonempty (H := H) (v := v) (hDR1 := hDR1)
-  exact Finset.nonempty_iff_ne_empty.mpr hne
+  apply Finset.nonempty_iff_ne_empty.mpr
+  exact Finset.nonempty_iff_ne_empty.mp hne
 
----現状使ってない。
+---headをもてば、唯一の前提が存在する。
 /-- Under DR1, nonempty `prem v` has a unique premise element. -/
 lemma exists_unique_prem_of_DR1_of_nonempty
     (H : HornNF α) (v : α)
     (hDR1 : HornNF.IsDR1 H)
-    (hne : (H.prem v).Nonempty) :
+    (hne : H.hasHead v) :
     ∃! P : Finset α, P ∈ H.prem v
 := by
   classical

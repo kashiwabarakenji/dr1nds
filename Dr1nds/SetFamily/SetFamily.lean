@@ -1,7 +1,7 @@
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Algebra.BigOperators.Group.Finset.Basic
---import LeanCopilot
+import LeanCopilot
 
 namespace Dr1nds
 
@@ -65,6 +65,47 @@ def SC (F : SetFamily α) (x : α) : Prop :=
   (F : SetFamily α) (x : α) :
   SC F x ↔ ({x} : Finset α) ∈ F.C := by
   rfl
+
+def contraction (F : SetFamily α) (x : α) : SetFamily α where
+  U := F.U.erase x
+  C := (F.C.filter (fun X => x ∈ X)).image (fun X => X.erase x)
+  subset_univ := by
+    classical
+    intro X hX
+    rw [Finset.mem_image] at hX
+    simp at hX
+    obtain ⟨A,hA⟩ := hX
+    rw [Finset.subset_erase]
+    constructor
+    · have : A ⊆ F.U := by
+        exact F.subset_univ hA.1.1
+      rw [←hA.2]
+      have : A.erase x ⊆ A := by exact Finset.erase_subset x A
+      (expose_names; exact fun ⦃a⦄ a_1 => this_1 (this a_1))
+    · rcases hA with ⟨h1,h2⟩
+      rw [←h2]
+      exact Finset.notMem_erase x A
+
+---SCの要素でcontractionすると、NEPになる。
+theorem contraction_SC_NEP (F : SetFamily α) (x : α) :
+  F.SC x → (F.contraction x).NEP := by
+  intro h
+  dsimp [SetFamily.SC] at h
+  dsimp [SetFamily.contraction]
+  dsimp [SetFamily.NEP]
+  rw [Finset.mem_image]
+  use {x}
+  simp
+  exact h
+
+
+
+
+
+
+
+
+
 
 end SetFamily
 

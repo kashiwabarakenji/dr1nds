@@ -21,7 +21,7 @@ or be an SC point.
 def HornWithForbid.trace (S : HornWithForbid α) (v : α) (h_nonempty : (S.F.erase v).Nonempty) : HornWithForbid α :=
   { H := S.H.trace v
     hDR1 := HornNF.trace_preserves_DR1 S.H v S.hDR1
-    hNEP := HornNF.trace_preserves_NEP' S.H v S.hNEP
+    hNEP := HornNF.trace_preserves_NEP S.H v S.hNEP
     F := S.F.erase v
     F_subset_U := by
       dsimp [HornNF.trace]
@@ -61,7 +61,7 @@ noncomputable def traceWithPrem
       simpa [HornNF.IsDR1, HornNF.DR1] using hDR1''
     hNEP := by
       -- NEP is preserved by trace (proved in the Horn layer).
-      let tp := HornNF.trace_preserves_NEP' S.H a
+      let tp := HornNF.trace_preserves_NEP S.H a
       have :S.H.IsNEP := by
         dsimp [HornNF.IsNEP]
         simp [S.hNEP ]

@@ -316,11 +316,13 @@ theorem deleteRules_head_free_fix_equiv
           simp_all only
         · exact hXsub hx
 
+
+-------ここから集合族のconとHornのcontractionの一致を示す。
 ------------------------------------------------------------
 -- forward
 ------------------------------------------------------------
 
-theorem contraction_fix_equiv_forward
+private lemma contraction_fix_equiv_forward
   {α : Type} [DecidableEq α]
   (H : HornNF α)
   (x : α)
@@ -408,7 +410,7 @@ theorem contraction_fix_equiv_forward
 -- backward
 ------------------------------------------------------------
 
-theorem contraction_fix_equiv_backward
+private lemma contraction_fix_equiv_backward
   {α : Type} [DecidableEq α]
   (H : HornNF α)
   (x : α)
@@ -485,10 +487,7 @@ theorem contraction_fix_equiv_backward
       obtain ⟨left_1, right_2⟩ := hy
       exact hXsub right_2
 
-------------------------------------------------------------
--- 最終定理
-------------------------------------------------------------
-
+---集合族のConとHornのcontractionが一致する。
 theorem contraction_fix_equiv
   {α : Type} [DecidableEq α]
   (H : HornNF α)
@@ -504,6 +503,9 @@ theorem contraction_fix_equiv
     exact contraction_fix_equiv_forward H x hxU hY
   · intro hY
     exact contraction_fix_equiv_backward H x hxU hY
+
+
+---------------------------------------------------------------------------
 
 /-- DR1 is preserved under contraction (skeleton theorem). -/
 theorem HornNF.contraction_preserves_DR1
@@ -526,7 +528,7 @@ by
     -- use the explicit prem form for h ≠ x
     simpa [contraction_prem_of_ne (H := H) (x := x) hh] using le_trans himg hcard
 
-/-- NF is preserved under contraction (skeleton theorem). -/
+/-- NF is preserved under contraction (skeleton theorem). これはいらないかも。-/
 theorem HornNF.contraction_preserves_NF
   (H : HornNF α)
   (hNF : H.IsNF)

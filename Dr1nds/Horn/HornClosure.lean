@@ -4,6 +4,7 @@ import Mathlib.Data.Finset.Powerset
 
 import Dr1nds.ClosureSystem.ClosureOperator
 import Dr1nds.Horn.Horn
+import Dr1nds.Horn.HornContraction
 
 namespace Dr1nds
 
@@ -248,5 +249,66 @@ noncomputable def HornNF.toClosureOperator (H : HornNF α) : ClosureOperator α 
           exact hYcl (hXcl ha)
         exact (Finset.mem_filter.mp hx).2 Y hYclosed hXY
 }
+
+--------------------------------------------
+-----閉集合族のSC関連。contractionしたときのNEPとの関連も。
+--------------------------------------------
+
+def HornNF.IsSC (H : HornNF α) (x : α) : Prop :=
+  H.closure {x} = {x}
+
+lemma SC_closure_singleton  (H : HornNF α) (x : α):
+  ({x} : Finset α) ∈ H.FixSet ↔ H.IsSC x := by
+  dsimp [HornNF.IsSC]
+  dsimp [HornNF.closure]
+  constructor
+  · intro h
+
+    ext xx
+    constructor
+    ·
+      intro a
+      simp_all only [mem_FixSet_iff, Finset.singleton_subset_iff, Finset.mem_filter, Finset.mem_singleton]
+    ·
+      intro a
+      simp_all only [mem_FixSet_iff, Finset.mem_singleton, Finset.singleton_subset_iff, Finset.mem_filter, implies_true,
+        and_true]
+      subst a
+      simpa using h.2
+  · intro h
+    dsimp [HornNF.FixSet]
+    simp
+    constructor
+    . simp at h
+      have :{x} ⊆ H.U := by
+        rw [←h]
+        intro y hy
+        simp at hy
+        exact hy.1
+      exact Finset.singleton_subset_iff.mp this
+    · exact (HornNF.IsClosed_iff H {x}).mpr h
+
+----閉集合族において、SCをcontractionしたらNEPになること。
+lemma contraction_SC_NEP (H : HornNF α)(x : α)(hSC: H.IsSC x):
+  (H.contraction x).IsNEP := by
+  classical
+  have SetSC: {x} ∈ H.FixSet := by exact (SC_closure_singleton H x).mpr hSC
+  have : x ∈ H.U := by
+    dsimp [HornNF.IsSC]
+    dsimp [HornNF.FixSet] at SetSC
+    simp_all only [Finset.mem_filter, Finset.mem_powerset, Finset.singleton_subset_iff]
+  have :Con x H.FixSet = (H.contraction x).FixSet := by
+    symm
+    exact contraction_fix_equiv H x this
+  have : ∅ ∈ Con x H.FixSet := by
+    dsimp [Con]
+    rw [Finset.mem_image]
+    simp
+    use {x}
+    simp
+    simp_all only [mem_FixSet_iff]
+  simp_all only [mem_FixSet_iff]
+  let hi := (HornNF.contraction x H).isNEP_iff_empty_mem_FixSet
+  simp_all only [mem_FixSet_iff]
 
 end Dr1nds

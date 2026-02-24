@@ -745,8 +745,8 @@ lemma Qcorr_singleton_by_trace_cases
       -- DR1 + nonempty
       exact prem_card_eq_one_of_DR1_of_ne_empty (H := H) (v := v) (hDR1 := hDR1)
         (by
-          intro hEq
-          exact hfree hEq)
+          dsimp [HornNF.hasHead]
+          exact ⟨P, hP⟩)
     -- now discharge using the has-head bridge
     have hQp : NDS_corr (α := α) n (HornNF.FixSet (H.trace v)) P ≤ 0 :=
       hQ_trace_Qcorr P hP
