@@ -450,5 +450,122 @@ lemma CON_ID_assoc
   simpa [add_assoc, add_left_comm, add_comm] using
     (CON_ID (α := α) (n := n) (hn := hn) (C := C) (u := u))
 
+/- ============================================================
+  6. Trace-PairTrace identity
+============================================================ -/
+
+lemma mem_Con_iff
+  (u : α) (C : Finset (Finset α)) (Y : Finset α) :
+  Y ∈ Con (α := α) u C ↔ u ∉ Y ∧ (Y ∪ {u} : Finset α) ∈ C := by
+  classical
+  constructor
+  · intro hY
+    rcases Finset.mem_image.mp hY with ⟨X, hXf, hYX⟩
+    have hXC : X ∈ C := (Finset.mem_filter.mp hXf).1
+    have huX : u ∈ X := (Finset.mem_filter.mp hXf).2
+    have huY : u ∉ Y := by
+      rw [← hYX]
+      exact Finset.notMem_erase u X
+    have hYcup : (Y ∪ {u} : Finset α) = X := by
+      rw [← hYX]
+      simpa [Finset.union_comm, Finset.union_left_comm, Finset.union_assoc] using
+        (Finset.insert_erase huX)
+    exact ⟨huY, by simpa [hYcup] using hXC⟩
+  · intro h
+    rcases h with ⟨huY, hYcup⟩
+    refine Finset.mem_image.mpr ?_
+    refine ⟨Y ∪ {u}, ?_, ?_⟩
+    · refine Finset.mem_filter.mpr ?_
+      refine ⟨hYcup, ?_⟩
+      exact Finset.mem_union_right Y (Finset.mem_singleton.mpr rfl)
+    · simp [huY]
+
+lemma mem_PairTr_iff
+  (u : α) (C : Finset (Finset α)) (Y : Finset α) :
+  Y ∈ PairTr (α := α) u C ↔ Y ∈ C ∧ u ∉ Y ∧ (Y ∪ {u} : Finset α) ∈ C := by
+  simp [PairTr, and_left_comm]
+
+lemma mem_Tr_iff_mem_Del_or_mem_Con
+  (u : α) (C : Finset (Finset α)) (Y : Finset α) :
+  Y ∈ Tr (α := α) u C ↔ Y ∈ Del (α := α) u C ∨ Y ∈ Con (α := α) u C := by
+  classical
+  constructor
+  · intro hY
+    rcases Finset.mem_image.mp hY with ⟨X, hXC, hYX⟩
+    by_cases huX : u ∈ X
+    · right
+      refine Finset.mem_image.mpr ?_
+      refine ⟨X, Finset.mem_filter.mpr ⟨hXC, huX⟩, hYX⟩
+    · left
+      refine Finset.mem_filter.mpr ?_
+      refine ⟨?_, ?_⟩
+      · simpa [← hYX, Finset.erase_eq_of_notMem huX] using hXC
+      · simpa [← hYX, Finset.erase_eq_of_notMem huX] using huX
+  · intro hY
+    rcases hY with hDel | hCon
+    · have hYC : Y ∈ C := (Finset.mem_filter.mp hDel).1
+      refine Finset.mem_image.mpr ?_
+      exact ⟨Y, hYC, by simp [(Finset.mem_filter.mp hDel).2]⟩
+    · rcases Finset.mem_image.mp hCon with ⟨X, hXf, hYX⟩
+      refine Finset.mem_image.mpr ?_
+      exact ⟨X, (Finset.mem_filter.mp hXf).1, hYX⟩
+
+lemma Tr_eq_Del_union_Con
+  (u : α) (C : Finset (Finset α)) :
+  Tr (α := α) u C = Del (α := α) u C ∪ Con (α := α) u C := by
+  classical
+  ext Y
+  simpa [Finset.mem_union] using (mem_Tr_iff_mem_Del_or_mem_Con (α := α) u C Y)
+
+lemma PairTr_eq_Del_inter_Con
+  (u : α) (C : Finset (Finset α)) :
+  PairTr (α := α) u C = Del (α := α) u C ∩ Con (α := α) u C := by
+  classical
+  ext Y
+  constructor
+  · intro hY
+    have hPair := (mem_PairTr_iff (α := α) u C Y).1 hY
+    rcases hPair with ⟨hYC, huY, hYcup⟩
+    refine Finset.mem_inter.mpr ?_
+    refine ⟨Finset.mem_filter.mpr ⟨hYC, huY⟩, ?_⟩
+    exact (mem_Con_iff (α := α) u C Y).2 ⟨huY, hYcup⟩
+  · intro hY
+    rcases Finset.mem_inter.mp hY with ⟨hDel, hCon⟩
+    have hYC : Y ∈ C := (Finset.mem_filter.mp hDel).1
+    have huY : u ∉ Y := (Finset.mem_filter.mp hDel).2
+    have hYcup : (Y ∪ {u} : Finset α) ∈ C := (mem_Con_iff (α := α) u C Y).1 hCon |>.2
+    exact (mem_PairTr_iff (α := α) u C Y).2 ⟨hYC, huY, hYcup⟩
+
+lemma NDS_Tr_add_NDS_PairTr_eq_NDS_Del_add_NDS_Con
+  (n : Nat) (u : α) (C : Finset (Finset α)) :
+  NDS (α := α) n (Tr (α := α) u C) + NDS (α := α) n (PairTr (α := α) u C)
+    = NDS (α := α) n (Del (α := α) u C) + NDS (α := α) n (Con (α := α) u C) := by
+  classical
+  have hTr : Tr (α := α) u C = Del (α := α) u C ∪ Con (α := α) u C :=
+    Tr_eq_Del_union_Con (α := α) u C
+  have hPair : PairTr (α := α) u C = Del (α := α) u C ∩ Con (α := α) u C :=
+    PairTr_eq_Del_inter_Con (α := α) u C
+  rw [hTr, hPair]
+  simpa [NDS, add_comm, add_left_comm, add_assoc] using
+    (Finset.sum_union_inter
+      (s₁ := Del (α := α) u C)
+      (s₂ := Con (α := α) u C)
+      (f := fun X : Finset α => w (α := α) n X))
+
+theorem TRACE_ID
+  (n : Nat) (hn : 1 ≤ n) (C : Finset (Finset α)) (u : α) :
+  NDS (α := α) n C
+    =
+  NDS (α := α) (n - 1) (Tr (α := α) u C)
+    +
+  NDS (α := α) (n - 1) (PairTr (α := α) u C)
+    +
+  ndeg (α := α) C u := by
+  have hConId := CON_ID (α := α) (n := n) (hn := hn) (C := C) (u := u)
+  have hTracePart :=
+    NDS_Tr_add_NDS_PairTr_eq_NDS_Del_add_NDS_Con
+      (α := α) (n := n - 1) (u := u) (C := C)
+  linarith [hConId, hTracePart]
+
 end Accounting
 end Dr1nds
