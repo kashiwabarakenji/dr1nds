@@ -201,6 +201,32 @@ noncomputable def Q_deletion_head {α :Type} [DecidableEq α](P : Pack0 α) (a: 
       exact ph h_mem
     simp_all only [F]
 
+/-- In the has-head branch, rule-level deletion matches family-level `Del` on `FixSet`. -/
+theorem Q_deletion_head_fixset_eq_Del
+  (P : Pack0 α) (a : α) (hasHead : P.H.hasHead a) :
+  (Q_deletion_head P a hasHead).FixSet = Del a (HornNF.FixSet P.H) := by
+  classical
+  let Pprem := Classical.choose (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)
+  have hP : Pprem ∈ P.H.prem a :=
+    (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)).1
+  have hUnique : (P.H.prem a).card = 1 := by
+    exact prem_card_eq_one_of_DR1_of_ne_empty (H := P.H) (v := a) (hDR1 := P.hDR1) hasHead
+  have hHole :=
+    hole_singleton_eq_hole_trace_prem (α := α)
+      (H := P.H) (hDR1 := P.hDR1) (v := a) (P := Pprem)
+      (hP := hP) (hUnique := hUnique)
+  have hQhole :
+      (Q_deletion_head P a hasHead).FixSet
+        = Hole (α := α) (HornNF.FixSet (P.H.trace a)) Pprem := by
+    simpa [Q_deletion_head, Pprem] using
+      (FixSet_eq_Hole_FixSet (α := α) (S := Q_deletion_head P a hasHead))
+  calc
+    (Q_deletion_head P a hasHead).FixSet
+        = Hole (α := α) (HornNF.FixSet (P.H.trace a)) Pprem := hQhole
+    _ = Hole (α := α) (HornNF.FixSet P.H) ({a} : Finset α) := hHole.symm
+    _ = Del a (HornNF.FixSet P.H) := by
+      simp [Del]
+
 -- 新しいローカルカーネル Qcorr編
 
 --禁止集合のサイズが2以上の場合に使われる。
