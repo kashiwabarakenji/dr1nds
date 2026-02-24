@@ -285,15 +285,73 @@ noncomputable def Qcorr_singleton_hasHead_get {α :Type} [DecidableEq α](F : Ho
     ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (F'.NDS_corr (F.H.U.card - 1))
 := by
   have ainU:a ∈ F.H.U := by exact F.H.head_mem_U hs
-  use Qcorr_deletion_head F a hs
+  let Hnorm : HornNF α := F.H.normalize a
+  obtain ⟨Pprem, hPprem_orig⟩ := hs
+  have hPprem_not_a : a ∉ Pprem := F.H.nf hPprem_orig
+  have hPprem_norm : Pprem ∈ Hnorm.prem a := by
+    dsimp [Hnorm, HornNF.normalize]
+    exact Finset.mem_filter.mpr ⟨hPprem_orig, hPprem_not_a⟩
+  have hs_norm : Hnorm.hasHead a := ⟨Pprem, hPprem_norm⟩
+  have hDR1_norm : HornNF.DR1 Hnorm := by
+    exact HornNF.normalizePreservesDR1 F.H a F.hDR1
+  have hUnique_norm : (Hnorm.prem a).card = 1 := by
+    exact prem_card_eq_one_of_DR1_of_ne_empty Hnorm a hDR1_norm hs_norm
+  have hNEP_norm : Hnorm.IsNEP := by
+    intro h hempty
+    have hmem_filter : (∅ : Finset α) ∈ (F.H.prem h).filter (fun Q => a ∉ Q) := by
+      simpa [Hnorm, HornNF.normalize] using hempty
+    have hmem : (∅ : Finset α) ∈ F.H.prem h := (Finset.mem_filter.mp hmem_filter).1
+    exact (F.hNEP (h := h)) hmem
+  let F' : HornWithForbid α := {
+    H := Hnorm.trace a
+    hDR1 := Hnorm.trace_preserves_DR1 a hDR1_norm
+    hNEP := Hnorm.trace_preserves_NEP a hNEP_norm
+    F := Pprem
+    F_subset_U := by
+      exact HornNF.prem_subset_traceU_of_mem_prem (H := Hnorm) hPprem_norm
+    F_nonempty := by
+      have hne : Pprem ≠ ∅ := by
+        intro h0
+        rw [h0] at hPprem_orig
+        exact (F.hNEP (h := a)) hPprem_orig
+      exact Finset.nonempty_iff_ne_empty.mpr hne
+  }
+  refine ⟨F', ?_⟩
   constructor
-  · dsimp [Qcorr_deletion_head]
+  · have hainU_norm : a ∈ Hnorm.U := by
+      simpa [Hnorm, HornNF.normalize] using ainU
+    dsimp [F', Hnorm]
     dsimp [HornNF.trace]
-    exact Finset.card_erase_of_mem ainU
-  · --dsimp [Qcorr_deletion_head]
-    --集合が等しいことを利用する。normalizeを経由しないで証明するのはそれなりに大変。
-    --NDS部は等号でなりたち、corr部は不等号で成り立つ(normalize分がずれる。)
-    sorry
+    simpa [HornNF.normalize] using Finset.card_erase_of_mem hainU_norm
+  · dsimp [HornWithForbid.NDS_corr, HornWithForbid.BaseC, F']
+    rw [heq]
+    have hmono :
+      NDS_corr (F.H.U.card) (HornNF.FixSet F.H) ({a} : Finset α)
+        ≤
+      NDS_corr (F.H.U.card) (HornNF.FixSet Hnorm) ({a} : Finset α) := by
+      exact HornNF.ndscorr_singleton_normalize_le (k := F.H.U.card) (H := F.H) (a := a)
+    have hEq_norm :
+      NDS_corr (F.H.U.card) (HornNF.FixSet Hnorm) ({a} : Finset α)
+        =
+      NDS_corr (F.H.U.card - 1) (HornNF.FixSet (Hnorm.trace a)) Pprem := by
+      have hpos : 0 < F.H.U.card := Finset.card_pos.mpr ⟨a, ainU⟩
+      have hsubadd : F.H.U.card - 1 + 1 = F.H.U.card := by
+        exact Nat.sub_add_cancel (Nat.succ_le_of_lt hpos)
+      have hEq_raw :=
+        Dr1nds.NDS_corr_singleton_hasHead_P_eq
+          (α := α) (n := F.H.U.card - 1)
+          (H := Hnorm) (hDR1 := hDR1_norm)
+          (v := a) (P := Pprem)
+          (hvU := by simpa [Hnorm, HornNF.normalize] using ainU)
+          (hP := hPprem_norm)
+          (hUnique := hUnique_norm)
+          (hNoPremV := by
+            intro h Q hQ
+            have hQ' : Q ∈ (HornNF.normalizePrem F.H a).prem h := by
+              simpa [Hnorm, HornNF.normalizePrem] using hQ
+            exact HornNF.normalizePrem_noPremContains (H := F.H) (a := a) hQ')
+      simpa [Nat.succ_eq_add_one, hsubadd] using hEq_raw
+    exact le_trans hmono (le_of_eq hEq_norm)
 
 theorem Qcorr_singleton_hasHead
   (n : Nat) (F : HornWithForbid α) :
@@ -331,7 +389,63 @@ theorem Qcorr_singleton_hasHead
 ---ここでNDSの計算を行う。
 noncomputable def Qcorr_singleton_headFree_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:¬HasHead1 F a):
     ∃ P':Pack0 α , P'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (NDS P'.H.U.card P'.H.FixSet)
-:= sorry
+:= by
+  have ainU : a ∈ F.H.U := by
+    have haF : a ∈ F.F := by simpa [heq]
+    exact F.F_subset_U haF
+  have hfree : F.H.prem a = ∅ := by
+    by_contra hne
+    exact hs (Finset.nonempty_iff_ne_empty.mpr hne)
+  let Hnorm : HornNF α := F.H.normalize a
+  have hmono :
+    NDS_corr (F.H.U.card) (HornNF.FixSet F.H) ({a} : Finset α)
+      ≤
+    NDS_corr (F.H.U.card) (HornNF.FixSet Hnorm) ({a} : Finset α) := by
+    exact HornNF.ndscorr_singleton_normalize_le (k := F.H.U.card) (H := F.H) (a := a)
+  have hheadfree_norm :
+    NDS_corr (F.H.U.card) (HornNF.FixSet Hnorm) ({a} : Finset α)
+      =
+    NDS (F.H.U.card - 1) (HornNF.FixSet (Hnorm.trace a)) := by
+    have hpos : 0 < F.H.U.card := Finset.card_pos.mpr ⟨a, ainU⟩
+    have hsubadd : F.H.U.card - 1 + 1 = F.H.U.card := by
+      exact Nat.sub_add_cancel (Nat.succ_le_of_lt hpos)
+    have hEq_raw :=
+      Dr1nds.NDS_corr_singleton_head_free_eq
+        (α := α) (n := F.H.U.card - 1)
+        (H := Hnorm) (v := a)
+        (hvU := by simpa [Hnorm, HornNF.normalize] using ainU)
+        (hfree := by
+          simpa [Hnorm, HornNF.normalize, hfree])
+        (hNoPremV := by
+          intro h Q hQ
+          have hQ' : Q ∈ (HornNF.normalizePrem F.H a).prem h := by
+            simpa [Hnorm, HornNF.normalizePrem] using hQ
+          exact HornNF.normalizePrem_noPremContains (H := F.H) (a := a) hQ')
+    simpa [Nat.succ_eq_add_one, hsubadd] using hEq_raw
+  have htrace_eq : Hnorm.trace a = F.H.trace a := by
+    exact HornNF.trace_normalizePrem_eq_of_head_free (H := F.H) (a := a) hfree
+  have hineq :
+    NDS_corr (F.H.U.card) (HornNF.FixSet F.H) ({a} : Finset α)
+      ≤
+    NDS (F.H.U.card - 1) (HornNF.FixSet (F.H.trace a)) := by
+    calc
+      NDS_corr (F.H.U.card) (HornNF.FixSet F.H) ({a} : Finset α)
+          ≤
+        NDS_corr (F.H.U.card) (HornNF.FixSet Hnorm) ({a} : Finset α) := hmono
+      _ = NDS (F.H.U.card - 1) (HornNF.FixSet (Hnorm.trace a)) := hheadfree_norm
+      _ = NDS (F.H.U.card - 1) (HornNF.FixSet (F.H.trace a)) := by simpa [htrace_eq]
+  refine ⟨Qcorr_singleton_deletion_free F a, ?_⟩
+  constructor
+  · dsimp [Qcorr_singleton_deletion_free]
+    dsimp [HornNF.trace]
+    exact Finset.card_erase_of_mem ainU
+  · dsimp [HornWithForbid.NDS_corr, HornWithForbid.BaseC]
+    rw [heq]
+    dsimp [Qcorr_singleton_deletion_free]
+    rw [show (F.H.trace a).U.card = F.H.U.card - 1 by
+      dsimp [HornNF.trace]
+      exact Finset.card_erase_of_mem ainU]
+    exact hineq
 
 theorem Qcorr_singleton_headFree
   (n : Nat) (F : HornWithForbid α)  :
