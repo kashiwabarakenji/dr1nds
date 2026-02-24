@@ -185,11 +185,25 @@ noncomputable def Q_deletion_head {α :Type} [DecidableEq α](P : Pack0 α) (a: 
   hDR1 := P.H.trace_preserves_DR1 a P.hDR1
   hNEP := P.H.trace_preserves_NEP a P.hNEP
   F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)  --- headを持つ唯一のルールのpremiseを入れる。
-  F_subset_U := by sorry
-  F_nonempty := by sorry
+  F_subset_U := by
+    let F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)
+    have h_mem : F ∈ P.H.prem a := (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)).1
+    exact HornNF.prem_subset_traceU_of_mem_prem P.H h_mem
+  F_nonempty := by
+    let F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)
+    have h_mem : F ∈ P.H.prem a := (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)).1
+    have :F.Nonempty := by
+      let ph := P.hNEP (h := a)
+      suffices F ≠ ∅ from by
+        exact Finset.nonempty_iff_ne_empty.mpr this
+      intro h
+      rw [h] at h_mem
+      exact ph h_mem
+    simp_all only [F]
 
 -- 新しいローカルカーネル Qcorr編
 
+--禁止集合のサイズが2以上の場合に使われる。
 noncomputable def Qcorr_contraction {α :Type} [DecidableEq α] (F: HornWithForbid α) (a: α) (hSC:F.H.IsSC a) (hA: a ∈ F.F) (geq2: F.F.card ≥ 2):
    HornWithForbid α where
   H := F.H.contraction a
@@ -210,20 +224,147 @@ noncomputable def Qcorr_contraction {α :Type} [DecidableEq α] (F: HornWithForb
       -- 3. card > 0 なら Nonempty
     exact Finset.card_pos.mp hpos
 
-/-
-  F : Finset α                    -- forbid set
-  F_subset_U : F ⊆ H.U
-  F_nonempty : F.Nonempty
--/
+---禁止集合の大きさが2以上でパラレルの場合に使われる。HornWithForbidになるもの。禁止集合がなくなるtraceは、Qcorr_singleton_deletion_free
+noncomputable def Qcorr_trace {α :Type} [DecidableEq α] (F: HornWithForbid α) (a: α)  (hA: a ∈ F.F) (geq2: F.F.card ≥ 2):
+   HornWithForbid α where
+  H := F.H.trace a
+  hDR1 := F.H.trace_preserves_DR1 a F.hDR1
+  hNEP := F.H.trace_preserves_NEP a F.hNEP
+  F := F.F.erase a
+  F_subset_U := by
+    dsimp [HornNF.trace]
+    have : F.F ⊆ F.H.U := by exact F.F_subset_U
+    exact Finset.erase_subset_erase a this
+  F_nonempty := by
+    have hcard : (F.F.erase a).card = F.F.card - 1 :=
+    Finset.card_erase_of_mem hA
+    -- 2. card ≥ 2 より card - 1 ≥ 1
+    have hpos : (F.F.erase a).card > 0 := by
+      rw [hcard]
+      exact Nat.sub_pos_of_lt geq2   -- または omega / linarith
+      -- 3. card > 0 なら Nonempty
+    exact Finset.card_pos.mp hpos
+
+-- (hA: a ∈ F.F) (geq2: F.F.card ≥ 2)の場合に使われるが、マイナーの構成には使わないのか。すると、F.F.card = 1の場合もこれでOKか。
+noncomputable def Qcorr_deletion_head  {α :Type} [DecidableEq α] (F: HornWithForbid α) (a: α)  (hasHead: F.H.hasHead a) :
+   HornWithForbid α where
+  H := F.H.trace a
+  hDR1 := F.H.trace_preserves_DR1 a F.hDR1
+  hNEP := F.H.trace_preserves_NEP a F.hNEP
+  F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)  --- headを持つ唯一のルールのpremiseを入れる。
+  F_subset_U := by
+    let FF := Classical.choose (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)
+    have h_mem : FF ∈ F.H.prem a := (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)).1
+    exact HornNF.prem_subset_traceU_of_mem_prem F.H h_mem
+  F_nonempty := by
+    let FF := Classical.choose (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)
+    have h_mem : FF ∈ F.H.prem a := (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)).1
+    have :FF.Nonempty := by
+      let ph := F.hNEP (h := a)
+      suffices FF ≠ ∅ from by
+        exact Finset.nonempty_iff_ne_empty.mpr this
+      intro h
+      rw [h] at h_mem
+      exact ph h_mem
+    simp_all only [FF]
+
+--  (hA: {a} = F.F) (hs:IsForbidSingleton F) の状況下で使うが、マイナーの定義には出てこない。型的には禁止集合を無視したtrace。
+-- Normalizeも行っていることになる。Head freeの状態だと、Normalizeとはただのtraceになる。NDSの非減少は別途考える。
+noncomputable def Qcorr_singleton_deletion_free {α :Type} [DecidableEq α] (F: HornWithForbid α) (a: α) :
+   Pack0 α where
+  H := F.H.trace a
+  hDR1 := F.H.trace_preserves_DR1 a F.hDR1
+  hNEP := F.H.trace_preserves_NEP a F.hNEP
 
 
+------------------------------------------------------
+--古いけど再利用可能なもの。
 
+--ここでNDSの計算を行う。
+noncomputable def Qcorr_singleton_hasHead_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:HasHead1 F a):
+    ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (F'.NDS_corr (F.H.U.card - 1))
+:= by
+  have ainU:a ∈ F.H.U := by exact F.H.head_mem_U hs
+  use Qcorr_deletion_head F a hs
+  constructor
+  · dsimp [Qcorr_deletion_head]
+    dsimp [HornNF.trace]
+    exact Finset.card_erase_of_mem ainU
+  · --dsimp [Qcorr_deletion_head]
+    --集合が等しいことを利用する。normalizeを経由しないで証明するのはそれなりに大変。
+    --NDS部は等号でなりたち、corr部は不等号で成り立つ(normalize分がずれる。)
+    sorry
 
+theorem Qcorr_singleton_hasHead
+  (n : Nat) (F : HornWithForbid α) :
+   (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
+  F.H.U.card = n + 1 → (fb:IsForbidSingleton F) → HasHead1s F fb→
+   Qcorr (n+1) F := by
+  intro hQcorr hn hSC hh
+  dsimp [IsForbidSingleton] at hSC
+  have :∃ a , F.F = {a} := by exact Finset.card_eq_one.mp hSC
+  obtain ⟨a,ha⟩ := this
+  have : HasHead1 F a := by
+    dsimp [HasHead1s] at hh
+    simp_all only [Finset.singleton_inj, Classical.choose_eq']
+    simp_all only [Finset.card_singleton]
+    exact hh
+  obtain ⟨F',hF'⟩ := Qcorr_singleton_hasHead_get F a ha this
+  dsimp [Qcorr]
+  intro hn
+  specialize hQcorr F'
+  have :F'.H.U.card = n := by
+    simp_all only [add_tsub_cancel_right, forall_const]
+  specialize hQcorr this
+  dsimp [Qcorr] at hQcorr
+  specialize hQcorr this
+  rw [←hn]
+  rw [←this] at hQcorr
+  rcases hF' with ⟨h1,h2⟩
+  dsimp [HornWithForbid.NDS_corr] at h2
+  dsimp [HornWithForbid.BaseC] at h2
+  rw [h1] at hQcorr
+  --dsimp [HornNF.FixSet] at hQcorr
+  --dsimp [HornNF.FixSet] at h2
+  exact Int.le_trans h2 hQcorr
 
+---ここでNDSの計算を行う。
+noncomputable def Qcorr_singleton_headFree_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:¬HasHead1 F a):
+    ∃ P':Pack0 α , P'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (NDS P'.H.U.card P'.H.FixSet)
+:= sorry
 
-
-
-
+theorem Qcorr_singleton_headFree
+  (n : Nat) (F : HornWithForbid α)  :
+  (∀ P:Pack0 α, P.H.U.card = n → Q n P) →
+  F.H.U.card = n + 1 → (fb:IsForbidSingleton F) → ¬HasHead1s F fb→
+   Qcorr (n+1) F := by
+  intro hQ hn hSC hh
+  dsimp [IsForbidSingleton] at hSC
+  have :∃ a , F.F = {a} := by exact Finset.card_eq_one.mp hSC
+  obtain ⟨a,ha⟩ := this
+  have : ¬HasHead1 F a := by
+    dsimp [HasHead1s] at hh
+    simp_all only [Finset.singleton_inj, Classical.choose_eq']
+    simp_all only [Finset.card_singleton]
+    dsimp [HasHead1]
+    exact hh
+  obtain ⟨P',hP'⟩ := Qcorr_singleton_headFree_get F a ha this
+  dsimp [Qcorr]
+  intro hn
+  specialize hQ P'
+  have :P'.H.U.card = n := by
+    simp_all only [add_tsub_cancel_right, forall_const]
+  specialize hQ this
+  dsimp [Q] at hQ
+  specialize hQ this
+  rw [←hn]
+  rw [←this] at hQ
+  rcases hP' with ⟨h1,h2⟩
+  dsimp [HornWithForbid.NDS_corr] at h2
+  dsimp [HornWithForbid.BaseC] at h2
+  rw [h1] at hQ
+  rw [h1] at h2
+  exact Int.le_trans h2 hQ
 
 -----------------------------------------------------
 ---古いもの。完成したら消す。
@@ -278,79 +419,6 @@ theorem Q_branch_hasHead
   rcases hP' with ⟨h1,h2⟩
   exact Int.le_trans h2 hQ
 
-noncomputable def Qcorr_singleton_hasHead_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:HasHead1 F a):
-    ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (F'.NDS_corr (F.H.U.card - 1))
-:= sorry
-
-theorem Qcorr_singleton_hasHead
-  (n : Nat) (F : HornWithForbid α) :
-   (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
-  F.H.U.card = n + 1 → (fb:IsForbidSingleton F) → HasHead1s F fb→
-   Qcorr (n+1) F := by
-  intro hQcorr hn hSC hh
-  dsimp [IsForbidSingleton] at hSC
-  have :∃ a , F.F = {a} := by exact Finset.card_eq_one.mp hSC
-  obtain ⟨a,ha⟩ := this
-  have : HasHead1 F a := by
-    dsimp [HasHead1s] at hh
-    simp_all only [Finset.singleton_inj, Classical.choose_eq']
-    simp_all only [Finset.card_singleton]
-    exact hh
-  obtain ⟨F',hF'⟩ := Qcorr_singleton_hasHead_get F a ha this
-  dsimp [Qcorr]
-  intro hn
-  specialize hQcorr F'
-  have :F'.H.U.card = n := by
-    simp_all only [add_tsub_cancel_right, forall_const]
-  specialize hQcorr this
-  dsimp [Qcorr] at hQcorr
-  specialize hQcorr this
-  rw [←hn]
-  rw [←this] at hQcorr
-  rcases hF' with ⟨h1,h2⟩
-  dsimp [HornWithForbid.NDS_corr] at h2
-  dsimp [HornWithForbid.BaseC] at h2
-  rw [h1] at hQcorr
-  --dsimp [HornNF.FixSet] at hQcorr
-  --dsimp [HornNF.FixSet] at h2
-  exact Int.le_trans h2 hQcorr
-
-noncomputable def Qcorr_singleton_headFree_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:¬HasHead1 F a):
-    ∃ P':Pack0 α , P'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (NDS P'.H.U.card P'.H.FixSet)
-:= sorry
-
-theorem Qcorr_singleton_headFree
-  (n : Nat) (F : HornWithForbid α)  :
-  (∀ P:Pack0 α, P.H.U.card = n → Q n P) →
-  F.H.U.card = n + 1 → (fb:IsForbidSingleton F) → ¬HasHead1s F fb→
-   Qcorr (n+1) F := by
-  intro hQ hn hSC hh
-  dsimp [IsForbidSingleton] at hSC
-  have :∃ a , F.F = {a} := by exact Finset.card_eq_one.mp hSC
-  obtain ⟨a,ha⟩ := this
-  have : ¬HasHead1 F a := by
-    dsimp [HasHead1s] at hh
-    simp_all only [Finset.singleton_inj, Classical.choose_eq']
-    simp_all only [Finset.card_singleton]
-    dsimp [HasHead1]
-    exact hh
-  obtain ⟨P',hP'⟩ := Qcorr_singleton_headFree_get F a ha this
-  dsimp [Qcorr]
-  intro hn
-  specialize hQ P'
-  have :P'.H.U.card = n := by
-    simp_all only [add_tsub_cancel_right, forall_const]
-  specialize hQ this
-  dsimp [Q] at hQ
-  specialize hQ this
-  rw [←hn]
-  rw [←this] at hQ
-  rcases hP' with ⟨h1,h2⟩
-  dsimp [HornWithForbid.NDS_corr] at h2
-  dsimp [HornWithForbid.BaseC] at h2
-  rw [h1] at hQ
-  rw [h1] at h2
-  exact Int.le_trans h2 hQ
 
 noncomputable def Qcorr_ge2_hasHead_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (geq2: F.F.card ≥ 2) (ha:a ∈ F.F) (hs:HasHead1 F a):
     ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (F'.NDS_corr (F.H.U.card - 1))

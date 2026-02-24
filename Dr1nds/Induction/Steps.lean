@@ -106,6 +106,7 @@ theorem Qcorr_step1
   · -- A.card≥2（A 内 SC を取って進める）
     let Fclosed := HornNF.ClosureForbid F
     ---禁止集合を閉集合に変えたものを作る必要がある。
+    -- この処理を行ったかどうかは先に伝える必要なし。SCさえ取れれば任務完了。
     suffices NDS_corr (n+1) Fclosed.H.FixSet Fclosed.F ≤ 0 from by
       dsimp [Qcorr]
       intro hn
