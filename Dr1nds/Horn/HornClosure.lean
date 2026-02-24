@@ -1,10 +1,12 @@
 -- Dr1nds/ClosureSystem/HornClosure.lean
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Powerset
+import Mathlib.Tactic
 
 import Dr1nds.ClosureSystem.ClosureOperator
 import Dr1nds.Horn.Horn
 import Dr1nds.Horn.HornContraction
+import Dr1nds.SetFamily.CoreDefs
 
 namespace Dr1nds
 
@@ -310,5 +312,106 @@ lemma contraction_SC_NEP (H : HornNF α)(x : α)(hSC: H.IsSC x):
   simp_all only [mem_FixSet_iff]
   let hi := (HornNF.contraction x H).isNEP_iff_empty_mem_FixSet
   simp_all only [mem_FixSet_iff]
+
+namespace HornNF
+
+/-- `v` is rare in `H` iff its normalized degree on `FixSet H` is nonpositive. -/
+def rare (H : HornNF α) (v : α) : Prop :=
+  ndeg (α := α) (H.FixSet) v ≤ 0
+
+theorem rare_of_not_hasHead
+  (H : HornNF α) (v : α)
+  (hheadFree : ¬ H.hasHead v) :
+  H.rare v := by
+  classical
+  let C : Finset (Finset α) := H.FixSet
+  let A : Finset (Finset α) := C.filter (fun X => v ∈ X)
+  let B : Finset (Finset α) := C.filter (fun X => v ∉ X)
+  let f : Finset α → Finset α := fun X => X.erase v
+
+  have hmap_to_B : ∀ {X : Finset α}, X ∈ A → f X ∈ B := by
+    intro X hX
+    have hXfix : X ∈ C := (Finset.mem_filter.mp hX).1
+    have hvX : v ∈ X := (Finset.mem_filter.mp hX).2
+    have hXclosed : H.IsClosed X := by
+      simpa [C] using (mem_FixSet_iff (H := H) (X := X)).1 hXfix
+    have hEraseClosed : H.IsClosed (X.erase v) := by
+      constructor
+      · intro h P hP hPsub
+        have hhX : h ∈ X := by
+          exact hXclosed.1 hP (by
+            intro x hx
+            exact Finset.mem_of_mem_erase (hPsub hx))
+        have hneq : h ≠ v := by
+          intro hEq
+          subst hEq
+          exact hheadFree ⟨P, hP⟩
+        exact Finset.mem_erase.mpr ⟨hneq, hhX⟩
+      · intro x hx
+        exact hXclosed.2 (Finset.mem_of_mem_erase hx)
+    have hEraseFix : X.erase v ∈ C := by
+      simpa [C] using (mem_FixSet_iff (H := H) (X := X.erase v)).2 hEraseClosed
+    exact Finset.mem_filter.mpr ⟨hEraseFix, by simp [f]⟩
+
+  have hInj : ∀ {X Y : Finset α}, X ∈ A → Y ∈ A → f X = f Y → X = Y := by
+    intro X Y hX hY hEq
+    have hvX : v ∈ X := (Finset.mem_filter.mp hX).2
+    have hvY : v ∈ Y := (Finset.mem_filter.mp hY).2
+    have hins := congrArg (fun Z : Finset α => insert v Z) hEq
+    simpa [f, Finset.insert_erase, hvX, hvY] using hins
+
+  have hAcard_image : A.card = (A.image f).card := by
+    refine Finset.card_bij
+      (s := A) (t := A.image f)
+      (i := fun X _ => f X)
+      (hi := by
+        intro X hX
+        exact Finset.mem_image_of_mem f hX)
+      (i_inj := by
+        intro X hX Y hY hEq
+        exact hInj hX hY hEq)
+      (i_surj := by
+        intro Y hY
+        rcases Finset.mem_image.mp hY with ⟨X, hX, rfl⟩
+        exact ⟨X, hX, rfl⟩)
+
+  have hImageSubset : A.image f ⊆ B := by
+    intro Y hY
+    rcases Finset.mem_image.mp hY with ⟨X, hX, rfl⟩
+    exact hmap_to_B hX
+
+  have hAleB : A.card ≤ B.card := by
+    calc
+      A.card = (A.image f).card := hAcard_image
+      _ ≤ B.card := Finset.card_le_card hImageSubset
+
+  have hCardSplit : A.card + B.card = C.card := by
+    simpa [A, B, C] using
+      (Finset.filter_card_add_filter_neg_card_eq_card
+        (s := H.FixSet) (p := fun X : Finset α => v ∈ X))
+
+  have hndegAB : ndeg (α := α) C v = (A.card : Int) - (B.card : Int) := by
+    have hCardNat : C.card = A.card + B.card := hCardSplit.symm
+    calc
+      ndeg (α := α) C v
+          = (2 : Int) * (A.card : Int) - (C.card : Int) := by
+              simp [ndeg, deg, A, C]
+      _ = (2 : Int) * (A.card : Int) - ((A.card + B.card : Nat) : Int) := by
+              rw [hCardNat]
+      _ = (A.card : Int) - (B.card : Int) := by
+              calc
+                (2 : Int) * (A.card : Int) - ((A.card + B.card : Nat) : Int)
+                    = ((A.card : Int) + (A.card : Int)) - ((A.card : Int) + (B.card : Int)) := by
+                        simp [Nat.cast_add, two_mul]
+                _ = (A.card : Int) - (B.card : Int) := by
+                        abel
+
+  have hRareInt : (A.card : Int) - (B.card : Int) ≤ 0 := by
+    exact sub_nonpos.mpr (Int.ofNat_le.mpr hAleB)
+
+  dsimp [rare]
+  simpa [C, hndegAB] using hRareInt
+
+end HornNF
 
 end Dr1nds
