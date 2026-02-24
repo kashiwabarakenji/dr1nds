@@ -682,6 +682,46 @@ theorem fixset_trace_eq_Tr_fixset_of_head_free
       (mem_FixSet_iff (H.trace v) (Y.erase v)).2 hEraseClosedTrace
     simpa [hYX] using hXfix
 
+/-- Head-free case: `FixSet (H.trace v)` is exactly family-level deletion on `FixSet H`. -/
+theorem fixset_trace_eq_Del_fixset_of_head_free
+  (H : HornNF α) (v : α)
+  (_hvU : v ∈ H.U)
+  (hfree : H.prem v = ∅) :
+  HornNF.FixSet (H.trace v) = Del v (HornNF.FixSet H) := by
+  classical
+  ext X
+  constructor
+  · intro hX
+    have hXclosed : HornNF.IsClosed (H.trace v) X := (mem_FixSet_iff (H.trace v) X).1 hX
+    have hvX : v ∉ X := by
+      have hsub : X ⊆ (H.trace v).U := hXclosed.2
+      intro hv
+      have : v ∈ (H.trace v).U := hsub hv
+      simpa [HornNF.trace] using this
+    have hXclosedH : HornNF.IsClosed H X :=
+      (trace_isClosed_iff_head_free (H := H) (v := v) (hfree := hfree) (hvX := hvX)).1 hXclosed
+    have hXfix : X ∈ HornNF.FixSet H := (mem_FixSet_iff H X).2 hXclosedH
+    exact Finset.mem_filter.mpr ⟨hXfix, hvX⟩
+  · intro hX
+    rcases Finset.mem_filter.mp hX with ⟨hXfix, hvX⟩
+    have hXclosedH : HornNF.IsClosed H X := (mem_FixSet_iff H X).1 hXfix
+    have hXclosedTrace : HornNF.IsClosed (H.trace v) X :=
+      (trace_isClosed_iff_head_free (H := H) (v := v) (hfree := hfree) (hvX := hvX)).2 hXclosedH
+    exact (mem_FixSet_iff (H.trace v) X).2 hXclosedTrace
+
+/-- Head-free case: on `FixSet H`, trace-image and deletion coincide (`Tr v = Del v`). -/
+theorem Tr_fixset_eq_Del_fixset_of_head_free
+  (H : HornNF α) (v : α)
+  (hvU : v ∈ H.U)
+  (hfree : H.prem v = ∅) :
+  Tr v (HornNF.FixSet H) = Del v (HornNF.FixSet H) := by
+  calc
+    Tr v (HornNF.FixSet H) = HornNF.FixSet (H.trace v) := by
+      symm
+      exact fixset_trace_eq_Tr_fixset_of_head_free (H := H) (v := v) (hvU := hvU) (hfree := hfree)
+    _ = Del v (HornNF.FixSet H) :=
+      fixset_trace_eq_Del_fixset_of_head_free (H := H) (v := v) (_hvU := hvU) (hfree := hfree)
+
 /-- DR1 step version: trace and `Tr` commute on fixed sets. -/
 theorem fixset_trace_eq_Tr_fixset_of_DR1
   (H : HornNF α) (_hDR1 : H.IsDR1) (v : α) (hvU : v ∈ H.U) :
