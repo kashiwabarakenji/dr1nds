@@ -151,7 +151,7 @@ theorem Qcorr_step1
         dsimp [Qcorr] at qc
         specialize qc this
         exact qc
-      · let qc := Qcorr_ge2_headFree (α := α) (n := n) Fclosed (a := a) hmem hQ hn fs hSC hs
+      · let qc := Qcorr_ge2_headFree (α := α) (n := n) Fclosed (a := a) hmem hQ hQcorr hn fs hSC hs
         dsimp [Qcorr] at qc
         specialize qc this
         exact qc
