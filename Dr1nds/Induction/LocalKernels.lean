@@ -105,6 +105,12 @@ theorem Qcorr_ge_hasParallel
 abbrev IsSC1 (F: HornWithForbid α) (h : α) : Prop :=
   F.H.closure {h} = {h}
 
+lemma isSC1_singleton_mem_baseFixSet
+  (F : HornWithForbid α) (a : α)
+  (hSC : IsSC1 F a) :
+  ({a} : Finset α) ∈ HornNF.FixSet F.H := by
+  exact (SC_closure_singleton F.H a).mpr hSC
+
 /--
 No-parallel (forbid-free) ⇒ existence of an SC point.
 This is the entry point to the SC-based induction branch.
@@ -159,6 +165,47 @@ def HasHead1 (F :HornWithForbid  α) (h : α) : Prop :=
 
 def IsForbidSingleton (F :HornWithForbid  α): Prop :=
   F.F.card = 1
+
+lemma erase_nonempty_of_mem_not_singleton
+  (F : HornWithForbid α) (a : α)
+  (ha : a ∈ F.F)
+  (hns : ¬ IsForbidSingleton F) :
+  (F.F.erase a).Nonempty := by
+  have hcard_erase : (F.F.erase a).card = F.F.card - 1 := Finset.card_erase_of_mem ha
+  have hge2 : 2 ≤ F.F.card := by
+    by_contra hlt2
+    have hle1 : F.F.card ≤ 1 := by omega
+    have hcard1 : F.F.card = 1 := by
+      have hpos : 0 < F.F.card := Finset.card_pos.mpr ⟨a, ha⟩
+      omega
+    exact hns hcard1
+  have hpos : 0 < (F.F.erase a).card := by
+    rw [hcard_erase]
+    omega
+  exact Finset.card_pos.mp hpos
+
+lemma not_subset_singleton_of_mem_not_singleton
+  (F : HornWithForbid α) (a : α)
+  (ha : a ∈ F.F)
+  (hns : ¬ IsForbidSingleton F) :
+  ¬ F.F ⊆ ({a} : Finset α) := by
+  intro hsub
+  have hle1 : F.F.card ≤ 1 := by
+    exact Finset.card_le_card hsub
+  have hpos : 0 < F.F.card := Finset.card_pos.mpr ⟨a, ha⟩
+  have hcard1 : F.F.card = 1 := by omega
+  exact hns hcard1
+
+lemma card_ge_two_of_mem_not_singleton
+  (F : HornWithForbid α) (a : α)
+  (ha : a ∈ F.F)
+  (hns : ¬ IsForbidSingleton F) :
+  2 ≤ F.F.card := by
+  have hpos : 0 < F.F.card := Finset.card_pos.mpr ⟨a, ha⟩
+  by_contra hlt2
+  have hle1 : F.F.card ≤ 1 := by omega
+  have hcard1 : F.F.card = 1 := by omega
+  exact hns hcard1
 
 --シングルトンの禁止集合を与えたときに、headがあるかどうか。
 def HasHead1s (F :HornWithForbid  α) (fs: IsForbidSingleton F):Prop := by
@@ -252,6 +299,99 @@ noncomputable def Qcorr_contraction {α :Type} [DecidableEq α] (F: HornWithForb
       -- 3. card > 0 なら Nonempty
     exact Finset.card_pos.mp hpos
 
+theorem Qcorr_contraction_fixset_eq_Con
+  (F : HornWithForbid α) (a : α)
+  (hSC : F.H.IsSC a) (hA : a ∈ F.F) (geq2 : F.F.card ≥ 2) :
+  (Qcorr_contraction F a hSC hA geq2).FixSet = Con a F.FixSet := by
+  classical
+  have hne : (F.F.erase a).Nonempty := by
+    have hcard : (F.F.erase a).card = F.F.card - 1 := Finset.card_erase_of_mem hA
+    have hpos : 0 < (F.F.erase a).card := by
+      rw [hcard]
+      exact Nat.sub_pos_of_lt geq2
+    exact Finset.card_pos.mp hpos
+  have hsc_mem : ({a} : Finset α) ∈ F.FixSet := by
+    refine (HornWithForbid.mem_FixSet_withForbid_iff F {a}).2 ?_
+    refine ⟨(SC_closure_singleton F.H a).mpr hSC, ?_⟩
+    exact not_subset_singleton_of_mem_not_singleton
+      (F := F) (a := a) (ha := hA)
+      (hns := by
+        intro hs
+        have : F.F.card ≤ 1 := by simpa [IsForbidSingleton] using hs.le
+        omega)
+  simpa [Qcorr_contraction] using contract_FixSet_eq F a hne hsc_mem
+
+lemma qcorr_contraction_card
+  (F : HornWithForbid α) (a : α)
+  (hSC : F.H.IsSC a) (hA : a ∈ F.F) (geq2 : F.F.card ≥ 2) :
+  (Qcorr_contraction F a hSC hA geq2).H.U.card = F.H.U.card - 1 := by
+  dsimp [Qcorr_contraction]
+  have haU : a ∈ F.H.U := F.F_subset_U hA
+  rw [contraction_U, Finset.card_erase_of_mem haU]
+
+lemma Del_Hole_eq_Del_of_mem
+  (C : Finset (Finset α)) (A : Finset α) (a : α)
+  (ha : a ∈ A) :
+  Del a (Hole (α := α) C A) = Del a C := by
+  ext X
+  constructor
+  · intro hX
+    rcases Finset.mem_filter.mp hX with ⟨hXHole, hXa⟩
+    exact Finset.mem_filter.mpr ⟨(Finset.mem_filter.mp hXHole).1, hXa⟩
+  · intro hX
+    rcases Finset.mem_filter.mp hX with ⟨hXC, hXa⟩
+    refine Finset.mem_filter.mpr ?_
+    refine ⟨?_, hXa⟩
+    refine Finset.mem_filter.mpr ?_
+    refine ⟨hXC, ?_⟩
+    intro hAX
+    exact hXa (hAX ha)
+
+lemma nds_del_add_ndeg_eq_nds_corr_singleton
+  (n : Nat) (C : Finset (Finset α)) (a : α) :
+  NDS (α := α) n (Del a C) + ndeg (α := α) C a
+    =
+  NDS_corr (α := α) (n + 1) C ({a} : Finset α) := by
+  have hcard : (Up (α := α) C ({a} : Finset α)).card + (Hole (α := α) C ({a} : Finset α)).card = C.card := by
+    exact card_Up_add_card_Hole (α := α) C ({a} : Finset α)
+  have hndeg :
+      ndeg (α := α) C a
+        = (((Up (α := α) C ({a} : Finset α)).card : Int)
+            - (Hole (α := α) C ({a} : Finset α)).card) := by
+    have hcardInt :
+        (C.card : Int)
+          = ((Up (α := α) C ({a} : Finset α)).card : Int)
+            + (Hole (α := α) C ({a} : Finset α)).card := by
+      have := congrArg (fun t : Nat => (t : Int)) hcard
+      simpa [Int.natCast_add, add_comm, add_left_comm, add_assoc] using this.symm
+    calc
+      ndeg (α := α) C a = (2 : Int) * (deg (α := α) C a : Int) - (C.card : Int) := by
+        rfl
+      _ = (2 : Int) * ((Up (α := α) C ({a} : Finset α)).card : Int) - (C.card : Int) := by
+        simp [deg, Up]
+      _ = (2 : Int) * ((Up (α := α) C ({a} : Finset α)).card : Int)
+            - (((Up (α := α) C ({a} : Finset α)).card : Int)
+              + (Hole (α := α) C ({a} : Finset α)).card) := by
+            rw [hcardInt]
+      _ = (((Up (α := α) C ({a} : Finset α)).card : Int)
+            - (Hole (α := α) C ({a} : Finset α)).card) := by
+            ring
+  calc
+    NDS (α := α) n (Del a C) + ndeg (α := α) C a
+        = NDS (α := α) n (Hole (α := α) C ({a} : Finset α))
+          + (((Up (α := α) C ({a} : Finset α)).card : Int)
+              - (Hole (α := α) C ({a} : Finset α)).card) := by
+            simp [Del, Hole, hndeg]
+    _ = (NDS (α := α) n (Hole (α := α) C ({a} : Finset α))
+          - (Hole (α := α) C ({a} : Finset α)).card)
+        + (Up (α := α) C ({a} : Finset α)).card := by
+          ring
+    _ = NDS (α := α) (n + 1) (Hole (α := α) C ({a} : Finset α))
+        + (Up (α := α) C ({a} : Finset α)).card := by
+          simp [Accounting.NDS_succ]
+    _ = NDS_corr (α := α) (n + 1) C ({a} : Finset α) := by
+          simp [NDS_corr]
+
 ---禁止集合の大きさが2以上でパラレルの場合に使われる。HornWithForbidになるもの。禁止集合がなくなるtraceは、Qcorr_singleton_deletion_free
 noncomputable def Qcorr_trace {α :Type} [DecidableEq α] (F: HornWithForbid α) (a: α)  (hA: a ∈ F.F) (geq2: F.F.card ≥ 2):
    HornWithForbid α where
@@ -295,6 +435,56 @@ noncomputable def Qcorr_deletion_head  {α :Type} [DecidableEq α] (F: HornWithF
       rw [h] at h_mem
       exact ph h_mem
     simp_all only [FF]
+
+lemma qcorr_deletion_head_card
+  (F : HornWithForbid α) (a : α) (hasHead : F.H.hasHead a) :
+  (Qcorr_deletion_head F a hasHead).H.U.card = F.H.U.card - 1 := by
+  dsimp [Qcorr_deletion_head, HornNF.trace]
+  have haU : a ∈ F.H.U := F.H.head_mem_U hasHead
+  simpa using Finset.card_erase_of_mem haU
+
+/-- In the has-head branch, `Qcorr_deletion_head` realizes family-level deletion on the base fixset. -/
+theorem Qcorr_deletion_head_fixset_eq_Del
+  (F : HornWithForbid α) (a : α) (hasHead : F.H.hasHead a) :
+  (Qcorr_deletion_head F a hasHead).FixSet = Del a (HornNF.FixSet F.H) := by
+  classical
+  let Pprem := Classical.choose (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)
+  have hP : Pprem ∈ F.H.prem a :=
+    (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)).1
+  have hUnique : (F.H.prem a).card = 1 := by
+    exact prem_card_eq_one_of_DR1_of_ne_empty (H := F.H) (v := a) (hDR1 := F.hDR1) hasHead
+  have hHole :=
+    hole_singleton_eq_hole_trace_prem (α := α)
+      (H := F.H) (hDR1 := F.hDR1) (v := a) (P := Pprem)
+      (hP := hP) (hUnique := hUnique)
+  have hQhole :
+      (Qcorr_deletion_head F a hasHead).FixSet
+        = Hole (α := α) (HornNF.FixSet (F.H.trace a)) Pprem := by
+    simpa [Qcorr_deletion_head, Pprem] using
+      (FixSet_eq_Hole_FixSet (α := α) (S := Qcorr_deletion_head F a hasHead))
+  calc
+    (Qcorr_deletion_head F a hasHead).FixSet
+        = Hole (α := α) (HornNF.FixSet (F.H.trace a)) Pprem := hQhole
+    _ = Hole (α := α) (HornNF.FixSet F.H) ({a} : Finset α) := hHole.symm
+    _ = Del a (HornNF.FixSet F.H) := by
+      simp [Del]
+
+lemma ndiscorr_nonpos_of_Qcorr
+  (n : Nat) (F : HornWithForbid α)
+  (hQcorr : Qcorr n F)
+  (hcard : F.H.U.card = n) :
+  F.NDS_corr n ≤ 0 := by
+  dsimp [Qcorr] at hQcorr
+  simpa [HornWithForbid.NDS_corr, HornWithForbid.BaseC] using hQcorr hcard
+
+lemma hole_nonpos_of_Qcorr
+  (n : Nat) (F : HornWithForbid α)
+  (hQcorr : Qcorr n F)
+  (hcard : F.H.U.card = n) :
+  NDS (α := α) n F.FixSet ≤ 0 := by
+  have hcorr : F.NDS_corr n ≤ 0 := ndiscorr_nonpos_of_Qcorr (n := n) (F := F) hQcorr hcard
+  simpa [HornWithForbid.NDS_corr, HornWithForbid.BaseC, FixSet_eq_Hole_FixSet] using
+    (corr_implies_hole_bound (α := α) (n := n) (C := HornNF.FixSet F.H) (A := F.F) hcorr)
 
 --  (hA: {a} = F.F) (hs:IsForbidSingleton F) の状況下で使うが、マイナーの定義には出てこない。型的には禁止集合を無視したtrace。
 -- Normalizeも行っていることになる。Head freeの状態だと、Normalizeとはただのtraceになる。NDSの非減少は別途考える。
