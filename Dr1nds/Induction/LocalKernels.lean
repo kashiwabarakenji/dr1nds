@@ -3,12 +3,14 @@ import Mathlib.Data.Nat.Init
 import Mathlib.Order.Basic
 import Mathlib.Tactic
 import Dr1nds.Horn.HornTrace
+import Dr1nds.Horn.HornContraction
 import Dr1nds.Forbid.HornNormalize
 import Dr1nds.Forbid.Basic
 import Dr1nds.Forbid.HornWithForbid
 import Dr1nds.Forbid.HornBridge
 import Dr1nds.Forbid.Singleton
 import Dr1nds.Induction.Statements
+import Dr1nds.SetFamily.ConDelNdegId
 set_option maxHeartbeats 10000000
 
 namespace Dr1nds
@@ -514,7 +516,62 @@ theorem Q_branch_headFree
   (∀ P':Pack0 α, P'.H.U.card = n → Q n P') →
   P.H.U.card = n + 1 → P.H.IsSC h → ¬P.H.hasHead h →
    Q (n+1) P := by
- sorry
+  intro hIH hn hSC hNoHead
+  dsimp [Q]
+  intro _hn
+  have hhU : h ∈ P.H.U := by
+    have hFixSingle : ({h} : Finset α) ∈ P.H.FixSet :=
+      (SC_closure_singleton P.H h).mpr hSC
+    have hClosedSingle : HornNF.IsClosed P.H ({h} : Finset α) :=
+      (mem_FixSet_iff P.H ({h} : Finset α)).1 hFixSingle
+    exact hClosedSingle.2 (by simp)
+  have hfree : P.H.prem h = ∅ := by
+    by_cases hp : P.H.prem h = ∅
+    · exact hp
+    · exfalso
+      exact hNoHead (Finset.nonempty_iff_ne_empty.mpr hp)
+  have hConCard : (Q_contraction P h hSC).H.U.card = n := by
+    dsimp [Q_contraction]
+    rw [contraction_U, Finset.card_erase_of_mem hhU]
+    omega
+  have hTraceCard : (Q_trace P h).H.U.card = n := by
+    dsimp [Q_trace, HornNF.trace]
+    rw [Finset.card_erase_of_mem hhU]
+    omega
+  have hConQ : Q n (Q_contraction P h hSC) := hIH (Q_contraction P h hSC) hConCard
+  have hTraceQ : Q n (Q_trace P h) := hIH (Q_trace P h) hTraceCard
+  have hCon_nonpos : NDS n (Con h (HornNF.FixSet P.H)) ≤ 0 := by
+    have h0 : NDS n ((Q_contraction P h hSC).H.FixSet) ≤ 0 := hConQ hConCard
+    have hFixEq : (Q_contraction P h hSC).H.FixSet = Con h (HornNF.FixSet P.H) := by
+      dsimp [Q_contraction]
+      exact contraction_fix_equiv P.H h hhU
+    simpa [hFixEq] using h0
+  have hDel_nonpos : NDS n (Del h (HornNF.FixSet P.H)) ≤ 0 := by
+    have h0 : NDS n ((Q_trace P h).H.FixSet) ≤ 0 := hTraceQ hTraceCard
+    have hFixEq : (Q_trace P h).H.FixSet = Del h (HornNF.FixSet P.H) := by
+      dsimp [Q_trace]
+      calc
+        HornNF.FixSet (P.H.trace h)
+            = Hole (α := α) (HornNF.FixSet P.H) ({h} : Finset α) := by
+              symm
+              exact hole_singleton_eq_fixset_trace_head_free
+                (H := P.H) (v := h) (hvU := hhU) (hfree := hfree)
+        _ = Del h (HornNF.FixSet P.H) := by
+              simp [Del, Hole]
+    simpa [hFixEq] using h0
+  have hRare : HornNF.rare P.H h := HornNF.rare_of_not_hasHead P.H h hNoHead
+  have hndeg_nonpos : ndeg (HornNF.FixSet P.H) h ≤ 0 := by
+    simpa [HornNF.rare] using hRare
+  have hID :
+      NDS (n + 1) (HornNF.FixSet P.H)
+        =
+      NDS n (Con h (HornNF.FixSet P.H))
+        + (NDS n (Del h (HornNF.FixSet P.H)) + ndeg (HornNF.FixSet P.H) h) := by
+    simpa using
+      (Accounting.CON_ID_assoc (α := α) (n := n + 1) (hn := by omega)
+        (C := HornNF.FixSet P.H) (u := h))
+  rw [hID]
+  linarith
 
 theorem Q_branch_hasHead
   (n : Nat) (P : Pack0 α) (h : α) :
