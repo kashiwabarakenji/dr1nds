@@ -578,7 +578,115 @@ theorem Q_branch_hasHead
   (∀ P:Pack0 α, P.H.U.card = n → Q n P) → (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
   P.H.U.card = n + 1 → P.H.IsSC h → P.H.hasHead h →
   Q (n+1) P := by
-sorry
+  intro hIH hIHcorr hn hSC hHasHead
+  dsimp [Q]
+  intro _hn
+  have hhU : h ∈ P.H.U := by
+    have hFixSingle : ({h} : Finset α) ∈ P.H.FixSet :=
+      (SC_closure_singleton P.H h).mpr hSC
+    have hClosedSingle : HornNF.IsClosed P.H ({h} : Finset α) :=
+      (mem_FixSet_iff P.H ({h} : Finset α)).1 hFixSingle
+    exact hClosedSingle.2 (by simp)
+  have hConCard : (Q_contraction P h hSC).H.U.card = n := by
+    dsimp [Q_contraction]
+    rw [contraction_U, Finset.card_erase_of_mem hhU]
+    omega
+  have hConQ : Q n (Q_contraction P h hSC) := hIH (Q_contraction P h hSC) hConCard
+  have hCon_nonpos : NDS n (Con h (HornNF.FixSet P.H)) ≤ 0 := by
+    have h0 : NDS n ((Q_contraction P h hSC).H.FixSet) ≤ 0 := hConQ hConCard
+    have hFixEq : (Q_contraction P h hSC).H.FixSet = Con h (HornNF.FixSet P.H) := by
+      dsimp [Q_contraction]
+      exact contraction_fix_equiv P.H h hhU
+    simpa [hFixEq] using h0
+  let F0 : HornWithForbid α := {
+    H := P.H
+    hDR1 := P.hDR1
+    hNEP := P.hNEP
+    F := ({h} : Finset α)
+    F_subset_U := by
+      intro x hx
+      simpa using (Finset.mem_singleton.mp hx ▸ hhU)
+    F_nonempty := by simp
+  }
+  have hHasHead1 : HasHead1 F0 h := by
+    simpa [HasHead1, F0] using hHasHead
+  obtain ⟨F', hF'⟩ := Qcorr_singleton_hasHead_get (α := α) F0 h rfl hHasHead1
+  have hF'card_n : F'.H.U.card = n := by
+    rcases hF' with ⟨hcard, _⟩
+    have : F0.H.U.card = n + 1 := by simpa [F0] using hn
+    omega
+  have hQcorrF' : Qcorr n F' := hIHcorr F' hF'card_n
+  have hF'nonpos : F'.NDS_corr n ≤ 0 := by
+    dsimp [Qcorr] at hQcorrF'
+    exact hQcorrF' hF'card_n
+  have hSingletonCorr_nonpos : NDS_corr (n + 1) (HornNF.FixSet P.H) ({h} : Finset α) ≤ 0 := by
+    rcases hF' with ⟨hcard, hineq⟩
+    have hineq' : F0.NDS_corr (n + 1) ≤ F'.NDS_corr n := by
+      have h0card : F0.H.U.card = n + 1 := by simpa [F0] using hn
+      have h1card : F'.H.U.card = n := by
+        have : F0.H.U.card = n + 1 := by simpa [F0] using hn
+        omega
+      simpa [h0card, h1card] using hineq
+    have hF0_nonpos : F0.NDS_corr (n + 1) ≤ 0 := le_trans hineq' hF'nonpos
+    simpa [HornWithForbid.NDS_corr, HornWithForbid.BaseC, F0] using hF0_nonpos
+  have hDelNdeg_eq_corr :
+      NDS n (Del h (HornNF.FixSet P.H)) + ndeg (HornNF.FixSet P.H) h
+        =
+      NDS_corr (n + 1) (HornNF.FixSet P.H) ({h} : Finset α) := by
+    let C : Finset (Finset α) := HornNF.FixSet P.H
+    have hcard : (Up (α := α) C ({h} : Finset α)).card + (Hole (α := α) C ({h} : Finset α)).card = C.card := by
+      exact card_Up_add_card_Hole (α := α) C ({h} : Finset α)
+    have hndeg :
+        ndeg C h
+          = (((Up (α := α) C ({h} : Finset α)).card : Int)
+              - (Hole (α := α) C ({h} : Finset α)).card) := by
+      have hcardInt :
+          (C.card : Int)
+            = ((Up (α := α) C ({h} : Finset α)).card : Int)
+              + (Hole (α := α) C ({h} : Finset α)).card := by
+        have := congrArg (fun t : Nat => (t : Int)) hcard
+        simpa [Int.natCast_add, add_comm, add_left_comm, add_assoc] using this.symm
+      calc
+        ndeg C h = (2 : Int) * (deg (α := α) C h : Int) - (C.card : Int) := by
+          rfl
+        _ = (2 : Int) * ((Up (α := α) C ({h} : Finset α)).card : Int) - (C.card : Int) := by
+          simp [deg, Up]
+        _ = (2 : Int) * ((Up (α := α) C ({h} : Finset α)).card : Int)
+              - (((Up (α := α) C ({h} : Finset α)).card : Int)
+                + (Hole (α := α) C ({h} : Finset α)).card) := by
+              rw [hcardInt]
+        _ = (((Up (α := α) C ({h} : Finset α)).card : Int)
+              - (Hole (α := α) C ({h} : Finset α)).card) := by
+              ring
+    calc
+      NDS n (Del h C) + ndeg C h
+          = NDS n (Hole (α := α) C ({h} : Finset α))
+            + (((Up (α := α) C ({h} : Finset α)).card : Int)
+                - (Hole (α := α) C ({h} : Finset α)).card) := by
+              simp [Del, Hole, hndeg]
+      _ = (NDS n (Hole (α := α) C ({h} : Finset α))
+            - (Hole (α := α) C ({h} : Finset α)).card)
+          + (Up (α := α) C ({h} : Finset α)).card := by
+            ring
+      _ = NDS (n + 1) (Hole (α := α) C ({h} : Finset α))
+          + (Up (α := α) C ({h} : Finset α)).card := by
+            simp [Accounting.NDS_succ]
+      _ = NDS_corr (n + 1) C ({h} : Finset α) := by
+            simp [NDS_corr]
+  have hDelNdeg_nonpos :
+      NDS n (Del h (HornNF.FixSet P.H)) + ndeg (HornNF.FixSet P.H) h ≤ 0 := by
+    rw [hDelNdeg_eq_corr]
+    exact hSingletonCorr_nonpos
+  have hID :
+      NDS (n + 1) (HornNF.FixSet P.H)
+        =
+      NDS n (Con h (HornNF.FixSet P.H))
+        + (NDS n (Del h (HornNF.FixSet P.H)) + ndeg (HornNF.FixSet P.H) h) := by
+    simpa using
+      (Accounting.CON_ID_assoc (α := α) (n := n + 1) (hn := by omega)
+        (C := HornNF.FixSet P.H) (u := h))
+  rw [hID]
+  linarith
 
 theorem Qcorr_ge2_hasHead
   (n : Nat) (F : HornWithForbid α) (a : α) (hh : a ∈ F.F):
