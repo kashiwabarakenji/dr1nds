@@ -4,97 +4,20 @@ import Mathlib.Order.Basic
 import Mathlib.Tactic
 import Dr1nds.Horn.HornTrace
 import Dr1nds.Horn.HornContraction
-import Dr1nds.Forbid.HornNormalize
 import Dr1nds.Forbid.Basic
 import Dr1nds.Forbid.HornWithForbid
 import Dr1nds.Forbid.HornBridge
 import Dr1nds.Forbid.Singleton
+import Dr1nds.Forbid.HornNormalize
 import Dr1nds.Induction.Statements
 import Dr1nds.SetFamily.ConDelNdegId
+import Dr1nds.Induction.Parallel
 set_option maxHeartbeats 10000000
 
 namespace Dr1nds
 variable {α : Type} [DecidableEq α]
 
--- =====================================
--- (0) parallel / no-parallel 分岐（独立核）
--- =====================================
 
-/- Parallel / NoParallel for forbid-free packs. -/
-abbrev Parallel0 (P : Pack0 α) : Prop :=
-  ∃ u v, u ≠ v ∧ u ∈ P.H.closure {v} ∧ v ∈ P.H.closure {u}
-abbrev NoParallel0 (P : Pack0 α) : Prop := ¬ Parallel0 P
-
-/-- Parallel / NoParallel for forbid packs. 禁止集合の中にパラレルがあるかどうか。-/
-abbrev Parallel1 (F: HornWithForbid α) : Prop :=
-  ∃ u v, u ≠ v ∧ u ∈ F.F ∧ v ∈ F.F ∧ u ∈ F.H.closure {v} ∧ v ∈ F.H.closure {u}
-abbrev NoParallel1  (F: HornWithForbid α): Prop := ¬ Parallel1 F
-
---使わないかも。
-def HasParallel0 (P : Pack0 α) (v:α) :=
-  ∃ u, u ≠ v ∧ u ∈ P.H.closure {v} ∧ v ∈ P.H.closure {u}
-
-def HasParallel1 (F : HornWithForbid α) (v:α) :=
-  ∃ u, u ≠ v ∧ u ∈ F.H.closure {v} ∧ v ∈ F.H.closure {u}
-
----ほかの言明に合わせて2段階にする。getのほうは、頂点をtraceしたものがNDSが大きくなくて、Packの条件を満たすというもの。頂点を引数に入れる。
----上のほうの言明は、帰納法の仮定を仮定すると、Q n が成り立つというもの。
-/-- Wiring helper: advance one step under the parallel-branch (forbid-free). -/
-axiom Q_of_parallel_get
-  (n : Nat) (P : Pack0 α) (hn : P.H.U.card = n):
-  Parallel0 P → ∃ P':Pack0 α , (P'.H.U.card = n - 1 ∧ NDS n (P.H.FixSet) ≤ NDS (n-1) (P'.H.FixSet))
-
-/-- Parallel-branch (forbid-free): if `Parallel0 P` holds, we can close `Q n P` by the trace reduction core. -/
-theorem Q_of_parallel
-  (n : Nat) (P : Pack0 α) : (∀ P':Pack0 α, P'.H.U.card = n → Q n P') →
-  P.H.U.card = n + 1 →
-  Parallel0 P → Q (n+1) P := by
-  intro hQ hn hPar
-  obtain ⟨P',hP'⟩ := Q_of_parallel_get (α := α) (n+1) P hn hPar
-  simp at hP'
-  dsimp [Q]
-  intro hn'
-  specialize hQ P'
-  have :P'.H.U.card = n := by simp_all
-  specialize hQ this
-  dsimp [Q] at hQ
-  specialize hQ this
-  rw [←this] at hQ
-  rw [←hn']
-  rcases hP' with ⟨h1,h2⟩
-  rw [←hn] at h2
-  rw [←h1] at h2
-  exact Int.le_trans h2 hQ
-
-/-- Wiring helper: advance one step under the parallel-branch (with forbid). -/
-axiom Qcorr_of_parallel_get
-  (n : Nat) (F : HornWithForbid α)  (hn : F.H.U.card = n):
-  Parallel1 F → ∃ F':HornWithForbid α , F'.H.U.card = n - 1 ∧ (F.NDS_corr n) ≤ (F'.NDS_corr (n - 1))
-
-theorem Qcorr_ge_hasParallel
-  (n : Nat) (F : HornWithForbid α) :
-  (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') → F.H.U.card = n + 1 → Parallel1 F →
-  Qcorr (n+1) F := by
-  intro hQcorr hn hPar
-  obtain ⟨F',hF'⟩ := Qcorr_of_parallel_get (α := α) (n+1) F hn hPar
-  dsimp [Qcorr]
-  intro hn'
-  specialize hQcorr F'
-  have :F'.H.U.card = n := by simp_all
-  specialize hQcorr this
-  dsimp [Qcorr] at hQcorr
-  specialize hQcorr this
-  --rw [←this] at hQcorr
-  rw [←hn']
-  rcases hF' with ⟨h1,h2⟩
-  rw [←hn] at h2
-  simp at h1
-  rw [←this] at hn'
-  have : n = F.H.U.card -1:= by
-    subst this
-    simp_all only [add_tsub_cancel_right]
-  rw [this] at hQcorr
-  exact Int.le_trans h2 hQcorr
 
 ---------------------------------------------
 ---これは、Hornレベルで定義することではないのか。HornNF.IsSCを定義した。今後は、P.H.IsSCを使う。
@@ -115,19 +38,81 @@ lemma isSC1_singleton_mem_baseFixSet
 No-parallel (forbid-free) ⇒ existence of an SC point.
 This is the entry point to the SC-based induction branch.
 -/
-axiom exists_SC_no_parallel
-  (P : Pack0 α) :
-  NoParallel0 P → ∃ h : α, P.H.IsSC h
+theorem exists_SC_no_parallel
+  (P : Pack0 α) (hU : P.H.U.Nonempty) :
+  NoParallel0 P → ∃ h : α, P.H.IsSC h := by
+  classical
+  intro hNP
+  let S : Finset (Finset α) := P.H.FixSet.filter (fun X => X.Nonempty)
+  have hUfix : P.H.U ∈ P.H.FixSet := by
+    refine (mem_FixSet_iff (H := P.H) (X := P.H.U)).2 ?_
+    refine ⟨?_, subset_rfl⟩
+    intro h Pprem hPrem hsub
+    exact P.H.head_mem_U ⟨Pprem, hPrem⟩
+  have hSnonempty : S.Nonempty := by
+    refine ⟨P.H.U, Finset.mem_filter.mpr ?_⟩
+    exact ⟨hUfix, hU⟩
+  obtain ⟨M, hMS, hMmin⟩ := Finset.exists_min_image S Finset.card hSnonempty
+  have hMfix : M ∈ P.H.FixSet := (Finset.mem_filter.mp hMS).1
+  have hMnonempty : M.Nonempty := (Finset.mem_filter.mp hMS).2
+  have hMsubsetU : M ⊆ P.H.U := mem_FixSet_subset_U (H := P.H) hMfix
+  have hMnotTwo : ¬ 2 ≤ M.card := by
+    intro hMge2
+    have hMgt1 : 1 < M.card := by omega
+    rcases (Finset.one_lt_card.mp hMgt1) with ⟨u, huM, v, hvM, huv_ne⟩
+    have huU : u ∈ P.H.U := hMsubsetU huM
+    have hvU : v ∈ P.H.U := hMsubsetU hvM
+    have hsub_u : ({u} : Finset α) ⊆ M := Finset.singleton_subset_iff.mpr huM
+    have hsub_v : ({v} : Finset α) ⊆ M := Finset.singleton_subset_iff.mpr hvM
+    have hMclosed : P.H.IsClosed M := (mem_FixSet_iff (H := P.H) (X := M)).1 hMfix
+    have hclu_sub_M : P.H.closure ({u} : Finset α) ⊆ M :=
+      HornNF.closure_subset_of_subset_isClosed (H := P.H) (hXY := hsub_u) (hY := hMclosed)
+    have hclv_sub_M : P.H.closure ({v} : Finset α) ⊆ M :=
+      HornNF.closure_subset_of_subset_isClosed (H := P.H) (hXY := hsub_v) (hY := hMclosed)
+    have hu_in_clu : u ∈ P.H.closure ({u} : Finset α) := by
+      have hsingletonU : ({u} : Finset α) ⊆ P.H.U := Finset.singleton_subset_iff.mpr huU
+      exact (HornNF.subset_closure (H := P.H) (X := ({u} : Finset α)) hsingletonU) (by simp)
+    have hv_in_clv : v ∈ P.H.closure ({v} : Finset α) := by
+      have hsingletonU : ({v} : Finset α) ⊆ P.H.U := Finset.singleton_subset_iff.mpr hvU
+      exact (HornNF.subset_closure (H := P.H) (X := ({v} : Finset α)) hsingletonU) (by simp)
+    have hclu_fix : P.H.closure ({u} : Finset α) ∈ P.H.FixSet := by
+      exact (mem_FixSet_iff (H := P.H) (X := P.H.closure ({u} : Finset α))).2
+        (HornNF.closure_isClosed (H := P.H) (X := ({u} : Finset α)))
+    have hclv_fix : P.H.closure ({v} : Finset α) ∈ P.H.FixSet := by
+      exact (mem_FixSet_iff (H := P.H) (X := P.H.closure ({v} : Finset α))).2
+        (HornNF.closure_isClosed (H := P.H) (X := ({v} : Finset α)))
+    have hclu_nonempty : (P.H.closure ({u} : Finset α)).Nonempty := ⟨u, hu_in_clu⟩
+    have hclv_nonempty : (P.H.closure ({v} : Finset α)).Nonempty := ⟨v, hv_in_clv⟩
+    have hcluS : P.H.closure ({u} : Finset α) ∈ S := Finset.mem_filter.mpr ⟨hclu_fix, hclu_nonempty⟩
+    have hclvS : P.H.closure ({v} : Finset α) ∈ S := Finset.mem_filter.mpr ⟨hclv_fix, hclv_nonempty⟩
+    have hMle_clu : M.card ≤ (P.H.closure ({u} : Finset α)).card := hMmin _ hcluS
+    have hMle_clv : M.card ≤ (P.H.closure ({v} : Finset α)).card := hMmin _ hclvS
+    have hclu_eq_M : P.H.closure ({u} : Finset α) = M :=
+      Finset.eq_of_subset_of_card_le hclu_sub_M hMle_clu
+    have hclv_eq_M : P.H.closure ({v} : Finset α) = M :=
+      Finset.eq_of_subset_of_card_le hclv_sub_M hMle_clv
+    have hu_in_clv : u ∈ P.H.closure ({v} : Finset α) := by simpa [hclv_eq_M] using huM
+    have hv_in_clu : v ∈ P.H.closure ({u} : Finset α) := by simpa [hclu_eq_M] using hvM
+    have hPar : Parallel0 P := ⟨u, v, huv_ne, hu_in_clv, hv_in_clu⟩
+    exact hNP hPar
+  have hMcard_one : M.card = 1 := by
+    have hMpos : 0 < M.card := Finset.card_pos.mpr hMnonempty
+    omega
+  obtain ⟨a, hMa⟩ := Finset.card_eq_one.mp hMcard_one
+  refine ⟨a, ?_⟩
+  have hsingle_fix : ({a} : Finset α) ∈ P.H.FixSet := by
+    simpa [hMa] using hMfix
+  exact (SC_closure_singleton P.H a).1 hsingle_fix
 
 /-- Noncomputably pick an SC point from `exists_SC_no_parallel`. -/
 noncomputable def choose_SC_no_parallel
-  (P : Pack0 α) (hNP : NoParallel0 P) : α :=
-  Classical.choose (exists_SC_no_parallel (α := α) P hNP)
+  (P : Pack0 α) (hU : P.H.U.Nonempty) (hNP : NoParallel0 P) : α :=
+  Classical.choose (exists_SC_no_parallel (α := α) P hU hNP)
 
 @[simp] theorem choose_SC_no_parallel_spec
-  (P : Pack0 α) (hNP : NoParallel0 P) :
-  P.H.IsSC (choose_SC_no_parallel (α := α) P hNP) :=
-  Classical.choose_spec (exists_SC_no_parallel (α := α) P hNP)
+  (P : Pack0 α) (hU : P.H.U.Nonempty) (hNP : NoParallel0 P) :
+  P.H.IsSC (choose_SC_no_parallel (α := α) P hU hNP) :=
+  Classical.choose_spec (exists_SC_no_parallel (α := α) P hU hNP)
 ------------------------------------------------
 
 /- No-parallel (with forbid) implies existence of an SC point *inside* the forbid set `A`.
@@ -1174,7 +1159,7 @@ theorem Qcorr_ge2_headFree
   have hfree : F.H.prem a = ∅ := by
     simpa [HasHead1] using hNoHead1
   have hNoHead : ¬F.H.hasHead a := by
-    simpa [HornNF.hasHead, hfree]
+    simp [HornNF.hasHead, hfree]
 
   -- Contraction branch (ge2 world)
   let Fc : HornWithForbid α := Qcorr_contraction F a hSC ha hge2

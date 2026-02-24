@@ -32,8 +32,11 @@ theorem Q_step0
       -- NOTE (設計メモ): 現在 NoParallel0 は abbrev True なので trivial。
       -- 将来 `NoParallel0 P := ¬ Parallel0 P` に差し替えたら、ここは `hPar` から構成する。
       trivial
-    let h := choose_SC_no_parallel (α := α) P hNP
-    have hSC : P.H.IsSC h := choose_SC_no_parallel_spec (α := α) P hNP
+    have hU_nonempty : P.H.U.Nonempty := by
+      have hpos : 0 < P.H.U.card := by omega
+      exact Finset.card_pos.mp hpos
+    let h := choose_SC_no_parallel (α := α) P hU_nonempty hNP
+    have hSC : P.H.IsSC h := choose_SC_no_parallel_spec (α := α) P hU_nonempty hNP
 
     -- SC 点で head 構造を 3-way split
     have hcases : (¬P.H.hasHead h) ∨ (P.H.hasHead h) := by exact Decidable.not_or_of_imp fun a => a
@@ -155,5 +158,54 @@ theorem Qcorr_step1
         dsimp [Qcorr] at qc
         specialize qc this
         exact qc
+
+/- ============================================================
+  (S10-2) Main Mutual Induction (Q / Qcorr)
+============================================================ -/
+
+/--
+`Q`（forbidなし）と `Qcorr`（forbidあり）を同時に進めるメインの相互帰納法。
+
+- 帰納の添字は `n` で、主張は「台集合サイズ `n+1` で成立」。
+- Base (`n=0`) は `Q_base` / `Qcorr_base`（=サイズ1ケース）。
+- Step は `Q_step0` / `Qcorr_step1` を直結している。
+-/
+theorem Q_Qcorr_main :
+  ∀ n : Nat,
+    (∀ P : Pack0 α, P.H.U.card = n + 1 → Q (n + 1) P) ∧
+    (∀ F : HornWithForbid α, F.H.U.card = n + 1 → Qcorr (n + 1) F) := by
+  intro n
+  induction n with
+  | zero =>
+      constructor
+      · intro P hcard
+        have : Q 1 P := Q_base (α := α) P
+        simpa using this
+      · intro F hcard
+        have : Qcorr 1 F := Qcorr_base (α := α) F
+        simpa using this
+  | succ n ih =>
+      rcases ih with ⟨hQ, hQcorr⟩
+      constructor
+      · intro P hcard
+        have hcard' : P.H.U.card = (n + 1) + 1 := by
+          simpa [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using hcard
+        exact Q_step0 (α := α) (n := n + 1) (P := P) hQ hQcorr hcard'
+      · intro F hcard
+        have hcard' : F.H.U.card = (n + 1) + 1 := by
+          simpa [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using hcard
+        exact Qcorr_step1 (α := α) (n := n + 1) hQ hQcorr F hcard'
+
+/-- Convenience corollary: forbid-free branch at size `n+1`. -/
+theorem Q_main
+  (n : Nat) (P : Pack0 α) (hcard : P.H.U.card = n + 1) :
+  Q (n + 1) P := by
+  exact (Q_Qcorr_main (α := α) n).1 P hcard
+
+/-- Convenience corollary: forbid branch at size `n+1`. -/
+theorem Qcorr_main
+  (n : Nat) (F : HornWithForbid α) (hcard : F.H.U.card = n + 1) :
+  Qcorr (n + 1) F := by
+  exact (Q_Qcorr_main (α := α) n).2 F hcard
 
 end Dr1nds

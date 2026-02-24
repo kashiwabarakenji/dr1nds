@@ -140,7 +140,7 @@ theorem Q_base (P : Pack0 α) : Q 1 P := by
     calc
       NDS 1 P.H.FixSet = NDS 1 ({(∅ : Finset α), P.H.U} : Finset (Finset α)) := by simp [hFix]
       _ = 0 := by simp [NDS, w, hu]
-  simpa [hNDS0]
+  simp [hNDS0]
 
 theorem Qcorr_base (F : HornWithForbid α) : Qcorr 1 F := by
   intro hcardU
@@ -165,7 +165,7 @@ theorem Qcorr_base (F : HornWithForbid α) : Qcorr 1 F := by
           intro y hy
           have hXe : X = ({u} : Finset α) := Finset.mem_singleton.1 hX1
           have hyu : y = u := Finset.mem_singleton.1 hy
-          simpa [hXe, hyu]
+          simp [hXe, hyu]
       · intro hX
         have hX0 : X = ∅ := Finset.mem_singleton.1 hX
         refine Finset.mem_filter.2 ?_
@@ -202,6 +202,6 @@ theorem Qcorr_base (F : HornWithForbid α) : Qcorr 1 F := by
       _ = 0 := by
         rw [hu]
         simp [NDS_corr, NDS, w, hHole, hUp]
-  simpa [hCorr0]
+  simp [hCorr0]
 
 end Dr1nds
