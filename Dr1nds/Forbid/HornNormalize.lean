@@ -358,6 +358,66 @@ theorem closureForbid_NDS_corr_spec (n : Nat)(F: HornWithForbid α) :
   dsimp [NDS_corr]
   rw [eq,this]
 
+section SingletonTraceDirect
+
+variable {α : Type} [DecidableEq α]
+
+theorem nds_corr_singleton_headFree_trace_step
+  (n : Nat) (F : HornWithForbid α) (a : α)
+  (hA : F.F = ({a} : Finset α))
+  (hfree : F.H.prem a = ∅)
+  (hNoPremA : ∀ {h : α} {Q : Finset α}, Q ∈ F.H.prem h → a ∉ Q)
+  (hTrace : NDS (α := α) n (HornNF.FixSet (F.H.trace a)) ≤ 0) :
+  NDS_corr (α := α) (n + 1) (HornNF.FixSet F.H) F.F ≤ 0 := by
+  have haF : a ∈ F.F := by simpa [hA]
+  rw [hA]
+  have haU : a ∈ F.H.U := by
+    exact F.F_subset_U haF
+  exact Dr1nds.qcorr_singleton_noHead_step_noNorm (α := α)
+    (n := n) (H := F.H) (v := a)
+    (hvU := haU) (hfree := hfree) (hNoPremV := hNoPremA)
+    (hQ_trace := hTrace)
+
+theorem nds_corr_singleton_hasHead_trace_step
+  (n : Nat) (F : HornWithForbid α) (a : α)
+  (hA : F.F = ({a} : Finset α))
+  (Pprem : Finset α)
+  (hP : Pprem ∈ F.H.prem a)
+  (hUnique : (F.H.prem a).card = 1)
+  (hNoPremA : ∀ {h : α} {Q : Finset α}, Q ∈ F.H.prem h → a ∉ Q)
+  (hTrace : NDS_corr (α := α) n (HornNF.FixSet (F.H.trace a)) Pprem ≤ 0) :
+  NDS_corr (α := α) (n + 1) (HornNF.FixSet F.H) F.F ≤ 0 := by
+  have haF : a ∈ F.F := by simpa [hA]
+  rw [hA]
+  have haU : a ∈ F.H.U := by
+    exact F.F_subset_U haF
+  exact Dr1nds.qcorr_singleton_hasHead_P_step_noNorm (α := α)
+    (n := n) (H := F.H) (hDR1 := F.hDR1)
+    (v := a) (Pprem := Pprem)
+    (hvU := haU) (hP := hP) (hUnique := hUnique)
+    (hNoPremV := hNoPremA) (hQ_trace := hTrace)
+
+theorem nds_corr_singleton_hasHead_trace_step_choose
+  (n : Nat) (F : HornWithForbid α) (a : α)
+  (hA : F.F = ({a} : Finset α))
+  (hasHead : F.H.hasHead a)
+  (hNoPremA : ∀ {h : α} {Q : Finset α}, Q ∈ F.H.prem h → a ∉ Q)
+  (hTrace :
+    NDS_corr (α := α) n (HornNF.FixSet (F.H.trace a))
+      (Classical.choose (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)) ≤ 0) :
+  NDS_corr (α := α) (n + 1) (HornNF.FixSet F.H) F.F ≤ 0 := by
+  let Pprem := Classical.choose (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)
+  have hP : Pprem ∈ F.H.prem a :=
+    (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)).1
+  have hUnique : (F.H.prem a).card = 1 := by
+    exact prem_card_eq_one_of_DR1_of_ne_empty (H := F.H) (v := a) (hDR1 := F.hDR1) hasHead
+  exact nds_corr_singleton_hasHead_trace_step
+    (n := n) (F := F) (a := a) (hA := hA)
+    (Pprem := Pprem) (hP := hP) (hUnique := hUnique)
+    (hNoPremA := hNoPremA) (hTrace := by simpa [Pprem] using hTrace)
+
+end SingletonTraceDirect
+
 
 end HornNF
 end Dr1nds
