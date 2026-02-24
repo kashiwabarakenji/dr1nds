@@ -14,9 +14,9 @@ variable {α : Type} [DecidableEq α]
 def normalize (H : HornNF α) (a : α) : HornNF α :=
   { U := H.U
     prem := fun h => (H.prem h).filter (fun P => a ∉ P)
-    prem_subset_U := fun {h P} hP => H.prem_subset_U (Finset.mem_filter.mp hP).1
-    head_mem_U := fun {h} ⟨P, hP⟩ => H.head_mem_U ⟨P, (Finset.mem_filter.mp hP).1⟩
-    nf := fun {h P} hP => H.nf (Finset.mem_filter.mp hP).1
+    prem_subset_U := fun {_h _P} hP => H.prem_subset_U (Finset.mem_filter.mp hP).1
+    head_mem_U := fun {_h} ⟨P, hP⟩ => H.head_mem_U ⟨P, (Finset.mem_filter.mp hP).1⟩
+    nf := fun {_h _P} hP => H.nf (Finset.mem_filter.mp hP).1
   }
 
 /-- Alias for normalize, emphasizing it acts on premises. -/
@@ -369,7 +369,7 @@ theorem nds_corr_singleton_headFree_trace_step
   (hNoPremA : ∀ {h : α} {Q : Finset α}, Q ∈ F.H.prem h → a ∉ Q)
   (hTrace : NDS (α := α) n (HornNF.FixSet (F.H.trace a)) ≤ 0) :
   NDS_corr (α := α) (n + 1) (HornNF.FixSet F.H) F.F ≤ 0 := by
-  have haF : a ∈ F.F := by simpa [hA]
+  have haF : a ∈ F.F := by simp [hA]
   rw [hA]
   have haU : a ∈ F.H.U := by
     exact F.F_subset_U haF
@@ -387,7 +387,7 @@ theorem nds_corr_singleton_hasHead_trace_step
   (hNoPremA : ∀ {h : α} {Q : Finset α}, Q ∈ F.H.prem h → a ∉ Q)
   (hTrace : NDS_corr (α := α) n (HornNF.FixSet (F.H.trace a)) Pprem ≤ 0) :
   NDS_corr (α := α) (n + 1) (HornNF.FixSet F.H) F.F ≤ 0 := by
-  have haF : a ∈ F.F := by simpa [hA]
+  have haF : a ∈ F.F := by simp [hA]
   rw [hA]
   have haU : a ∈ F.H.U := by
     exact F.F_subset_U haF

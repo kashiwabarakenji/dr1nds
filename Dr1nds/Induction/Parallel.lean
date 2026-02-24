@@ -79,7 +79,7 @@ theorem Q_of_parallel_get_spec
   · dsimp [Q_of_parallel_get, HornNF.trace]
     calc
       (P.H.U.erase v).card = P.H.U.card - 1 := Finset.card_erase_of_mem hvU
-      _ = n - 1 := by simpa [hn]
+      _ = n - 1 := by simp [hn]
   · simpa [hFixTrace] using hNDSleTr
 
 /-- Parallel-branch (forbid-free): if `Parallel0 P` holds, we can close `Q n P` by the trace reduction core. -/
@@ -287,7 +287,7 @@ theorem Qcorr_of_parallel_get_spec
     intro X hX
     have hXbase : X ∈ PairTr v (F.H.FixSet) :=
       PairTr_subset_of_subset (v := v) (C := Hole (F.H.FixSet) F.F) (D := F.H.FixSet) hHoleSubsetBase hX
-    simpa [hPairBaseEmpty] using hXbase
+    simp [hPairBaseEmpty] at hXbase
   have hPairHoleNDS0 : NDS (n - 1) (PairTr v (Hole (F.H.FixSet) F.F)) = 0 := by
     simp [hPairHoleEmpty, NDS]
   have hRare : F.H.rare v :=
@@ -349,7 +349,7 @@ theorem Qcorr_of_parallel_get_spec
     dsimp [F', Qcorr_of_parallel_get, HornNF.trace]
     calc
       (F.H.U.erase v).card = F.H.U.card - 1 := Finset.card_erase_of_mem hvU
-      _ = n - 1 := by simpa [hn]
+      _ = n - 1 := by simp [hn]
   have hLeF' : F.NDS_corr n ≤ F'.NDS_corr (n - 1) := by
     have hHoleLe :
         NDS_corr n (F.H.FixSet) F.F
@@ -368,7 +368,14 @@ theorem Qcorr_of_parallel_get_spec
         NDS (n - 1) (Hole (HornNF.FixSet (F.H.trace v)) (F.F.erase v))
           ≤
         NDS_corr (n - 1) (HornNF.FixSet (F.H.trace v)) (F.F.erase v) := by
-      simpa [NDS_corr] using (le_add_of_nonneg_right hUpNonneg)
+      calc
+        NDS (n - 1) (Hole (HornNF.FixSet (F.H.trace v)) (F.F.erase v))
+            ≤
+          NDS (n - 1) (Hole (HornNF.FixSet (F.H.trace v)) (F.F.erase v))
+            + (Up (HornNF.FixSet (F.H.trace v)) (F.F.erase v)).card :=
+              le_add_of_nonneg_right hUpNonneg
+        _ = NDS_corr (n - 1) (HornNF.FixSet (F.H.trace v)) (F.F.erase v) := by
+              simp [NDS_corr]
     have hBase : F.NDS_corr n = NDS_corr n (F.H.FixSet) F.F := by
       simp [HornWithForbid.NDS_corr, HornWithForbid.BaseC]
     have hTarget :

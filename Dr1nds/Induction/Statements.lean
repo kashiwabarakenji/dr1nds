@@ -95,13 +95,13 @@ lemma fixset_eq_pair_empty_U_of_card_one
       rcases hXne with ⟨x, hxX⟩
       have hxu : x = u := by
         have hxS : x ∈ ({u} : Finset α) := hXsub hxX
-        simpa using hxS
+        exact Finset.mem_singleton.mp hxS
       have huX : u ∈ X := by simpa [← hxu] using hxX
       have hXeq : X = ({u} : Finset α) := by
         apply Finset.Subset.antisymm
         · exact hXsub
         · intro y hy
-          have hyu : y = u := by simpa using hy
+          have hyu : y = u := Finset.mem_singleton.mp hy
           simpa [hyu] using huX
       simp [hu, hXeq]
   · intro hX
@@ -120,13 +120,13 @@ lemma forbid_eq_U_of_card_one
   rcases F.F_nonempty with ⟨x, hxF⟩
   have hxu : x = u := by
     have hxS : x ∈ ({u} : Finset α) := hFsub hxF
-    simpa using hxS
+    exact Finset.mem_singleton.mp hxS
   have huF : u ∈ F.F := by simpa [← hxu] using hxF
   have hFeq : F.F = ({u} : Finset α) := by
     apply Finset.Subset.antisymm
     · exact hFsub
     · intro y hy
-      have hyu : y = u := by simpa using hy
+      have hyu : y = u := Finset.mem_singleton.mp hy
       simpa [hyu] using huF
   simpa [hu] using hFeq
 
@@ -174,7 +174,7 @@ theorem Qcorr_base (F : HornWithForbid α) : Qcorr 1 F := by
         · intro hsub
           have hu_single : u ∈ ({u} : Finset α) := by simp
           have : u ∈ (∅ : Finset α) := by simpa [hX0] using hsub hu_single
-          simpa using this
+          exact (Finset.notMem_empty u) this
     have hUp :
         Up (α := α) ({(∅ : Finset α), ({u} : Finset α)} : Finset (Finset α)) ({u} : Finset α)
           =
@@ -187,7 +187,7 @@ theorem Qcorr_base (F : HornWithForbid α) : Qcorr 1 F := by
         · exfalso
           have hu_single : u ∈ ({u} : Finset α) := by simp
           have : u ∈ (∅ : Finset α) := by simpa [hX0] using hsub hu_single
-          simpa using this
+          exact (Finset.notMem_empty u) this
         · exact Finset.mem_singleton.2 (Finset.mem_singleton.1 hX1)
       · intro hX
         have hXu : X = ({u} : Finset α) := Finset.mem_singleton.1 hX

@@ -504,7 +504,7 @@ lemma nep_FixSet_iff_empty_mem_base
         intro X hX
         -- FixSet members are subsets of U
         simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff]
-        obtain ⟨left, right⟩ := hX
+        obtain ⟨left, _right⟩ := hX
         simpa using left.2
     } : SetFamily α)
   ↔ (∅ : Finset α) ∈ HornNF.FixSet S.H := by
@@ -517,7 +517,7 @@ lemma nep_FixSet_iff_empty_mem_base
           subset_univ := by
             intro X hX
             simp_all only [HornWithForbid.mem_FixSet_withForbid_iff, mem_FixSet_iff]
-            obtain ⟨left, right⟩ := hX
+            obtain ⟨left, _right⟩ := hX
             simpa using left.2
         } : SetFamily α)
       ↔ (∅ : Finset α) ∈ S.FixSet := by

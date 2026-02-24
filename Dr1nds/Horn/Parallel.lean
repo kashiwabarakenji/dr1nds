@@ -118,8 +118,10 @@ lemma HornNF.prem_inter_closure_singleton_nonempty_of_parallel
     exact hNEP this
   have hPsubsetNotS : ∀ x ∈ P, x ∉ S := by
     intro x hxP hxS
-    have : x ∈ P ∩ S := Finset.mem_inter.mpr ⟨hxP, hxS⟩
-    have hcontra : x ∈ (∅ : Finset α) := by simpa [S, hEmpty'] using this
+    have hxPS : x ∈ P ∩ H.closure ({u} : Finset α) := Finset.mem_inter.mpr ⟨hxP, hxS⟩
+    have hcontra : x ∈ (∅ : Finset α) := by
+      rw [hEmpty'] at hxPS
+      exact hxPS
     exact (Finset.notMem_empty x) hcontra
   have hTclosed : H.IsClosed T := by
     constructor

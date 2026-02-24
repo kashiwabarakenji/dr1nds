@@ -19,10 +19,9 @@ SetFamily を継承し、
 -/
 
 structure ClosureSystem (α : Type) [Fintype α] [DecidableEq α]
-  extends SetFamily α :=
-  (mem_inter :
-     ∀ {X Y : Finset α}, X ∈ C → Y ∈ C → X ∩ Y ∈ C)
-  (top_mem : U ∈ C)
+  extends SetFamily α where
+  mem_inter : ∀ {X Y : Finset α}, X ∈ C → Y ∈ C → X ∩ Y ∈ C
+  top_mem : U ∈ C
 
 
 namespace ClosureSystem

@@ -176,7 +176,7 @@ lemma trace_preserves_NEP
       simp_all only
     let ni :=Finset.nonempty_iff_ne_empty (s := P)
     simp_all only [not_false_eq_true, ne_eq]
-    simpa using ni.2 this
+    exact ni.2 this
 
   let tp := trace_preserves_NEP' H u this
   intro h
@@ -425,7 +425,7 @@ lemma isClosed_union_singleton_of_noPremContains
         rw [Finset.subset_erase] at hY2
         exact hY1 hQtrace hQsubY
       -- conclude h ∈ Y ∪ {v}
-      exact Finset.mem_union_left _ (by simpa using hhY)
+      exact Finset.mem_union_left _ hhY
   · rcases hY with ⟨hY, hvY⟩
     dsimp [HornNF.trace] at hvY
     rw [Finset.subset_erase] at hvY
@@ -596,7 +596,7 @@ theorem fixset_trace_eq_Tr_fixset_of_noPremContains
       have hsub : X ⊆ (H.trace v).U := hXclosed.2
       intro hv
       have : v ∈ (H.trace v).U := hsub hv
-      simpa [HornNF.trace] using this
+      simp [HornNF.trace] at this
     have hInsClosed : HornNF.IsClosed H (X ∪ ({v} : Finset α)) :=
       isClosed_union_singleton_of_noPremContains
         (H := H) (v := v) (hv := hvU) (hNoPremV := hNoPremV) (hY := hXclosed)
@@ -604,7 +604,7 @@ theorem fixset_trace_eq_Tr_fixset_of_noPremContains
       (mem_FixSet_iff H (X ∪ ({v} : Finset α))).2 hInsClosed
     refine Finset.mem_image.mpr ?_
     refine ⟨X ∪ ({v} : Finset α), hInsFix, ?_⟩
-    simpa [Tr, Finset.union_singleton, hvX]
+    simp [Finset.union_singleton, hvX]
   · intro hX
     rcases Finset.mem_image.mp hX with ⟨Y, hYfix, hYX⟩
     have hYclosed : HornNF.IsClosed H Y := (mem_FixSet_iff H Y).1 hYfix
@@ -651,7 +651,7 @@ theorem fixset_trace_eq_Tr_fixset_of_head_free
       have hsub : X ⊆ (H.trace v).U := hXclosed.2
       intro hv
       have : v ∈ (H.trace v).U := hsub hv
-      simpa [HornNF.trace] using this
+      simp [HornNF.trace] at this
     have hXclosedH : HornNF.IsClosed H X :=
       (trace_isClosed_iff_head_free (H := H) (v := v) (hfree := hfree) (hvX := hvX)).1 hXclosed
     have hXfix : X ∈ HornNF.FixSet H := (mem_FixSet_iff H X).2 hXclosedH
@@ -697,7 +697,7 @@ theorem fixset_trace_eq_Del_fixset_of_head_free
       have hsub : X ⊆ (H.trace v).U := hXclosed.2
       intro hv
       have : v ∈ (H.trace v).U := hsub hv
-      simpa [HornNF.trace] using this
+      simp [HornNF.trace] at this
     have hXclosedH : HornNF.IsClosed H X :=
       (trace_isClosed_iff_head_free (H := H) (v := v) (hfree := hfree) (hvX := hvX)).1 hXclosed
     have hXfix : X ∈ HornNF.FixSet H := (mem_FixSet_iff H X).2 hXclosedH

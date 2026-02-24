@@ -16,19 +16,11 @@ set_option maxHeartbeats 10000000
 
 namespace Dr1nds
 variable {α : Type} [DecidableEq α]
-
-
-
----------------------------------------------
----これは、Hornレベルで定義することではないのか。HornNF.IsSCを定義した。今後は、P.H.IsSCを使う。
---abbrev IsSC0 (P : Pack0 α) (h : α) : Prop :=
---  P.H.closure {h} = {h}
-
 /-- SC / head-structure predicates for forbid packs. -/
 abbrev IsSC1 (F: HornWithForbid α) (h : α) : Prop :=
   F.H.closure {h} = {h}
 
-lemma isSC1_singleton_mem_baseFixSet
+private lemma isSC1_singleton_mem_baseFixSet
   (F : HornWithForbid α) (a : α)
   (hSC : IsSC1 F a) :
   ({a} : Finset α) ∈ HornNF.FixSet F.H := by
@@ -190,7 +182,7 @@ theorem exists_SC_in_forbid
   have hsingle_fix : ({a} : Finset α) ∈ F.H.FixSet := by
     simpa [hMa] using hMfix
   have haF : a ∈ F.F := by
-    have haM : a ∈ M := by simpa [hMa]
+    have haM : a ∈ M := by simp [hMa]
     exact hMsubF haM
   refine ⟨haF, ?_⟩
   exact (SC_closure_singleton F.H a).1 hsingle_fix
@@ -214,19 +206,14 @@ by
   simpa [choose_SC_in_forbid] using
     (Classical.choose_spec (exists_SC_in_forbid (α := α) F hFclosed hNP)).2
 
------------------------------------------------------
--- Headがあるかないかの分岐。
-
-
-
---HornWithForbidに移動しても良いし、ここでもよい。
+/-- Head-presence predicate for a forbid pack. -/
 def HasHead1 (F :HornWithForbid  α) (h : α) : Prop :=
   (F.H.prem h).Nonempty
 
 def IsForbidSingleton (F :HornWithForbid  α): Prop :=
   F.F.card = 1
 
-lemma erase_nonempty_of_mem_not_singleton
+private lemma erase_nonempty_of_mem_not_singleton
   (F : HornWithForbid α) (a : α)
   (ha : a ∈ F.F)
   (hns : ¬ IsForbidSingleton F) :
@@ -244,7 +231,7 @@ lemma erase_nonempty_of_mem_not_singleton
     omega
   exact Finset.card_pos.mp hpos
 
-lemma not_subset_singleton_of_mem_not_singleton
+private lemma not_subset_singleton_of_mem_not_singleton
   (F : HornWithForbid α) (a : α)
   (ha : a ∈ F.F)
   (hns : ¬ IsForbidSingleton F) :
@@ -256,7 +243,7 @@ lemma not_subset_singleton_of_mem_not_singleton
   have hcard1 : F.F.card = 1 := by omega
   exact hns hcard1
 
-lemma card_ge_two_of_mem_not_singleton
+private lemma card_ge_two_of_mem_not_singleton
   (F : HornWithForbid α) (a : α)
   (ha : a ∈ F.F)
   (hns : ¬ IsForbidSingleton F) :
@@ -267,23 +254,17 @@ lemma card_ge_two_of_mem_not_singleton
   have hcard1 : F.F.card = 1 := by omega
   exact hns hcard1
 
---シングルトンの禁止集合を与えたときに、headがあるかどうか。
+/-- For singleton forbid sets, records whether the distinguished vertex has a head premise. -/
 def HasHead1s (F :HornWithForbid  α) (fs: IsForbidSingleton F):Prop := by
   let h := Classical.choose (Finset.card_eq_one.mp fs)
   exact (F.H.prem h).Nonempty
-
-
-
------------------------------------------------------
---新しいローカルカーネル
-
----contractionでは、閉集合族が閉集合族に。
+/-- Contraction kernel at an SC vertex. -/
 noncomputable def Q_contraction  {α :Type} [DecidableEq α](P : Pack0 α) (a: α) (hSC: P.H.IsSC a): Pack0 α where
   H := P.H.contraction a
   hDR1 := by exact P.H.contraction_preserves_DR1 P.hDR1 a
   hNEP := by exact contraction_SC_NEP P.H a hSC
 
----head freeのdeletionは、traceと同じ。だったら最初からtraceと言ってもいい気もするが。
+/-- Trace kernel (head-free deletion specialization). -/
 noncomputable def Q_trace {α :Type} [DecidableEq α](P : Pack0 α) (a: α) : Pack0 α where
   H := P.H.trace a
   hDR1 := by exact P.H.trace_preserves_DR1 a P.hDR1
@@ -293,7 +274,7 @@ noncomputable def Q_deletion_head {α :Type} [DecidableEq α](P : Pack0 α) (a: 
   H := P.H.trace a
   hDR1 := P.H.trace_preserves_DR1 a P.hDR1
   hNEP := P.H.trace_preserves_NEP a P.hNEP
-  F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)  --- headを持つ唯一のルールのpremiseを入れる。
+  F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)
   F_subset_U := by
     let F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)
     have h_mem : F ∈ P.H.prem a := (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty P.H a P.hDR1 hasHead)).1
@@ -336,9 +317,7 @@ theorem Q_deletion_head_fixset_eq_Del
     _ = Del a (HornNF.FixSet P.H) := by
       simp [Del]
 
--- 新しいローカルカーネル Qcorr編
-
---禁止集合のサイズが2以上の場合に使われる。
+/-- Qcorr kernel for forbid sets of cardinality at least two. -/
 noncomputable def Qcorr_contraction {α :Type} [DecidableEq α] (F: HornWithForbid α) (a: α) (hSC:F.H.IsSC a) (hA: a ∈ F.F) (geq2: F.F.card ≥ 2):
    HornWithForbid α where
   H := F.H.contraction a
@@ -352,11 +331,9 @@ noncomputable def Qcorr_contraction {α :Type} [DecidableEq α] (F: HornWithForb
   F_nonempty := by
     have hcard : (F.F.erase a).card = F.F.card - 1 :=
     Finset.card_erase_of_mem hA
-    -- 2. card ≥ 2 より card - 1 ≥ 1
     have hpos : (F.F.erase a).card > 0 := by
       rw [hcard]
-      exact Nat.sub_pos_of_lt geq2   -- または omega / linarith
-      -- 3. card > 0 なら Nonempty
+      exact Nat.sub_pos_of_lt geq2
     exact Finset.card_pos.mp hpos
 
 theorem Qcorr_contraction_fixset_eq_Con
@@ -584,7 +561,7 @@ lemma ndeg_hole_add_up_eq_ndeg_of_mem
     _ = ndeg (α := α) C a := by
           simp [ndeg]
 
----禁止集合の大きさが2以上でパラレルの場合に使われる。HornWithForbidになるもの。禁止集合がなくなるtraceは、Qcorr_singleton_deletion_free
+/-- Trace step for the `|F| ≥ 2` Qcorr branch (parallel case). -/
 noncomputable def Qcorr_trace {α :Type} [DecidableEq α] (F: HornWithForbid α) (a: α)  (hA: a ∈ F.F) (geq2: F.F.card ≥ 2):
    HornWithForbid α where
   H := F.H.trace a
@@ -598,20 +575,18 @@ noncomputable def Qcorr_trace {α :Type} [DecidableEq α] (F: HornWithForbid α)
   F_nonempty := by
     have hcard : (F.F.erase a).card = F.F.card - 1 :=
     Finset.card_erase_of_mem hA
-    -- 2. card ≥ 2 より card - 1 ≥ 1
     have hpos : (F.F.erase a).card > 0 := by
       rw [hcard]
-      exact Nat.sub_pos_of_lt geq2   -- または omega / linarith
-      -- 3. card > 0 なら Nonempty
+      exact Nat.sub_pos_of_lt geq2
     exact Finset.card_pos.mp hpos
 
--- (hA: a ∈ F.F) (geq2: F.F.card ≥ 2)の場合に使われるが、マイナーの構成には使わないのか。すると、F.F.card = 1の場合もこれでOKか。
+/-- Has-head deletion step in the Qcorr branch. -/
 noncomputable def Qcorr_deletion_head  {α :Type} [DecidableEq α] (F: HornWithForbid α) (a: α)  (hasHead: F.H.hasHead a) :
    HornWithForbid α where
   H := F.H.trace a
   hDR1 := F.H.trace_preserves_DR1 a F.hDR1
   hNEP := F.H.trace_preserves_NEP a F.hNEP
-  F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)  --- headを持つ唯一のルールのpremiseを入れる。
+  F := Classical.choose (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)
   F_subset_U := by
     let FF := Classical.choose (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)
     have h_mem : FF ∈ F.H.prem a := (Classical.choose_spec (exists_unique_prem_of_DR1_of_nonempty F.H a F.hDR1 hasHead)).1
@@ -661,7 +636,7 @@ theorem Qcorr_deletion_head_fixset_eq_Del
     _ = Del a (HornNF.FixSet F.H) := by
       simp [Del]
 
-lemma ndiscorr_nonpos_of_Qcorr
+private lemma ndiscorr_nonpos_of_Qcorr
   (n : Nat) (F : HornWithForbid α)
   (hQcorr : Qcorr n F)
   (hcard : F.H.U.card = n) :
@@ -669,7 +644,7 @@ lemma ndiscorr_nonpos_of_Qcorr
   dsimp [Qcorr] at hQcorr
   simpa [HornWithForbid.NDS_corr, HornWithForbid.BaseC] using hQcorr hcard
 
-lemma hole_nonpos_of_Qcorr
+private lemma hole_nonpos_of_Qcorr
   (n : Nat) (F : HornWithForbid α)
   (hQcorr : Qcorr n F)
   (hcard : F.H.U.card = n) :
@@ -678,19 +653,14 @@ lemma hole_nonpos_of_Qcorr
   simpa [HornWithForbid.NDS_corr, HornWithForbid.BaseC, FixSet_eq_Hole_FixSet] using
     (corr_implies_hole_bound (α := α) (n := n) (C := HornNF.FixSet F.H) (A := F.F) hcorr)
 
---  (hA: {a} = F.F) (hs:IsForbidSingleton F) の状況下で使うが、マイナーの定義には出てこない。型的には禁止集合を無視したtrace。
--- Normalizeも行っていることになる。Head freeの状態だと、Normalizeとはただのtraceになる。NDSの非減少は別途考える。
+/-- Singleton-forbid no-head step; effectively a trace pack after normalization. -/
 noncomputable def Qcorr_singleton_deletion_free {α :Type} [DecidableEq α] (F: HornWithForbid α) (a: α) :
    Pack0 α where
   H := F.H.trace a
   hDR1 := F.H.trace_preserves_DR1 a F.hDR1
   hNEP := F.H.trace_preserves_NEP a F.hNEP
 
-
-------------------------------------------------------
---古いけど再利用可能なもの。
-
---ここでNDSの計算を行う。
+/-- Legacy but reusable singleton/has-head branch constructor. -/
 noncomputable def Qcorr_singleton_hasHead_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:HasHead1 F a):
     ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (F'.NDS_corr (F.H.U.card - 1))
 := by
@@ -796,7 +766,7 @@ theorem Qcorr_singleton_hasHead
   --dsimp [HornNF.FixSet] at h2
   exact Int.le_trans h2 hQcorr
 
----ここでNDSの計算を行う。
+-- NDS accounting for the singleton/head-free branch.
 noncomputable def Qcorr_singleton_headFree_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (heq: F.F = {a}) (hs:¬HasHead1 F a):
     ∃ P':Pack0 α , P'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (NDS P'.H.U.card P'.H.FixSet)
 := by
@@ -1352,7 +1322,7 @@ theorem Qcorr_ge2_headFree
 
 omit [DecidableEq α] in
 /-- Card-split helper: any finite set has either card = 0, card = 1, or card ≥ 2.
-Stepsで使っている
+-- Used by `Induction/Steps.lean`.
 -/
 lemma card_cases
   (A : Finset α) :

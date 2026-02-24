@@ -319,7 +319,7 @@ def HornNF.deleteRules (H : HornNF α) (v : α) : HornNF α :=
   2d. DR1 ⇒ premise uniqueness for a fixed head (Q1)
 ------------------------------------------------------------ -/
 def HornNF.hasHead (H : HornNF α )(v : α): Prop := (H.prem v).Nonempty
----DR1でどっちも前提ならば一致する。下で使っている。
+
 lemma prem_eq_of_mem_of_mem
     (H : HornNF α) (v : α)
     (hDR1 : HornNF.IsDR1 H)
@@ -332,7 +332,7 @@ lemma prem_eq_of_mem_of_mem
   exact hP
   exact hQ
 
----DR1で、headを持てば、ちょうどルールの数は1つ。下で使っている。
+
 lemma prem_card_eq_one_of_DR1_of_nonempty
     (H : HornNF α) (v : α)
     (hDR1 : HornNF.IsDR1 H)
@@ -344,7 +344,7 @@ lemma prem_card_eq_one_of_DR1_of_nonempty
   have hge1 : 1 ≤ (H.prem v).card := Nat.succ_le_of_lt hpos
   exact Nat.le_antisymm hle1 hge1
 
----DR1でhead-freeでなければ、head次数は1となる。HornBridgeで使っている。
+
 lemma prem_card_eq_one_of_DR1_of_ne_empty
     (H : HornNF α) (v : α)
     (hDR1 : HornNF.IsDR1 H)
@@ -355,7 +355,6 @@ lemma prem_card_eq_one_of_DR1_of_ne_empty
   apply Finset.nonempty_iff_ne_empty.mpr
   exact Finset.nonempty_iff_ne_empty.mp hne
 
----headをもてば、唯一の前提が存在する。
 /-- Under DR1, nonempty `prem v` has a unique premise element. -/
 lemma exists_unique_prem_of_DR1_of_nonempty
     (H : HornNF α) (v : α)
@@ -369,9 +368,10 @@ lemma exists_unique_prem_of_DR1_of_nonempty
   intro Q hQ
   exact prem_eq_of_mem_of_mem (H := H) (v := v) (hDR1 := hDR1) (hP := hQ) (hQ := hP)
 
----現状使ってなさそう。DR1だったら、Pが前提であれば、前提の集合は、それだけになる。
-/-- Under DR1, membership `P ∈ prem v` forces `prem v = {P}`. -/
-lemma prem_eq_singleton_of_DR1_of_mem
+/-- Under DR1, membership `P ∈ prem v` forces `prem v = {P}`.
+Currently unused outside this file.
+-/
+private lemma prem_eq_singleton_of_DR1_of_mem
     (H : HornNF α) (v : α)
     (hDR1 : HornNF.IsDR1 H)
     {P : Finset α}
@@ -423,14 +423,13 @@ If a head `v` has no premises in `H`,
 then rule-level deletion at `v` coincides with
 simple filtering of premises (i.e. no rule interaction occurs).
 
-This is the formal "head-free deletion" statement
-used in the Del=Hole plan.
-----hfreeの仮定なしでなりたつので使う時は仮定をとって、名前を変えて使う。現状利用してない。
+This is the formal head-free deletion statement.
+Currently unused outside this file.
 -/
-lemma deleteRules_head_free
+private lemma deleteRules_head_free
     (H : HornNF α)
     (v : α)
-    (hfree : (H.prem v) = ∅) :
+    (_hfree : (H.prem v) = ∅) :
     HornNF.deleteRules H v =
     { U    := H.U.erase v
       prem := fun h =>

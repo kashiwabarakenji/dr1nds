@@ -1,8 +1,6 @@
-import Mathlib.Data.Fintype.Card
 import Mathlib.Data.Finset.Card
 import Mathlib.Tactic
 import Dr1nds.Forbid.Basic
-import Dr1nds.Forbid.HornWithForbid
 import Dr1nds.Forbid.ForbidTrace
 import Dr1nds.SetFamily.ConDelNdegId
 import Dr1nds.Horn.HornTrace
@@ -13,96 +11,9 @@ open scoped BigOperators
 
 variable {α : Type} [DecidableEq α]
 
-/-%
-================================================================================
-|A|=1（singleton forbid）ブリッジ：実装仕様（凍結メモ / Roadmap）
-================================================================================
 
-このファイルは「|A|=1 の forbid 分岐」を、trace/deletion 世界（台が 1 落ちた世界）へ
-帰着させる *橋渡し (bridge)* のみを担当する。
-
-## 0. 前提（設計として固定）
-
-(S1) `hNoPremV`（NoPremContains v）は **H 側の局所仮定**として受け取る。
-  - 形：`∀ {h} {Q}, Q ∈ H.prem h → v ∉ Q`
-  - 目的：Up 側の bijection（insert/erase）を安全に作るため。
-  - trace 世界では `HornTrace.trace_prem_not_mem` 等により「trace 後の premise は v を含まない」が
-    常に出るので、trace 側に `hNoPremV` を持ち込まない。
-
-(S2) has-head のときの唯一前提 `P` の取り出しは **存在的でよい**。
-  - DR1 により `(H.prem v).card = 1` が出たら `P` は `Classical.choose` 等で取って十分。
-  - 決定論的選択（`Finset.min` など）を入れて Order 構造を要求するのは副作用が大きいので避ける。
-  - ただし名前衝突防止のため、`choose_prem1` 系の公開 API は 1 系統に寄せる（LocalKernels 側で管理）。
-
-(S3) `NDS_succ` は `Nat.pred` を介さない恒等式として使う。
-  - `n=0` を排除する追加仮定は原則不要。
-
-## 1. 本ファイルの責務
-
-(A) Hole 側の移送（集合族の等式）
-  - head-free: `Hole(FixSet H,{v}) = FixSet (H.trace v)`
-  - has-head : `Hole(FixSet H,{v}) = Hole(FixSet (H.trace v), P)`
-
-(B) Up 側の同数性（card の一致）
-  - `hNoPremV` を仮定して `Up(FixSet H,{v}).card = FixSet(H.trace v).card` を示す。
-
-(C) 会計（NDS_corr の等式）
-  - (A)(B) と `NDS_succ` と Up/Hole 分割（trace 世界）から
-    `NDS_corr (n+1) (FixSet H) {v}` を trace 世界の `NDS` または `NDS_corr` に一致させる。
-
-(D) Step 形カーネル
-  - `qcorr_singleton_noHead_step` / `qcorr_singleton_hasHead_P_step` を
-    Induction wiring（LocalKernels / Steps）から呼べる形で提供する。
-================================================================================
-%-/
-
-/-
-================================================================================
-|A|=1（singleton forbid）ブリッジ：実装状況チェックリスト（追記）
-================================================================================
-
-このセクションは「既存の証明を壊さずに」完成へ向けて整えるためのチェックリスト。
-ここに書いてあることは *コードの意味を変えない*（宣言や補題の設計方針の固定のみ）。
-
-## 3. 供給位置の固定（最重要）
-
-- `hNoPremV : ∀ {h} {Q}, Q ∈ H.prem h → v ∉ Q` は **HornBridge では作らない**。
-  - HornBridge は「仮定として受け取るだけ」。
-  - 供給は `LocalKernels`（Pack 側）で `Pack1.noPremContains_forbid` を叩いて生成する。
-
-- `normalize` は **HornTrace に閉じる**（定義・補題も HornTrace に集約）。
-  - HornBridge は `normalize` に依存しない。
-  - 将来 `Pack1.noPremContains_forbid` を theorem 化するときに HornTrace の結果で置換する。
-
-## 4. このファイルで確定させる“橋渡し”だけ
-
-- Hole 側の等式（集合族の一致）
-  - head-free: `hole_singleton_eq_fixset_trace_head_free`
-  - has-head:  `hole_singleton_eq_hole_trace_prem`
-
-- Up 側の同数性（card の一致）
-  - head-free: `card_up_fixset_eq_card_fixset_trace_head_free`
-  - general/has-head: `card_up_fixset_eq_card_fixset_trace_has_head` とその alias
-
-- 会計（NDS_corr の等式）
-  - head-free: `NDS_corr_singleton_head_free_eq`
-  - has-head : `NDS_corr_singleton_hasHead_P_eq`
-
-- wiring 用 “step 形”
-  - `qcorr_singleton_noHead_step` / `qcorr_singleton_hasHead_P_step`
-
-## 5. 依存の方向（壊さないための注意）
-
-- このファイルは `Singleton.lean` の会計補題（`NDS_corr_singleton_*` や Up/Hole 分割）を利用する。
-- 逆方向（Singleton から HornBridge を import する等）は避ける。
-- `choose_prem1` 系の API は HornBridge では増やさない（LocalKernels 側の決定に従う）。
-
-================================================================================
--/
-
-
-/-- |A|=1（A={v}）かつ head=v の唯一前提が P のとき、
-    Hole(Fix(H), {v}) は trace 世界の Hole へ移せる（P 版）。 -/
+/-- For singleton forbid `{v}` with a unique head premise `P`,
+`Hole (FixSet H) {v}` transfers to the trace-side hole family at `P`. -/
 lemma hole_singleton_eq_hole_trace_prem
   (H : HornNF α) (hDR1 : H.IsDR1)
   (v : α) (P : Finset α)
@@ -123,11 +34,8 @@ lemma hole_singleton_eq_hole_trace_prem
     exact Finset.mem_filter.mp ((deletion_filter_equiv H hDR1 v P hP hUnique X).mpr hX)
 
 
-/-- |A|=1（A={v}）かつ head=v が存在しない（prem v = ∅）とき、
-    Hole(Fix(H), {v}) は trace 世界の FixSet と一致する（Hole 側の等式）。
-
-    ※Up 側（card の一致）には「v を前提に含む規則が無い」(NoPremContains v) の正規化仮定が必要なので、
-      ここではまず Hole 側だけを確定させる。 -/
+/-- For singleton forbid `{v}` in the head-free case (`prem v = ∅`),
+the hole family equals the trace-world fixed-set family. -/
 lemma hole_singleton_eq_fixset_trace_head_free
   (H : HornNF α)
   (v : α)
@@ -137,6 +45,7 @@ lemma hole_singleton_eq_fixset_trace_head_free
     =
   HornNF.FixSet (H.trace v) := by
   classical
+  have _ : v ∈ H.U := hvU
   have hfix :
       HornNF.FixSet (H.trace v)
         =
@@ -173,8 +82,8 @@ lemma hole_singleton_eq_fixset_trace_head_free
         = (HornNF.FixSet H).filter (fun X => v ∉ X) := by simp [Hole]
     _ = HornNF.FixSet (H.trace v) := hfix.symm
 
-/-- head-free（prem v = ∅）かつ「v を前提に含む規則が無い」(正規化仮定) の下で
-`Up(FixSet H,{v})` と `FixSet (H.trace v)` は `insert v` / `erase v` で双射。 -/
+/-- In the head-free case (`prem v = ∅`) with `NoPremContains v`,
+`Up (FixSet H) {v}` and `FixSet (H.trace v)` are in bijection via `insert`/`erase`. -/
 lemma card_up_fixset_eq_card_fixset_trace_head_free
   (H : HornNF α)
   (v : α)
@@ -186,7 +95,7 @@ lemma card_up_fixset_eq_card_fixset_trace_head_free
   (HornNF.FixSet (H.trace v)).card := by
   classical
 
-  -- 右 → 左 : X ∈ Fix(trace) ↦ insert v X ∈ Up(Fix(H),{v})
+  -- Right-to-left map: `X ∈ Fix(trace)` maps to `insert v X ∈ Up(Fix(H),{v})`.
   have h_forw :
       ∀ {X : Finset α}, X ∈ HornNF.FixSet (H.trace v) →
         insert v X ∈ Up (HornNF.FixSet H) ({v} : Finset α) := by
@@ -246,7 +155,7 @@ lemma card_up_fixset_eq_card_fixset_trace_head_free
 
     ⟩
 
-  -- 左 → 右 : Y ∈ Up ↦ erase v Y ∈ Fix(trace)
+  -- Left-to-right map: `Y ∈ Up` maps to `erase v Y ∈ Fix(trace)`.
   have h_back :
       ∀ {Y : Finset α}, Y ∈ Up (HornNF.FixSet H) ({v} : Finset α) →
         Y.erase v ∈ HornNF.FixSet (H.trace v) := by
@@ -388,7 +297,7 @@ lemma NDS_corr_singleton_head_free_eq
           simp [sub_eq_add_neg, add_left_comm, add_comm]
 
 /-- head-free singleton: if the trace-world is ≤0 then the singleton-forbid world is ≤0. -/
-lemma Qcorr_singleton_head_free_of_Q_trace
+private lemma Qcorr_singleton_head_free_of_Q_trace
   (n : Nat)
   (H : HornNF α) (v : α)
   (hvU : v ∈ H.U)
@@ -399,13 +308,6 @@ lemma Qcorr_singleton_head_free_of_Q_trace
   simpa [NDS_corr_singleton_head_free_eq (α := α)
     (n := n) (H := H) (v := v) (hvU := hvU) (hfree := hfree) (hNoPremV := hNoPremV)] using hQ
 
-/--
-(TODO) Has-head singleton: under the normalization `hNoPremV` (no premise contains `v`),
-`Up(FixSet H,{v})` should be in bijection with `FixSet (H.trace v)`.
-
-We postpone this because it needs a lemma relating `IsClosed H` and `IsClosed (H.trace v)` on sets not containing `v`
-in the has-head case (i.e. without assuming `H.prem v = ∅`).
--/
 lemma card_up_fixset_eq_card_fixset_trace_has_head
   (H : HornNF α)
   (v : α)
@@ -593,22 +495,6 @@ lemma card_up_fixset_eq_card_fixset_trace
 
 end HornNF
 
-/--
-(TODO) Has-head singleton bridge (equality, P-version):
-  NDS_corr (n+1) (FixSet H) {v} = NDS_corr n (FixSet (H.trace v)) P.
-
-This will be completed after the Up-card bridge above is proved.
--/
-/-/
-Has-head singleton bridge (equality, P-version):
-  NDS_corr (n+1) (FixSet H) {v} = NDS_corr n (FixSet (H.trace v)) P.
-
-This is proved from:
-- `hole_singleton_eq_hole_trace_prem` (SHIFT1 / Hole transfer),
-- `card_up_fixset_eq_card_fixset_trace_has_head` (the remaining Up-card kernel),
-- the tautological partition `Up + Hole = all` inside the trace world,
-- the accounting identity `NDS_succ` from S6.
--/
 lemma NDS_corr_singleton_hasHead_P_eq
   (n : Nat)
   (H : HornNF α) (hDR1 : H.IsDR1)
@@ -718,7 +604,8 @@ If `prem v = ∅` (head-free) we reduce to `NDS ≤ 0` on the trace world.
 If `prem v` is nonempty (has-head) we pick the unique premise `P` (using DR1) and reduce to
 `NDS_corr ≤ 0` on the trace world with forbid `P`.
 -/
-lemma Qcorr_singleton_by_trace_cases
+-- Currently unused outside this file.
+private lemma Qcorr_singleton_by_trace_cases
   (n : Nat)
   (H : HornNF α)
   (hDR1 : H.IsDR1)
@@ -760,7 +647,8 @@ lemma Qcorr_singleton_by_trace_cases
 This is often the exact shape needed in `LocalKernels.lean`.
 -/
 
-lemma Qcorr_singleton_hasHead_P_of_Qcorr_traceP
+-- Currently unused outside this file.
+private lemma Qcorr_singleton_hasHead_P_of_Qcorr_traceP
   (n : Nat)
   (H : HornNF α) (hDR1 : H.IsDR1)
   (v : α) (P : Finset α)
@@ -776,51 +664,7 @@ by
     (hvU := hvU) (hP := hP) (hUnique := hUnique) (hNoPremV := hNoPremV) (hQ := hQ)
 
 
-/--
-Kernel (singleton forbid, no-head case) in the *step* shape expected by the induction wiring:
-if the trace-world is forbid-free and satisfies `NDS ≤ 0`, then the original singleton-forbid world
-satisfies `NDS_corr ≤ 0`.
-
-This is just a naming wrapper around `Qcorr_singleton_head_free_of_Q_trace`.
--/
-lemma qcorr_singleton_noHead_step
-  (n : Nat)
-  (H : HornNF α)
-  (v : α)
-  (hvU : v ∈ H.U)
-  (hfree : H.prem v = ∅)
-  (hNoPremV : ∀ {h : α} {Q : Finset α}, Q ∈ H.prem h → v ∉ Q)
-  (hQ_trace : NDS (α := α) n (HornNF.FixSet (H.trace v)) ≤ 0) :
-  NDS_corr (α := α) n.succ (HornNF.FixSet H) ({v} : Finset α) ≤ 0 := by
-  exact Qcorr_singleton_head_free_of_Q_trace (α := α)
-    (n := n) (H := H) (v := v) (hvU := hvU)
-    (hfree := hfree) (hNoPremV := hNoPremV) (hQ := hQ_trace)
-
-
-/--
-Kernel (singleton forbid, has-head case) in the *step* shape expected by the induction wiring:
-if the trace-world with forbid `P` satisfies `NDS_corr ≤ 0`, then the original singleton-forbid world
-satisfies `NDS_corr ≤ 0`.
-
-This is just a naming wrapper around `Qcorr_singleton_hasHead_of_Qcorr_traceP`.
--/
-lemma qcorr_singleton_hasHead_P_step
-  (n : Nat)
-  (H : HornNF α) (hDR1 : H.IsDR1)
-  (v : α) (P : Finset α)
-  (hvU : v ∈ H.U)
-  (hP : P ∈ H.prem v)
-  (hUnique : (H.prem v).card = 1)
-  (hNoPremV : ∀ {h : α} {Q : Finset α}, Q ∈ H.prem h → v ∉ Q)
-  (hQ_trace : NDS_corr (α := α) n (HornNF.FixSet (H.trace v)) P ≤ 0) :
-  NDS_corr (α := α) n.succ (HornNF.FixSet H) ({v} : Finset α) ≤ 0 := by
-  exact Qcorr_singleton_hasHead_of_Qcorr_traceP (α := α)
-    (n := n) (H := H) (hDR1 := hDR1)
-    (v := v) (P := P)
-    (hvU := hvU) (hP := hP) (hUnique := hUnique)
-    (hNoPremV := hNoPremV) (hQ := hQ_trace)
-
-/-- (theorem) `qcorr_singleton_noHead_step` の `hNoPremV` 明示版。 -/
+/-- No-head singleton bridge in the step form used by induction. -/
 lemma qcorr_singleton_noHead_step_noNorm
   (α : Type) [DecidableEq α]
   (n : Nat)
@@ -832,13 +676,12 @@ lemma qcorr_singleton_noHead_step_noNorm
   (hQ_trace : NDS (α := α) n (HornNF.FixSet (H.trace v)) ≤ 0) :
   NDS_corr (α := α) n.succ (HornNF.FixSet H) ({v} : Finset α) ≤ 0 := by
   classical
-  exact Dr1nds.qcorr_singleton_noHead_step (α := α)
+  exact Qcorr_singleton_head_free_of_Q_trace (α := α)
     (n := n) (H := H) (v := v)
     (hvU := hvU) (hfree := hfree)
-    (hNoPremV := hNoPremV)
-    (hQ_trace := hQ_trace)
+    (hNoPremV := hNoPremV) (hQ := hQ_trace)
 
-/-- (theorem) `qcorr_singleton_hasHead_P_step` の `hNoPremV` 明示版。 -/
+/-- Has-head singleton bridge in the step form used by induction. -/
 lemma qcorr_singleton_hasHead_P_step_noNorm
   (α : Type) [DecidableEq α]
   (n : Nat)
@@ -853,16 +696,16 @@ lemma qcorr_singleton_hasHead_P_step_noNorm
   (hQ_trace : NDS_corr (α := α) n (HornNF.FixSet (H.trace v)) Pprem ≤ 0) :
   NDS_corr (α := α) n.succ (HornNF.FixSet H) ({v} : Finset α) ≤ 0 := by
   classical
-  exact Dr1nds.qcorr_singleton_hasHead_P_step (α := α)
+  exact Qcorr_singleton_hasHead_of_Qcorr_traceP (α := α)
     (n := n) (H := H) (hDR1 := hDR1)
-    (v := v) (P := Pprem)
+    (v := v) (P := Pprem) 
     (hvU := hvU) (hP := hP)
-    (hUnique := hUnique)
-    (hNoPremV := hNoPremV)
-    (hQ_trace := hQ_trace)
+    (hUnique := hUnique) (hNoPremV := hNoPremV)
+    (hQ := hQ_trace)
 
-/-- (theorem) `HasHead` で場合分けして上の2つへ落とす入口（`hNoPremV` 明示版）。 -/
-lemma qcorr_singleton_by_trace_cases_noNorm
+/-- Case split by `HasHead`, using explicit `hNoPremV` assumptions. -/
+-- Currently unused outside this file.
+private lemma qcorr_singleton_by_trace_cases_noNorm
   (α : Type) [DecidableEq α]
   (n : Nat)
   (H : HornNF α)
@@ -897,17 +740,5 @@ lemma qcorr_singleton_by_trace_cases_noNorm
       (hNoPremV := hNoPremV)
       (hQ_trace := hQcorr)
 
----使ってない。LocalKernelsから移してきたが、最終的に使わなければ消してもいいかも。HornWithForbidが登場してないがtraceは入っていて、Holeは登場しているのでHornBridgeあたりか。
-theorem hole_fixset_singleton_eq_hole_trace_prem
-  (H : HornNF α) (hDR1 : HornNF.DR1 H) (a : α) (Pprem : Finset α)
-  (h_prem_a : H.prem a = {Pprem})
-  (h_norm : ∀ {h Q}, Q ∈ H.prem h → a ∉ Q) :
-  Hole (α := α) (HornNF.FixSet H) {a}
-    =
-  Hole (α := α) (HornNF.FixSet (H.trace a)) Pprem := by
-  apply hole_singleton_eq_hole_trace_prem
-  · exact hDR1
-  · simp_all only [Finset.mem_singleton]
-  · rw [h_prem_a]; exact Finset.card_singleton Pprem
 
 end Dr1nds
