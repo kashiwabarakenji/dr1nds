@@ -128,10 +128,12 @@ theorem Qcorr_step1
         dsimp [NoParallel1]
         dsimp [Parallel1]
         simp_all only [not_exists, ne_eq, not_and, not_false_eq_true, implies_true, Fclosed]
-
-      let a := choose_SC_in_forbid (α := α) Fclosed hNP
-      have hmem : a ∈ Fclosed.F := choose_SC_in_forbid_mem (α := α) Fclosed hNP
-      have hSC : IsSC1 Fclosed a := choose_SC_in_forbid_spec (α := α) Fclosed hNP
+      have hFclosed_closed : Fclosed.H.IsClosed Fclosed.F := by
+        dsimp [Fclosed, HornNF.ClosureForbid]
+        simpa using HornNF.closure_isClosed (H := F.H) (X := F.F)
+      let a := choose_SC_in_forbid (α := α) Fclosed hFclosed_closed hNP
+      have hmem : a ∈ Fclosed.F := choose_SC_in_forbid_mem (α := α) Fclosed hFclosed_closed hNP
+      have hSC : IsSC1 Fclosed a := choose_SC_in_forbid_spec (α := α) Fclosed hFclosed_closed hNP
       have fs : ¬IsForbidSingleton Fclosed := by
         dsimp [IsForbidSingleton]
         dsimp [Fclosed]

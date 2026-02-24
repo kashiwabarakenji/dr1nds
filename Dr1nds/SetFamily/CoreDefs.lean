@@ -55,6 +55,10 @@ Note:
 def Del (u : α) (C : Finset (Finset α)) : Finset (Finset α) :=
   C.filter (fun X => u ∉ X)
 
+
+def Con (u : α) (C : Finset (Finset α)) : Finset (Finset α) :=
+  (C.filter (fun X => u ∈ X)).image (fun X => X.erase u)
+
 /--
 Trace (PROJECT TRACE):
   Tr_u(C) = { X.erase u | X∈C }
@@ -64,18 +68,8 @@ This is the image of *all* closed sets under erasing u.
 def Tr (u : α) (C : Finset (Finset α)) : Finset (Finset α) :=
   C.image (fun X => X.erase u)
 
-
-/--
-Contraction (RESTRICTED TRACE):
-  con_u(C) = { X.erase u | X∈C ∧ u∈X }
-
-IMPORTANT:
-  - image-level (duplicates are merged)
-  - this is NOT the same as Tr_u
--/
-def Con (u : α) (C : Finset (Finset α)) : Finset (Finset α) :=
-  (C.filter (fun X => u ∈ X)).image (fun X => X.erase u)
-
+def PairTr (u : α) (C : Finset (Finset α)) : Finset (Finset α) :=
+  (C.filter (fun X => u ∉ X ∧ (X ∪ {u} ∈ C)))
 
 
 /- ------------------------------------------------------------

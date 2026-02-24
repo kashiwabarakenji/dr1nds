@@ -118,26 +118,101 @@ noncomputable def choose_SC_no_parallel
 /- No-parallel (with forbid) implies existence of an SC point *inside* the forbid set `A`.
     Picking `h ∈ A` is crucial: it prevents the forbid-update from introducing a second forbid set. -/
 
-axiom exists_SC_in_forbid
-  (F : HornWithForbid α) :
-  NoParallel1 P → ∃ h : α, h ∈ F.F ∧ IsSC1 P h
+theorem exists_SC_in_forbid
+  (F : HornWithForbid α)
+  (hFclosed : F.H.IsClosed F.F) :
+  NoParallel1 F → ∃ h : α, h ∈ F.F ∧ IsSC1 F h := by
+  classical
+  intro hNP
+  let S : Finset (Finset α) := F.H.FixSet.filter (fun X => X.Nonempty ∧ X ⊆ F.F)
+  have hFfix : F.F ∈ F.H.FixSet := (mem_FixSet_iff (H := F.H) (X := F.F)).2 hFclosed
+  have hSnonempty : S.Nonempty := by
+    refine ⟨F.F, Finset.mem_filter.mpr ?_⟩
+    exact ⟨hFfix, ⟨F.F_nonempty, subset_rfl⟩⟩
+  obtain ⟨M, hMS, hMmin⟩ := Finset.exists_min_image S Finset.card hSnonempty
+  have hMfix : M ∈ F.H.FixSet := (Finset.mem_filter.mp hMS).1
+  have hMnonempty : M.Nonempty := (Finset.mem_filter.mp hMS).2.1
+  have hMsubF : M ⊆ F.F := (Finset.mem_filter.mp hMS).2.2
+  have hMsubU : M ⊆ F.H.U := by
+    exact (mem_FixSet_subset_U (H := F.H) (X := M) hMfix)
+  have hMnotTwo : ¬ 2 ≤ M.card := by
+    intro hMge2
+    have hMgt1 : 1 < M.card := by omega
+    rcases Finset.one_lt_card.mp hMgt1 with ⟨u, huM, v, hvM, huv_ne⟩
+    have huF : u ∈ F.F := hMsubF huM
+    have hvF : v ∈ F.F := hMsubF hvM
+    have huU : u ∈ F.H.U := hMsubU huM
+    have hvU : v ∈ F.H.U := hMsubU hvM
+    have hsub_u : ({u} : Finset α) ⊆ M := Finset.singleton_subset_iff.mpr huM
+    have hsub_v : ({v} : Finset α) ⊆ M := Finset.singleton_subset_iff.mpr hvM
+    have hMclosed : F.H.IsClosed M := (mem_FixSet_iff (H := F.H) (X := M)).1 hMfix
+    have hclu_sub_M : F.H.closure ({u} : Finset α) ⊆ M :=
+      HornNF.closure_subset_of_subset_isClosed (H := F.H) (hXY := hsub_u) (hY := hMclosed)
+    have hclv_sub_M : F.H.closure ({v} : Finset α) ⊆ M :=
+      HornNF.closure_subset_of_subset_isClosed (H := F.H) (hXY := hsub_v) (hY := hMclosed)
+    have hu_in_clu : u ∈ F.H.closure ({u} : Finset α) := by
+      have hsingletonU : ({u} : Finset α) ⊆ F.H.U := Finset.singleton_subset_iff.mpr huU
+      exact (HornNF.subset_closure (H := F.H) (X := ({u} : Finset α)) hsingletonU) (by simp)
+    have hv_in_clv : v ∈ F.H.closure ({v} : Finset α) := by
+      have hsingletonU : ({v} : Finset α) ⊆ F.H.U := Finset.singleton_subset_iff.mpr hvU
+      exact (HornNF.subset_closure (H := F.H) (X := ({v} : Finset α)) hsingletonU) (by simp)
+    have hclu_fix : F.H.closure ({u} : Finset α) ∈ F.H.FixSet := by
+      exact (mem_FixSet_iff (H := F.H) (X := F.H.closure ({u} : Finset α))).2
+        (HornNF.closure_isClosed (H := F.H) (X := ({u} : Finset α)))
+    have hclv_fix : F.H.closure ({v} : Finset α) ∈ F.H.FixSet := by
+      exact (mem_FixSet_iff (H := F.H) (X := F.H.closure ({v} : Finset α))).2
+        (HornNF.closure_isClosed (H := F.H) (X := ({v} : Finset α)))
+    have hclu_nonempty : (F.H.closure ({u} : Finset α)).Nonempty := ⟨u, hu_in_clu⟩
+    have hclv_nonempty : (F.H.closure ({v} : Finset α)).Nonempty := ⟨v, hv_in_clv⟩
+    have hclu_sub_F : F.H.closure ({u} : Finset α) ⊆ F.F := by
+      exact Finset.Subset.trans hclu_sub_M hMsubF
+    have hclv_sub_F : F.H.closure ({v} : Finset α) ⊆ F.F := by
+      exact Finset.Subset.trans hclv_sub_M hMsubF
+    have hcluS : F.H.closure ({u} : Finset α) ∈ S := Finset.mem_filter.mpr
+      ⟨hclu_fix, ⟨hclu_nonempty, hclu_sub_F⟩⟩
+    have hclvS : F.H.closure ({v} : Finset α) ∈ S := Finset.mem_filter.mpr
+      ⟨hclv_fix, ⟨hclv_nonempty, hclv_sub_F⟩⟩
+    have hMle_clu : M.card ≤ (F.H.closure ({u} : Finset α)).card := hMmin _ hcluS
+    have hMle_clv : M.card ≤ (F.H.closure ({v} : Finset α)).card := hMmin _ hclvS
+    have hclu_eq_M : F.H.closure ({u} : Finset α) = M :=
+      Finset.eq_of_subset_of_card_le hclu_sub_M hMle_clu
+    have hclv_eq_M : F.H.closure ({v} : Finset α) = M :=
+      Finset.eq_of_subset_of_card_le hclv_sub_M hMle_clv
+    have hu_in_clv : u ∈ F.H.closure ({v} : Finset α) := by simpa [hclv_eq_M] using huM
+    have hv_in_clu : v ∈ F.H.closure ({u} : Finset α) := by simpa [hclu_eq_M] using hvM
+    have hPar : Parallel1 F := ⟨u, v, huv_ne, huF, hvF, hu_in_clv, hv_in_clu⟩
+    exact hNP hPar
+  have hMcard_one : M.card = 1 := by
+    have hMpos : 0 < M.card := Finset.card_pos.mpr hMnonempty
+    omega
+  obtain ⟨a, hMa⟩ := Finset.card_eq_one.mp hMcard_one
+  refine ⟨a, ?_⟩
+  have hsingle_fix : ({a} : Finset α) ∈ F.H.FixSet := by
+    simpa [hMa] using hMfix
+  have haF : a ∈ F.F := by
+    have haM : a ∈ M := by simpa [hMa]
+    exact hMsubF haM
+  refine ⟨haF, ?_⟩
+  exact (SC_closure_singleton F.H a).1 hsingle_fix
 
 /-- Noncomputably pick an SC point inside `A` from `exists_SC_in_forbid`. -/
 noncomputable def choose_SC_in_forbid
-  (F : HornWithForbid α) (hNP : NoParallel1 F) : α :=
-  Classical.choose (exists_SC_in_forbid (α := α) F hNP)
+  (F : HornWithForbid α) (hFclosed : F.H.IsClosed F.F) (hNP : NoParallel1 F) : α :=
+  Classical.choose (exists_SC_in_forbid (α := α) F hFclosed hNP)
 
 @[simp] theorem choose_SC_in_forbid_mem
-  (F : HornWithForbid α) (hNP : NoParallel1 F) :
-  choose_SC_in_forbid (α := α) F hNP ∈ F.F :=
+  (F : HornWithForbid α) (hFclosed : F.H.IsClosed F.F) (hNP : NoParallel1 F) :
+  choose_SC_in_forbid (α := α) F hFclosed hNP ∈ F.F :=
 by
-  simpa [choose_SC_in_forbid] using (Classical.choose_spec (exists_SC_in_forbid (α := α) F hNP)).1
+  simpa [choose_SC_in_forbid] using
+    (Classical.choose_spec (exists_SC_in_forbid (α := α) F hFclosed hNP)).1
 
 @[simp] theorem choose_SC_in_forbid_spec
-(F : HornWithForbid α) (hNP : NoParallel1 F) :
-  IsSC1 F (choose_SC_in_forbid (α := α) F hNP) :=
+(F : HornWithForbid α) (hFclosed : F.H.IsClosed F.F) (hNP : NoParallel1 F) :
+  IsSC1 F (choose_SC_in_forbid (α := α) F hFclosed hNP) :=
 by
-  simpa [choose_SC_in_forbid] using (Classical.choose_spec (exists_SC_in_forbid (α := α) F hNP)).2
+  simpa [choose_SC_in_forbid] using
+    (Classical.choose_spec (exists_SC_in_forbid (α := α) F hFclosed hNP)).2
 
 -----------------------------------------------------
 -- Headがあるかないかの分岐。

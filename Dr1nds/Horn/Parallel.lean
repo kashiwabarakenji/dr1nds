@@ -295,4 +295,28 @@ theorem HornNF.rare_of_hasParallel_of_DR1
   dsimp [HornNF.rare]
   simpa [C, hndegAB] using hRareInt
 
+lemma HornNF.PairTr_fixset_eq_empty_of_parallel
+  (H : HornNF α) {u v : α} (hPar : H.IsParallelByClosure u v) :
+  PairTr (α := α) v (H.FixSet) = ∅ := by
+  classical
+  rcases (HornNF.parallel_closure_iff_parallel_fixset (H := H) (u := u) (v := v)).1 hPar with
+    ⟨huv_ne, _huU, _hvU, hiff⟩
+  apply Finset.eq_empty_iff_forall_notMem.mpr
+  intro X hX
+  rcases Finset.mem_filter.mp hX with ⟨hXfix, hXpair⟩
+  rcases hXpair with ⟨hvNotX, hXuvFix⟩
+  have huNotX : u ∉ X := by
+    intro huX
+    exact hvNotX ((hiff X hXfix).1 huX)
+  have huInXuv : u ∈ X ∪ ({v} : Finset α) := by
+    have hvInXuv : v ∈ X ∪ ({v} : Finset α) :=
+      Finset.mem_union_right X (Finset.mem_singleton.mpr rfl)
+    exact (hiff (X ∪ ({v} : Finset α)) hXuvFix).2 hvInXuv
+  have huInX : u ∈ X := by
+    rcases Finset.mem_union.mp huInXuv with huX | huV
+    · exact huX
+    · exfalso
+      exact huv_ne (Finset.mem_singleton.mp huV)
+  exact huNotX huInX
+
 end Dr1nds
