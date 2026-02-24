@@ -6,6 +6,7 @@ import Dr1nds.Horn.Horn
 import Dr1nds.Horn.HornClosure
 import Dr1nds.ClosureSystem.Basic
 import Dr1nds.Forbid.Basic
+import Dr1nds.SetFamily.CoreDefs
 
 /-
 ============================================================
@@ -319,7 +320,7 @@ If no premise in `H` contains `v`, then in the trace world the premises for any 
 are unchanged (the `biUnion` branch never fires).
 
 This lemma is the key simplification used in the `|A|=1` has-head Up-card bijection.
--- HornBridgeから使われている。
+-- HornBridgeから使われている。hNoPremVは、normalizedの仮定と同じ。
 -/
 lemma trace_prem_eq_of_noPremContains
   (H : HornNF α)
@@ -579,6 +580,241 @@ lemma empty_not_mem_Up_singleton
   (∅ : Finset α) ∉ Up (α := α) C ({a} : Finset α) := by
   classical
   simp [Dr1nds.Up]
+
+/-- Under `hNoPremV`, trace and family-level `Tr` commute on fixed sets. -/
+theorem fixset_trace_eq_Tr_fixset_of_noPremContains
+  (H : HornNF α) (v : α)
+  (hvU : v ∈ H.U)
+  (hNoPremV : ∀ {h : α} {P : Finset α}, P ∈ H.prem h → v ∉ P) :
+  HornNF.FixSet (H.trace v) = Tr v (HornNF.FixSet H) := by
+  classical
+  ext X
+  constructor
+  · intro hX
+    have hXclosed : HornNF.IsClosed (H.trace v) X := (mem_FixSet_iff (H.trace v) X).1 hX
+    have hvX : v ∉ X := by
+      have hsub : X ⊆ (H.trace v).U := hXclosed.2
+      intro hv
+      have : v ∈ (H.trace v).U := hsub hv
+      simpa [HornNF.trace] using this
+    have hInsClosed : HornNF.IsClosed H (X ∪ ({v} : Finset α)) :=
+      isClosed_union_singleton_of_noPremContains
+        (H := H) (v := v) (hv := hvU) (hNoPremV := hNoPremV) (hY := hXclosed)
+    have hInsFix : X ∪ ({v} : Finset α) ∈ HornNF.FixSet H :=
+      (mem_FixSet_iff H (X ∪ ({v} : Finset α))).2 hInsClosed
+    refine Finset.mem_image.mpr ?_
+    refine ⟨X ∪ ({v} : Finset α), hInsFix, ?_⟩
+    simpa [Tr, Finset.union_singleton, hvX]
+  · intro hX
+    rcases Finset.mem_image.mp hX with ⟨Y, hYfix, hYX⟩
+    have hYclosed : HornNF.IsClosed H Y := (mem_FixSet_iff H Y).1 hYfix
+    have hYsubU : Y ⊆ H.U := hYclosed.2
+    have hsubUerase : Y.erase v ⊆ H.U.erase v := by
+      intro x hx
+      have hxY : x ∈ Y := Finset.mem_of_mem_erase hx
+      have hxU : x ∈ H.U := hYsubU hxY
+      exact Finset.mem_erase.mpr ⟨(Finset.mem_erase.mp hx).1, hxU⟩
+    have hclosedTrace : HornNF.IsClosed (H.trace v) (Y.erase v) := by
+      constructor
+      · intro h P hP hPsub
+        by_cases hh : h = v
+        · subst hh
+          simp [HornNF.trace] at hP
+        · have hPremEq : (H.trace v).prem h = H.prem h :=
+            trace_prem_eq_of_noPremContains (H := H) (v := v)
+              (hNoPremV := hNoPremV) (h := h) (hneq := hh)
+          have hP' : P ∈ H.prem h := by
+            simpa [hPremEq] using hP
+          have hPsubY : P ⊆ Y := by
+            intro x hxP
+            have hxE : x ∈ Y.erase v := hPsub hxP
+            exact Finset.mem_of_mem_erase hxE
+          have hhY : h ∈ Y := hYclosed.1 hP' hPsubY
+          exact Finset.mem_erase.mpr ⟨hh, hhY⟩
+      · simpa [HornNF.trace] using hsubUerase
+    have hXfix : Y.erase v ∈ HornNF.FixSet (H.trace v) :=
+      (mem_FixSet_iff (H.trace v) (Y.erase v)).2 hclosedTrace
+    simpa [hYX] using hXfix
+
+/-- Head-free case: trace and `Tr` commute on fixed sets. -/
+theorem fixset_trace_eq_Tr_fixset_of_head_free
+  (H : HornNF α) (v : α)
+  (hvU : v ∈ H.U)
+  (hfree : H.prem v = ∅) :
+  HornNF.FixSet (H.trace v) = Tr v (HornNF.FixSet H) := by
+  classical
+  ext X
+  constructor
+  · intro hX
+    have hXclosed : HornNF.IsClosed (H.trace v) X := (mem_FixSet_iff (H.trace v) X).1 hX
+    have hvX : v ∉ X := by
+      have hsub : X ⊆ (H.trace v).U := hXclosed.2
+      intro hv
+      have : v ∈ (H.trace v).U := hsub hv
+      simpa [HornNF.trace] using this
+    have hXclosedH : HornNF.IsClosed H X :=
+      (trace_isClosed_iff_head_free (H := H) (v := v) (hfree := hfree) (hvX := hvX)).1 hXclosed
+    have hXfix : X ∈ HornNF.FixSet H := (mem_FixSet_iff H X).2 hXclosedH
+    refine Finset.mem_image.mpr ?_
+    refine ⟨X, hXfix, ?_⟩
+    simp [hvX]
+  · intro hX
+    rcases Finset.mem_image.mp hX with ⟨Y, hYfix, hYX⟩
+    have hYclosed : HornNF.IsClosed H Y := (mem_FixSet_iff H Y).1 hYfix
+    have hEraseClosedH : HornNF.IsClosed H (Y.erase v) := by
+      constructor
+      · intro h P hP hPsub
+        by_cases hh : h = v
+        · subst hh
+          simp [hfree] at hP
+        · have hPsubY : P ⊆ Y := by
+            intro x hx
+            exact Finset.mem_of_mem_erase (hPsub hx)
+          have hhY : h ∈ Y := hYclosed.1 hP hPsubY
+          exact Finset.mem_erase.mpr ⟨hh, hhY⟩
+      · intro x hx
+        exact hYclosed.2 (Finset.mem_of_mem_erase hx)
+    have hEraseFix : Y.erase v ∈ HornNF.FixSet H := (mem_FixSet_iff H (Y.erase v)).2 hEraseClosedH
+    have hvErase : v ∉ Y.erase v := by simp
+    have hEraseClosedTrace : HornNF.IsClosed (H.trace v) (Y.erase v) :=
+      (trace_isClosed_iff_head_free (H := H) (v := v) (hfree := hfree) (hvX := hvErase)).2 hEraseClosedH
+    have hXfix : Y.erase v ∈ HornNF.FixSet (H.trace v) :=
+      (mem_FixSet_iff (H.trace v) (Y.erase v)).2 hEraseClosedTrace
+    simpa [hYX] using hXfix
+
+/-- DR1 step version: trace and `Tr` commute on fixed sets. -/
+theorem fixset_trace_eq_Tr_fixset_of_DR1
+  (H : HornNF α) (_hDR1 : H.IsDR1) (v : α) (hvU : v ∈ H.U) :
+  HornNF.FixSet (H.trace v) = Tr v (HornNF.FixSet H) := by
+  classical
+  ext X
+  constructor
+  · intro hX
+    have hXclosed : HornNF.IsClosed (H.trace v) X := (mem_FixSet_iff (H.trace v) X).1 hX
+    have hvX : v ∉ X := by
+      have hsub : X ⊆ (H.trace v).U := hXclosed.2
+      intro hv
+      have : v ∈ (H.trace v).U := hsub hv
+      simp [HornNF.trace] at this
+    have hXsubU : X ⊆ H.U := by
+      intro x hx
+      exact (Finset.mem_erase.mp (hXclosed.2 hx)).2
+    by_cases hTrig : ∃ Pu : Finset α, Pu ∈ H.prem v ∧ Pu ⊆ X
+    · rcases hTrig with ⟨Pu0, hPu0, hPu0sub⟩
+      have hInsClosed : HornNF.IsClosed H (insert v X) := by
+        constructor
+        · intro h P hP hPsub
+          by_cases hEq : h = v
+          · subst hEq
+            simp
+          · by_cases hvP : v ∈ P
+            · have hQsubX : (P.erase v ∪ Pu0) ⊆ X := by
+                intro x hx
+                rcases Finset.mem_union.mp hx with hxE | hxPu
+                · have hxP : x ∈ P := Finset.mem_of_mem_erase hxE
+                  have hxIns : x ∈ insert v X := hPsub hxP
+                  rcases Finset.mem_insert.mp hxIns with hxeq | hxX
+                  · subst hxeq
+                    exact False.elim ((Finset.mem_erase.mp hxE).1 rfl)
+                  · exact hxX
+                · exact hPu0sub hxPu
+              by_cases hhQ : h ∈ (P.erase v ∪ Pu0)
+              · exact Finset.mem_insert_of_mem (hQsubX hhQ)
+              · have hQmem : (P.erase v ∪ Pu0) ∈ (H.trace v).prem h := by
+                  unfold HornNF.trace
+                  simp [hEq, hhQ]
+                  refine ⟨P, hP, ?_⟩
+                  simpa [hvP] using (Finset.mem_image.mpr ⟨Pu0, hPu0, rfl⟩)
+                have hhX : h ∈ X := hXclosed.1 hQmem hQsubX
+                exact Finset.mem_insert_of_mem hhX
+            · by_cases hhP : h ∈ P
+              · exact hPsub hhP
+              · have hPsubX : P ⊆ X := by
+                  intro x hx
+                  have hxIns : x ∈ insert v X := hPsub hx
+                  rcases Finset.mem_insert.mp hxIns with hxeq | hxX
+                  · subst hxeq
+                    exact False.elim (hvP hx)
+                  · exact hxX
+                have hPmemTrace : P ∈ (H.trace v).prem h := by
+                  unfold HornNF.trace
+                  simp [hEq, hhP]
+                  refine ⟨P, hP, ?_⟩
+                  simp [hvP]
+                have hhX : h ∈ X := hXclosed.1 hPmemTrace hPsubX
+                exact Finset.mem_insert_of_mem hhX
+        · intro x hx
+          rcases Finset.mem_insert.mp hx with hxeq | hxX
+          · subst hxeq
+            exact hvU
+          · exact hXsubU hxX
+      have hInsFix : insert v X ∈ HornNF.FixSet H :=
+        (mem_FixSet_iff H (insert v X)).2 hInsClosed
+      refine Finset.mem_image.mpr ?_
+      refine ⟨insert v X, hInsFix, ?_⟩
+      simp [hvX]
+    · have hBaseClosed : HornNF.IsClosed H X := by
+        constructor
+        · intro h P hP hPsub
+          by_cases hEq : h = v
+          · subst hEq
+            exfalso
+            exact hTrig ⟨P, hP, hPsub⟩
+          · by_cases hvP : v ∈ P
+            · exfalso
+              exact hvX (hPsub hvP)
+            · have hPmemTrace : P ∈ (H.trace v).prem h := by
+                unfold HornNF.trace
+                simp [hEq, H.nf hP]
+                refine ⟨P, hP, ?_⟩
+                simp [hvP]
+              exact hXclosed.1 hPmemTrace hPsub
+        · exact hXsubU
+      have hBaseFix : X ∈ HornNF.FixSet H := (mem_FixSet_iff H X).2 hBaseClosed
+      refine Finset.mem_image.mpr ?_
+      refine ⟨X, hBaseFix, ?_⟩
+      simp [hvX]
+  · intro hX
+    rcases Finset.mem_image.mp hX with ⟨Y, hYfix, hYX⟩
+    have hYclosed : HornNF.IsClosed H Y := (mem_FixSet_iff H Y).1 hYfix
+    have hYsubU : Y ⊆ H.U := hYclosed.2
+    have hClosedTrace : HornNF.IsClosed (H.trace v) (Y.erase v) := by
+      constructor
+      · intro h P hP hPsub
+        by_cases hEq : h = v
+        · subst hEq
+          simp [HornNF.trace] at hP
+        · simp [HornNF.trace, hEq] at hP
+          rcases hP with ⟨⟨P0, hP0, hcase⟩, _⟩
+          by_cases hvP0 : v ∈ P0
+          · simp [hvP0] at hcase
+            rcases hcase with ⟨Pu, hPu, hQeq⟩
+            subst hQeq
+            have hPuSubY : Pu ⊆ Y := by
+              intro x hx
+              exact Finset.mem_of_mem_erase (hPsub (Finset.mem_union.mpr (Or.inr hx)))
+            have hvY : v ∈ Y := hYclosed.1 hPu hPuSubY
+            have hP0SubY : P0 ⊆ Y := by
+              intro x hx
+              by_cases hxeq : x = v
+              · subst hxeq
+                exact hvY
+              · have hxE : x ∈ P0.erase v := Finset.mem_erase.mpr ⟨hxeq, hx⟩
+                exact Finset.mem_of_mem_erase (hPsub (Finset.mem_union.mpr (Or.inl hxE)))
+            have hhY : h ∈ Y := hYclosed.1 hP0 hP0SubY
+            exact Finset.mem_erase.mpr ⟨hEq, hhY⟩
+          · simp [hvP0] at hcase
+            subst hcase
+            have hP0SubY : P ⊆ Y := by
+              intro x hx
+              exact Finset.mem_of_mem_erase (hPsub hx)
+            have hhY : h ∈ Y := hYclosed.1 hP0 hP0SubY
+            exact Finset.mem_erase.mpr ⟨hEq, hhY⟩
+      · intro x hx
+        exact Finset.mem_erase.mpr ⟨(Finset.mem_erase.mp hx).1, hYsubU (Finset.mem_of_mem_erase hx)⟩
+    have hFixTrace : Y.erase v ∈ HornNF.FixSet (H.trace v) :=
+      (mem_FixSet_iff (H.trace v) (Y.erase v)).2 hClosedTrace
+    simpa [hYX] using hFixTrace
 
 end HornNF
 end Dr1nds
