@@ -2,6 +2,7 @@ import Dr1nds.Horn.Horn
 import Dr1nds.Horn.HornClosure
 import Dr1nds.Forbid.HornWithForbid
 import Dr1nds.SetFamily.CoreDefs
+import Mathlib.Tactic
 
 
 set_option autoImplicit false
@@ -70,8 +71,137 @@ so it does not conflict with the “no double Hole” convention for `NDS_corr`.
   ここは後で埋める。
 ------------------------------------------------------------ -/
 
-axiom Q_base (P : Pack0 α) : Q 0 P
+lemma fixset_eq_pair_empty_U_of_card_one
+  (H : HornNF α) (hNEP : H.IsNEP) (hcardU : H.U.card = 1) :
+  H.FixSet = ({(∅ : Finset α), H.U} : Finset (Finset α)) := by
+  classical
+  have hempty : (∅ : Finset α) ∈ H.FixSet :=
+    HornNF.empty_mem_FixSet_of_isNEP (H := H) hNEP
+  have hUmem : H.U ∈ H.FixSet := by
+    refine (mem_FixSet_iff (H := H) (X := H.U)).2 ?_
+    refine ⟨?_, subset_rfl⟩
+    intro h P hP hsub
+    exact H.head_mem_U ⟨P, hP⟩
+  apply Finset.ext
+  intro X
+  constructor
+  · intro hX
+    by_cases hX0 : X = ∅
+    · simp [hX0]
+    · have hXsubU : X ⊆ H.U := mem_FixSet_subset_U (H := H) hX
+      obtain ⟨u, hu⟩ := Finset.card_eq_one.mp hcardU
+      have hXsub : X ⊆ ({u} : Finset α) := by simpa [hu] using hXsubU
+      have hXne : X.Nonempty := Finset.nonempty_iff_ne_empty.mpr hX0
+      rcases hXne with ⟨x, hxX⟩
+      have hxu : x = u := by
+        have hxS : x ∈ ({u} : Finset α) := hXsub hxX
+        simpa using hxS
+      have huX : u ∈ X := by simpa [← hxu] using hxX
+      have hXeq : X = ({u} : Finset α) := by
+        apply Finset.Subset.antisymm
+        · exact hXsub
+        · intro y hy
+          have hyu : y = u := by simpa using hy
+          simpa [hyu] using huX
+      simp [hu, hXeq]
+  · intro hX
+    rcases Finset.mem_insert.1 hX with hX0 | hXU
+    · simpa [hX0] using hempty
+    · rcases Finset.mem_singleton.1 hXU with hXU'
+      simpa [hXU'] using hUmem
 
-axiom Qcorr_base (P : HornWithForbid α) : Qcorr 0 P
+lemma forbid_eq_U_of_card_one
+  (F : HornWithForbid α) (hcardU : F.H.U.card = 1) :
+  F.F = F.H.U := by
+  classical
+  obtain ⟨u, hu⟩ := Finset.card_eq_one.mp hcardU
+  have hFsub : F.F ⊆ ({u} : Finset α) := by
+    simpa [hu] using F.F_subset_U
+  rcases F.F_nonempty with ⟨x, hxF⟩
+  have hxu : x = u := by
+    have hxS : x ∈ ({u} : Finset α) := hFsub hxF
+    simpa using hxS
+  have huF : u ∈ F.F := by simpa [← hxu] using hxF
+  have hFeq : F.F = ({u} : Finset α) := by
+    apply Finset.Subset.antisymm
+    · exact hFsub
+    · intro y hy
+      have hyu : y = u := by simpa using hy
+      simpa [hyu] using huF
+  simpa [hu] using hFeq
+
+theorem Q_base (P : Pack0 α) : Q 1 P := by
+  intro hcardU
+  have hFix :
+      P.H.FixSet = ({(∅ : Finset α), P.H.U} : Finset (Finset α)) :=
+    fixset_eq_pair_empty_U_of_card_one (H := P.H) (hNEP := P.hNEP) (hcardU := hcardU)
+  have hNDS0 : NDS 1 P.H.FixSet = 0 := by
+    obtain ⟨u, hu⟩ := Finset.card_eq_one.mp hcardU
+    calc
+      NDS 1 P.H.FixSet = NDS 1 ({(∅ : Finset α), P.H.U} : Finset (Finset α)) := by simp [hFix]
+      _ = 0 := by simp [NDS, w, hu]
+  simpa [hNDS0]
+
+theorem Qcorr_base (F : HornWithForbid α) : Qcorr 1 F := by
+  intro hcardU
+  have hFix :
+      F.H.FixSet = ({(∅ : Finset α), F.H.U} : Finset (Finset α)) :=
+    fixset_eq_pair_empty_U_of_card_one (H := F.H) (hNEP := F.hNEP) (hcardU := hcardU)
+  have hFU : F.F = F.H.U := forbid_eq_U_of_card_one (F := F) (hcardU := hcardU)
+  have hCorr0 : NDS_corr 1 F.H.FixSet F.F = 0 := by
+    obtain ⟨u, hu⟩ := Finset.card_eq_one.mp hcardU
+    have hHole :
+        Hole (α := α) ({(∅ : Finset α), ({u} : Finset α)} : Finset (Finset α)) ({u} : Finset α)
+          =
+        ({(∅ : Finset α)} : Finset (Finset α)) := by
+      ext X
+      constructor
+      · intro hX
+        rcases Finset.mem_filter.1 hX with ⟨hXin, hnot⟩
+        rcases Finset.mem_insert.1 hXin with hX0 | hX1
+        · exact Finset.mem_singleton.2 hX0
+        · exfalso
+          apply hnot
+          intro y hy
+          have hXe : X = ({u} : Finset α) := Finset.mem_singleton.1 hX1
+          have hyu : y = u := Finset.mem_singleton.1 hy
+          simpa [hXe, hyu]
+      · intro hX
+        have hX0 : X = ∅ := Finset.mem_singleton.1 hX
+        refine Finset.mem_filter.2 ?_
+        refine ⟨?_, ?_⟩
+        · exact Finset.mem_insert.2 (Or.inl hX0)
+        · intro hsub
+          have hu_single : u ∈ ({u} : Finset α) := by simp
+          have : u ∈ (∅ : Finset α) := by simpa [hX0] using hsub hu_single
+          simpa using this
+    have hUp :
+        Up (α := α) ({(∅ : Finset α), ({u} : Finset α)} : Finset (Finset α)) ({u} : Finset α)
+          =
+        ({({u} : Finset α)} : Finset (Finset α)) := by
+      ext X
+      constructor
+      · intro hX
+        rcases Finset.mem_filter.1 hX with ⟨hXin, hsub⟩
+        rcases Finset.mem_insert.1 hXin with hX0 | hX1
+        · exfalso
+          have hu_single : u ∈ ({u} : Finset α) := by simp
+          have : u ∈ (∅ : Finset α) := by simpa [hX0] using hsub hu_single
+          simpa using this
+        · exact Finset.mem_singleton.2 (Finset.mem_singleton.1 hX1)
+      · intro hX
+        have hXu : X = ({u} : Finset α) := Finset.mem_singleton.1 hX
+        refine Finset.mem_filter.2 ?_
+        refine ⟨?_, ?_⟩
+        · exact Finset.mem_insert.2 (Or.inr (Finset.mem_singleton.2 hXu))
+        · intro y hy
+          simpa [hXu] using hy
+    calc
+      NDS_corr 1 F.H.FixSet F.F = NDS_corr 1 ({(∅ : Finset α), F.H.U} : Finset (Finset α)) F.H.U := by
+        simp [hFix, hFU]
+      _ = 0 := by
+        rw [hu]
+        simp [NDS_corr, NDS, w, hHole, hUp]
+  simpa [hCorr0]
 
 end Dr1nds
