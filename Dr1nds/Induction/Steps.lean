@@ -33,10 +33,10 @@ theorem Q_step0
       -- 将来 `NoParallel0 P := ¬ Parallel0 P` に差し替えたら、ここは `hPar` から構成する。
       trivial
     let h := choose_SC_no_parallel (α := α) P hNP
-    have hSC : IsSC0 P h := choose_SC_no_parallel_spec (α := α) P hNP
+    have hSC : P.H.IsSC h := choose_SC_no_parallel_spec (α := α) P hNP
 
     -- SC 点で head 構造を 3-way split
-    have hcases : (¬HasHead0 P h) ∨ (HasHead0 P h) := by exact Decidable.not_or_of_imp fun a => a
+    have hcases : (¬P.H.hasHead h) ∨ (P.H.hasHead h) := by exact Decidable.not_or_of_imp fun a => a
 
     cases hcases with
     | inl hNo =>

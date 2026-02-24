@@ -96,8 +96,8 @@ theorem Qcorr_ge_hasParallel
 
 ---------------------------------------------
 ---これは、Hornレベルで定義することではないのか。HornNF.IsSCを定義した。今後は、P.H.IsSCを使う。
-abbrev IsSC0 (P : Pack0 α) (h : α) : Prop :=
-  P.H.closure {h} = {h}
+--abbrev IsSC0 (P : Pack0 α) (h : α) : Prop :=
+--  P.H.closure {h} = {h}
 
 /-- SC / head-structure predicates for forbid packs. -/
 abbrev IsSC1 (F: HornWithForbid α) (h : α) : Prop :=
@@ -391,7 +391,7 @@ noncomputable def Qcorr_singleton_headFree_get {α :Type} [DecidableEq α](F : H
     ∃ P':Pack0 α , P'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (NDS P'.H.U.card P'.H.FixSet)
 := by
   have ainU : a ∈ F.H.U := by
-    have haF : a ∈ F.F := by simpa [heq]
+    have haF : a ∈ F.F := by simp [heq]
     exact F.F_subset_U haF
   have hfree : F.H.prem a = ∅ := by
     by_contra hne
@@ -415,7 +415,7 @@ noncomputable def Qcorr_singleton_headFree_get {α :Type} [DecidableEq α](F : H
         (H := Hnorm) (v := a)
         (hvU := by simpa [Hnorm, HornNF.normalize] using ainU)
         (hfree := by
-          simpa [Hnorm, HornNF.normalize, hfree])
+          simp [Hnorm, HornNF.normalize, hfree])
         (hNoPremV := by
           intro h Q hQ
           have hQ' : Q ∈ (HornNF.normalizePrem F.H a).prem h := by
@@ -433,7 +433,7 @@ noncomputable def Qcorr_singleton_headFree_get {α :Type} [DecidableEq α](F : H
           ≤
         NDS_corr (F.H.U.card) (HornNF.FixSet Hnorm) ({a} : Finset α) := hmono
       _ = NDS (F.H.U.card - 1) (HornNF.FixSet (Hnorm.trace a)) := hheadfree_norm
-      _ = NDS (F.H.U.card - 1) (HornNF.FixSet (F.H.trace a)) := by simpa [htrace_eq]
+      _ = NDS (F.H.U.card - 1) (HornNF.FixSet (F.H.trace a)) := by simp [htrace_eq]
   refine ⟨Qcorr_singleton_deletion_free F a, ?_⟩
   constructor
   · dsimp [Qcorr_singleton_deletion_free]
@@ -481,62 +481,21 @@ theorem Qcorr_singleton_headFree
   exact Int.le_trans h2 hQ
 
 -----------------------------------------------------
----古いもの。完成したら消す。
 
----これもHornレベルで定義するべきもの。HornNF.hasHeadを作った。よってこれは使わない。
-def HasHead0 (P : Pack0 α) (h : α) : Prop :=
-  (P.H.prem h).Nonempty
-
-noncomputable def Q_branch_headFree_get {α :Type} [DecidableEq α](P : Pack0 α) (a: α)  (hs:¬HasHead0 P a):
-    ∃ P':Pack0 α , P'.H.U.card = P.H.U.card - 1 ∧ (NDS P.H.U.card P.H.FixSet) ≤ (NDS P'.H.U.card P'.H.FixSet)
-  := sorry
 
 theorem Q_branch_headFree
   (n : Nat) (P : Pack0 α) (h : α) :
   (∀ P':Pack0 α, P'.H.U.card = n → Q n P') →
-  P.H.U.card = n + 1 → IsSC0 P h → ¬HasHead0 P h →
+  P.H.U.card = n + 1 → P.H.IsSC h → ¬P.H.hasHead h →
    Q (n+1) P := by
-  intro hQ hn hSC hh
-  obtain ⟨P',hP'⟩ := Q_branch_headFree_get P h hh
-  dsimp [Q]
-  intro hn'
-  specialize hQ P'
-  have :P'.H.U.card = n := by simp_all only [add_tsub_cancel_right, forall_const]
-  specialize hQ this
-  dsimp [Q] at hQ
-  specialize hQ this
-  rw [←this] at hQ
-  rw [←hn']
-  rcases hP' with ⟨h1,h2⟩
-  exact Int.le_trans h2 hQ
-
-noncomputable def Q_branch_hasHead_get {α :Type} [DecidableEq α](P : Pack0 α) (a: α)  (hs:HasHead0 P a):
-    ∃ P':Pack0 α , P'.H.U.card = P.H.U.card - 1 ∧ (NDS P.H.U.card P.H.FixSet) ≤ (NDS P'.H.U.card P'.H.FixSet)
-:= sorry
+ sorry
 
 theorem Q_branch_hasHead
   (n : Nat) (P : Pack0 α) (h : α) :
   (∀ P:Pack0 α, P.H.U.card = n → Q n P) → (∀ F':HornWithForbid α, F'.H.U.card = n → Qcorr n F') →
-  P.H.U.card = n + 1 → IsSC0 P h → HasHead0 P h →
+  P.H.U.card = n + 1 → P.H.IsSC h → P.H.hasHead h →
   Q (n+1) P := by
-  intro hQ hQcorr hn hSC hh
-  obtain ⟨P',hP'⟩ := Q_branch_hasHead_get P h hh
-  dsimp [Q]
-  intro hn'
-  specialize hQ P'
-  have :P'.H.U.card = n := by simp_all only [add_tsub_cancel_right, forall_const]
-  specialize hQ this
-  dsimp [Q] at hQ
-  specialize hQ this
-  rw [←this] at hQ
-  rw [←hn']
-  rcases hP' with ⟨h1,h2⟩
-  exact Int.le_trans h2 hQ
-
-
-noncomputable def Qcorr_ge2_hasHead_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (geq2: F.F.card ≥ 2) (ha:a ∈ F.F) (hs:HasHead1 F a):
-    ∃ F':HornWithForbid α , F'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (F'.NDS_corr (F.H.U.card - 1))
-:= sorry
+sorry
 
 theorem Qcorr_ge2_hasHead
   (n : Nat) (F : HornWithForbid α) (a : α) (hh : a ∈ F.F):
@@ -544,85 +503,14 @@ theorem Qcorr_ge2_hasHead
   F.H.U.card = n + 1 → ¬IsForbidSingleton F → IsSC1 F a → HasHead1 F a →
    Qcorr (n+1) F
 := by
-  -- 1. Introduce all hypotheses.
-  intro hQ_forbid hn_card h_not_singleton h_sc1 h_has_head
-
-  -- 2. Prepare arguments for the `_get` function.
-  -- We need to show `F.F.card ≥ 2` from `¬IsForbidSingleton F`.
-  have h_geq2 : F.F.card ≥ 2 := by
-    dsimp [IsForbidSingleton] at h_not_singleton
-    -- F.F is non-empty and its card is not 1, so it must be ≥ 2.
-    have h_nonempty : F.F.Nonempty := F.F_nonempty
-    cases h_card_cases : F.F.card with -- `card_cases` lemma from this file can be used.
-    | zero => exfalso; simp_all only [zero_ne_one, not_false_eq_true, Finset.card_eq_zero, Finset.notMem_empty]
-    | succ m =>
-      cases m with
-      | zero => -- card = 1
-        exfalso; exact h_not_singleton (by simp [h_card_cases])
-      | succ m' => -- card = m' + 2 ≥ 2
-        apply Nat.le_add_left
-
-  -- 3. Obtain the smaller problem `F'` using the `_get`
-  obtain ⟨F', hF'⟩ := Qcorr_ge2_hasHead_get F a h_geq2 hh h_has_head
-  rcases hF' with ⟨hF'_card, h_ineq⟩
-
-  -- The goal is `Qcorr (n+1) F`, which unfolds to `F.NDS_corr (n+1) ≤ 0`.
-  -- We use the induction hypothesis `hQ_forbid` on the smaller problem `F'`.
-  -- 4. First, show `F'` has the correct card size for the IH.
-  have hF'_card_n : F'.H.U.card = n := by
-    rw [hF'_card, hn_card]
-    simp -- n + 1 - 1 = n
-
-  -- 5. Apply the induction hypothesis to F'.
-  specialize hQ_forbid F' hF'_card_n
-  -- Now `hQ_forbid` is the proposition `Qcorr n F'`, which is `F'.NDS_corr n ≤ 0`.
-
-  -- 6. Chain the inequalities to prove the goal.
-  -- `h_ineq` (from `_get`) gives `F.NDS_corr (n+1) ≤ F'.NDS_corr n`.
-  -- `hQ_forbid` (from IH) gives `F'.NDS_corr n ≤ 0`.
-  rw [hn_card] at h_ineq
-  dsimp [Qcorr]
-  intro hn
-  exact Int.le_trans h_ineq (hQ_forbid hF'_card_n)
-
-
-noncomputable def Qcorr_ge2_headFree_get {α :Type} [DecidableEq α](F : HornWithForbid α) (a: α) (geq2: F.F.card ≥ 2) (ha:a ∈ F.F) (hs:¬HasHead1 F a):
-    ∃ P':Pack0 α , P'.H.U.card = F.H.U.card - 1 ∧ (F.NDS_corr F.H.U.card) ≤ (NDS P'.H.U.card P'.H.FixSet)
-:= sorry
+     sorry
 
 theorem Qcorr_ge2_headFree
   (n : Nat) (F : HornWithForbid α) (a : α) (ha : a ∈ F.F):
   (∀ P:Pack0 α, P.H.U.card = n → Q n P) →
   F.H.U.card = n + 1 → ¬IsForbidSingleton F → IsSC1 F a → ¬HasHead1 F a →
   Qcorr (n+1) F := by
-  intro hQ hn hs hSC hh
-  have geq2: F.F.card ≥ 2:= by
-    dsimp [IsForbidSingleton] at hs
-    have ne := HornWithForbid.F_nonempty (α := α) F
-    apply (Nat.two_le_iff F.F.card).mpr
-    simp_all only [ne_eq, Finset.card_eq_zero, not_false_eq_true, and_true]
-    apply Aesop.BuiltinRules.not_intro
-    intro a_1
-    simp_all only [Finset.notMem_empty]
-  obtain ⟨P',hP'⟩ := Qcorr_ge2_headFree_get F a geq2 ha hh
-  dsimp [Qcorr]
-  intro hn
-  specialize hQ P'
-  have :P'.H.U.card = n := by
-    simp_all only [add_tsub_cancel_right, forall_const]
-  specialize hQ this
-  dsimp [Q] at hQ
-  specialize hQ this
-  rw [←hn]
-  rw [←this] at hQ
-  rcases hP' with ⟨h1,h2⟩
-  dsimp [HornWithForbid.NDS_corr] at h2
-  dsimp [HornWithForbid.BaseC] at h2
-  rw [h1] at hQ
-  rw [h1] at h2
-  exact Int.le_trans h2 hQ
-
---禁止集合の閉包をとってもNDSが変わらないというものは、HornNormalizeにおいている。
+  sorry
 
 omit [DecidableEq α] in
 /-- Card-split helper: any finite set has either card = 0, card = 1, or card ≥ 2.
@@ -635,21 +523,5 @@ lemma card_cases
   have h : A.card = 0 ∨ A.card = 1 ∨ 2 ≤ A.card := by
     omega
   exact h
-
-----これに気が付かずにQ_traceとして再実装した。こっちを消す。
-
-noncomputable def tracePack0 (P : Pack0 α) (a : α) : Pack0 α :=
-  { H := P.H.trace a
-    hDR1 := by
-      -- DR1 is preserved by trace (proved in the Horn layer).
-      have hDR1' : HornNF.DR1 P.H := by
-        simpa [HornNF.IsDR1, HornNF.DR1] using P.hDR1
-      have hDR1'' : HornNF.DR1 (HornNF.trace P.H a) :=
-        HornNF.trace_preserves_DR1 (H := P.H) (u := a) hDR1'
-      simpa [HornNF.IsDR1, HornNF.DR1] using hDR1''
-    hNEP := by exact P.H.trace_preserves_NEP a P.hNEP
-  }
-
-
 
 end Dr1nds
