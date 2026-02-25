@@ -1,6 +1,6 @@
 name = "dr1nds"
 version = "0.1.0"
-defaultTargets = ["dr1nds"]
+defaultTargets = ["Dr1nds", "dr1nds"]
 
 [[lean_lib]]
 name = "Dr1nds"
