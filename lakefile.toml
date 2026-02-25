@@ -12,9 +12,9 @@ root = "Main"
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
-rev  = "v4.26.0"
+rev  = "v4.28.0"
 
 [[require]]
 name = "LeanCopilot"
 git  = "https://github.com/lean-dojo/LeanCopilot.git"
-rev = "v4.26.0"
+rev = "v4.28.0"
